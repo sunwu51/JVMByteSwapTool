@@ -1,0 +1,134 @@
+:root {
+  --identifierColour: #E06B75;
+  --tagColour: #8E94A1;
+  --equals: #ABB2BF;
+  --valColour: #92BA76;
+  --codeBg: #282C34;
+  --lineColours: #363C49;
+  --commentColour: #6A7181;
+  --linkColour: #56B6C2;
+  --hoverColour: #518BFF;
+}
+
+.identifier {
+  color: var(--identifierColour);
+}
+
+
+
+.identifier::before {
+  display: inline-block;
+  content: '<';
+  color: var(--tagColour);
+}
+
+.identifier::after {
+  display: inline-block;
+  content: '>';
+  color: var(--tagColour);
+}
+
+.value {
+  color: var(--valColour);
+}
+
+.attribute,
+.value,
+.identifier {
+  display: inline-block;
+}
+
+.value::before {
+  content: '"';
+  color: var(--valColour);
+  display: inline-block;
+
+}
+
+.value::after {
+  content: '"';
+  color: var(--valColour);
+  display: inline-block;
+
+}
+
+.value.link {
+  color: var(--linkColour);
+  text-decoration: underline;
+}
+
+.attribute {
+  color: #D19A66;
+  text-decoration: none !important;
+  margin-left: 0.5em;
+}
+
+.attribute::after {
+  content: '=';
+  color: var(--equals);
+}
+
+.syntaxbox {
+  font-family: monaco, Consolas, Lucida Console, monospace;
+  background-color: var(--codeBg);
+  padding: 20px;
+  display: inline-flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  counter-reset: lines;
+  border-radius: 10px;
+  color: #A0A8B5;
+}
+
+.identifier.end::before {
+  content: '</';
+}
+
+.newline {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.newline:hover {
+  background-color: var(--lineColours);
+}
+
+.newline::before {
+  color: var(--tagColour);
+  padding-right: 3em;
+  counter-increment: lines;
+  content: counter(lines);
+}
+
+.newline[data-level='1']>span:first-of-type {
+  padding-left: 1.5em;
+}
+
+.newline[data-level='2']>span:first-of-type {
+  padding-left: 3.5em;
+}
+
+.newline[data-level='3']>span:first-of-type {
+  padding-left: 5em;
+}
+
+.comment {
+  color: var(--commentColour);
+  font-style: italic;
+}
+
+.comment::before {
+  content: '<!--';
+}
+
+.comment::after {
+  content: '-->';
+}
+
+.identifier:not([class*="end"]):hover,
+.identifier:not([class*="end"]):hover+.identifier.end {
+  text-decoration: 1.5px underline;
+  text-decoration-color: var(--hoverColour);
+}

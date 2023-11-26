@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vm proxy</title>
+    <link rel="stylesheet" href="./prism.css"/>
+    <script src="./prism.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/themes/light.css" />
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/shoelace-autoloader.js"></script>
+
+</head>
+<body>
+    <sl-alert open id="alert">
+    </sl-alert>
+    <script>
+        // fetch("/jvmInfo", {method:"POST"}).then(res=>res.text()).then(text => document.getElementById("alert").textContent = text)
+    </script>
+    <sl-tab-group>
+        <sl-tab slot="nav" panel="retransform">字节码替换</sl-tab>
+        <sl-tab slot="nav" panel="spring">Spring</sl-tab>
+
+        <sl-tab-panel name="retransform">
+            <sl-card class="card-overview">
+                <div slot="header">
+                    <strong>Watch</strong><br />
+                    watch的原理也是字节码替换，进行环绕增强，打印函数执行时间和入参返回值。
+                    <pre><code class="language-java">// 在函数运行开始执行
+long start = System.currentTimeMillis();
+......
+// 在函数运行结束执行
+long end = System.currentTimeMillis();
+long duration = end - start;
+String req = com.example.vmproxy.Global.objectMapper.writeValueAsString($args);
+String res = com.example.vmproxy.Global.objectMapper.writeValueAsString($_);
+// 打印log并传到web端
+log("cost:"+duration+"ms,req:"+req+",res:"+res);
+</code></pre>
+                </div>
+                <div>
+                    <sl-input label="请输入方法签名"  placeholder="全限定类名#方法名"></sl-input>
+                    <sl-button variant="primary">watch</sl-button>
+                </div>
+            </sl-card>
+
+        </sl-tab-panel>
+        <sl-tab-panel name="watch">This is the custom tab panel.</sl-tab-panel>
+        <sl-tab-panel name="retransform">This is the advanced tab panel.</sl-tab-panel>
+        <sl-tab-panel name="spring">This is a disabled tab panel.</sl-tab-panel>
+    </sl-tab-group>
+</body>
+<script>
+    var ws = new WebSocket(`ws://${window.location.hostname}:18001`);
+    var heartbeats = setInterval(() => ws.send(JSON.stringify({id: "_", type: "PING"})), 1000);
+    ws.onmessage = (msg) => {
+        var m = JSON.parse(msg.data);
+        if (m.type == 'PING' || m.type == 'PONG') {return}
+        console.log(m);
+    }
+    ws.onclose = console.log
+    function uuid() {
+        var s = [];
+        var hexDigits = "0123456789abcdef";
+        for (var i = 0; i < 36; i++) {
+            s[i] = hexDigits.substr(Math.floor(Math.random() * 0x10), 1);
+        }
+        s[14] = "4"; // bits 12-15 of the time_hi_and_version field to 0010
+        s[19] = hexDigits.substr((s[19] & 0x3) | 0x8, 1); // bits 6-7 of the clock_seq_hi_and_reserved to 01
+        s[8] = s[13] = s[18] = s[23] = "-";
+
+        var uuid = s.join("");
+        return uuid;
+    }
+</script>
+</html>
