@@ -23,7 +23,7 @@
           <transformers>
             <transformer>
               <manifestEntries>
-                <Agent-Class>com.example.vmproxy.App</Agent-Class>
+                <Agent-Class>w.App</Agent-Class>
                 <Can-Retransform-Classes>true</Can-Retransform-Classes>
               </manifestEntries>
             </transformer>

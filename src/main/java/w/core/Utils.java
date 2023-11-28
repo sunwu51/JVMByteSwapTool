@@ -1,4 +1,4 @@
-package com.example.vmproxy.core;
+package w.core;
 
 import lombok.extern.slf4j.Slf4j;
 

@@ -1,6 +1,4 @@
-package com.example.vmproxy;
-
-import java.io.Serializable;
+package w;
 
 /**
  * @author Frank

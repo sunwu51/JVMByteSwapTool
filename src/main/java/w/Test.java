@@ -1,6 +1,6 @@
-package com.example.vmproxy;
+package w;
 
-import com.example.vmproxy.web.message.Message;
+import w.web.message.Message;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 /**
@@ -12,7 +12,7 @@ public class Test {
         String json = "{\n" +
                 "    \"id\": \"111\",\n" +
                 "    \"type\":\"WATCH\",\n" +
-                "    \"signature\": \"com.example.vmproxy.A#run\"\n" +
+                "    \"signature\": \"w.A#run\"\n" +
                 "}";
 
         Message m = Global.objectMapper.readValue(json, Message.class);

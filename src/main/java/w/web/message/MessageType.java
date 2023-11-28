@@ -1,4 +1,4 @@
-package com.example.vmproxy.web.message;
+package w.web.message;
 
 /**
  * @author Frank
@@ -11,6 +11,8 @@ public enum MessageType {
     CHANGE_BODY,
 
     WATCH,
+
+    EXEC,
 
     /**
      * 通信的心跳類型

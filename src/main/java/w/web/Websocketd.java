@@ -1,18 +1,16 @@
-package com.example.vmproxy.web;
+package w.web;
 
-import com.example.vmproxy.Global;
-import com.example.vmproxy.core.MethodId;
-import com.example.vmproxy.core.Retransformer;
-import com.example.vmproxy.web.message.ChangeBodyMessage;
-import com.example.vmproxy.web.message.Message;
-import com.example.vmproxy.web.message.PongMessage;
-import com.example.vmproxy.web.message.WatchMessage;
+import w.Global;
+import w.core.MethodId;
+import w.core.Retransformer;
+import w.web.message.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fi.iki.elonen.NanoWSD;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 /**
  * @author Frank
@@ -67,10 +65,6 @@ public class Websocketd extends NanoWSD {
                     Message message = objectMapper.readValue(msg, Message.class);
                     Global.socketCtx.set(this);
                     Global.traceIdCtx.set(message.getId());
-                    if (message.getId() != null && !message.getId().equals("_")) {
-                        Global.socketMap.put(message.getId(), this);
-                        System.out.println(Global.socketMap);
-                    }
                     switch (message.getType()) {
                         // 心跳包
                         case PING:
@@ -91,6 +85,11 @@ public class Websocketd extends NanoWSD {
                             assert arr.length == 2;
                             methodId = new MethodId(arr[0], arr[1], null);
                             retransformer.watch(methodId);
+                            break;
+                        case EXEC:
+                            ExecMessage execMessage = (ExecMessage) message;
+                            retransformer.changeExec(execMessage.getBody());
+                            Global.exec();
                             break;
                         default:
                             Global.info("message type not support");

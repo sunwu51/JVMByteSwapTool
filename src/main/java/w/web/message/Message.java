@@ -1,4 +1,4 @@
-package com.example.vmproxy.web.message;
+package w.web.message;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -16,7 +16,8 @@ import java.util.UUID;
         @JsonSubTypes.Type(value = ChangeBodyMessage.class, name = "CHANGE_BODY"),
         @JsonSubTypes.Type(value = PingMessage.class, name = "PING"),
         @JsonSubTypes.Type(value = PongMessage.class, name = "PONG"),
-        @JsonSubTypes.Type(value = WatchMessage.class, name = "WATCH")
+        @JsonSubTypes.Type(value = WatchMessage.class, name = "WATCH"),
+        @JsonSubTypes.Type(value = ExecMessage.class, name = "EXEC")
 })
 @Data
 public abstract class Message {

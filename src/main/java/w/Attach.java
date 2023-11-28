@@ -1,8 +1,7 @@
-package com.example.vmproxy;
+package w;
 
-import com.example.vmproxy.web.Httpd;
+import w.web.Httpd;
 import com.sun.tools.attach.*;
-import com.sun.tools.jdi.VirtualMachineManagerImpl;
 
 import java.io.IOException;
 import java.util.List;
@@ -36,7 +35,7 @@ public class Attach {
 
             String agentJarPath = "C:\\Users\\sunwu\\Desktop\\code\\Vmproxy\\target\\vmproxy-0.0.1-SNAPSHOT.jar";
 
-            String agentArgs = "hello";
+            String agentArgs =  args == null || args.length == 0 ? "8080" : args[0];
 
             jvm.loadAgent(agentJarPath, agentArgs);
             while (true) {
