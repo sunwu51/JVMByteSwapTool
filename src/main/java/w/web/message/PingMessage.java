@@ -1,4 +1,4 @@
-package com.example.vmproxy.web.message;
+package w.web.message;
 
 import lombok.Data;
 

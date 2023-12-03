@@ -4,50 +4,95 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>vm proxy</title>
+    <!--    nouse-->
     <link rel="stylesheet" href="./prism.css"/>
     <script src="./prism.js"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css" integrity="sha512-uf06llspW44/LZpHzHT6qBOIVODjWtv4MxCricRxkzvopAlSWnTf6hpZTFxuuZcuNE9CBQhqE0Seu1CoRk84nQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js" integrity="sha512-8RnEqURPUc5aqFEN04aQEiPlSAdE0jlFS/9iGgUyNtwFnSKCXhmB6ZTNl7LnDtDWKabJIASzXrzD0K+LYexU9g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/theme/darcula.min.css" integrity="sha512-kqCOYFDdyQF4JM8RddA6rMBi9oaLdR0aEACdB95Xl1EgaBhaXMIe8T4uxmPitfq4qRmHqo+nBU2d1l+M4zUx1g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/xml/xml.min.js" integrity="sha512-LarNmzVokUmcA7aUDtqZ6oTS+YXmUKzpGdm8DxC46A6AHu+PQiYCUlwEGWidjVYMo/QXZMFMIadZtrkfApYp/g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/clike/clike.min.js" integrity="sha512-l8ZIWnQ3XHPRG3MQ8+hT1OffRSTrFwrph1j1oc1Fzc9UKVGef5XN9fdO0vm3nW0PRgQ9LJgck6ciG59m69rvfg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/theme/duotone-light.min.css" integrity="sha512-xf8h6rqzUr4ZJBR/GKic+RSPJUHjPF1cFe6kGi5vgrTbcqIaRd4VaeniV/d8oM7ln5tSIV7KrQ5DxdeYO6zeCg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/themes/light.css" />
     <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/shoelace-autoloader.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/theme/ayu-dark.min.css" integrity="sha512-mV3RUXi1gt22jDb4UyRBFhZVFgAIiOfRE6ul+2l1Hcj6glyg6x4xlnjPH+neGm/t6XrFmsMRu4++McQu0asjqg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 
+    <style>
+        .CodeMirror
+        {
+            line-height: 25px;
+        }
+
+    </style>
 </head>
 <body>
     <sl-alert open id="alert">
+
     </sl-alert>
-    <script>
-        // fetch("/jvmInfo", {method:"POST"}).then(res=>res.text()).then(text => document.getElementById("alert").textContent = text)
-    </script>
-    <sl-tab-group>
-        <sl-tab slot="nav" panel="retransform">字节码替换</sl-tab>
-        <sl-tab slot="nav" panel="spring">Spring</sl-tab>
+    <div style="display: flex">
+        <script>
+            // fetch("/jvmInfo", {method:"POST"}).then(res=>res.text()).then(text => document.getElementById("alert").textContent = text)
+        </script>
+        <sl-tab-group>
+            <sl-tab slot="nav" panel="retransform">字节码替换</sl-tab>
+            <sl-tab slot="nav" panel="spring">Spring</sl-tab>
 
-        <sl-tab-panel name="retransform">
-            <sl-card class="card-overview">
-                <div slot="header">
-                    <strong>Watch</strong><br />
-                    watch的原理也是字节码替换，进行环绕增强，打印函数执行时间和入参返回值。
-                    <pre><code class="language-java">// 在函数运行开始执行
-long start = System.currentTimeMillis();
-......
-// 在函数运行结束执行
-long end = System.currentTimeMillis();
-long duration = end - start;
-String req = com.example.vmproxy.Global.objectMapper.writeValueAsString($args);
-String res = com.example.vmproxy.Global.objectMapper.writeValueAsString($_);
-// 打印log并传到web端
-log("cost:"+duration+"ms,req:"+req+",res:"+res);
-</code></pre>
-                </div>
-                <div>
-                    <sl-input label="请输入方法签名"  placeholder="全限定类名#方法名"></sl-input>
-                    <sl-button variant="primary">watch</sl-button>
-                </div>
-            </sl-card>
+            <sl-tab-panel name="retransform">
+                <sl-card class="card-overview">
+                    <div slot="header">
+                        <strong>Watch</strong><br />
+                        watch的原理也是字节码替换，进行环绕增强，打印函数执行时间和入参返回值。<br>
+                        与cglib不同，并非用子类代理而是直接修改当前类的字节码
+                        <textarea id="watch-text">{
+    // 在函数运行开始执行
+    long start = System.currentTimeMillis();
+    ......
+    // 在函数运行结束执行
+    long end = System.currentTimeMillis();
+    long duration = end - start;
+    // $args是入参数组， $_是原返回值指针
+    String req = w.Global.objectMapper.writeValueAsString($args);
+    String res = w.Global.objectMapper.writeValueAsString($_);
+    // 打印log并传到web端
+    log("cost:"+duration+"ms,req:"+req+",res:"+res);
+    return $_;
+}</textarea>
+                        <script>
+                            CodeMirror.fromTextArea(document.getElementById("watch-text"), {
+                                mode: 'text/x-java',
+                                theme: 'darcula',
+                                lineNumbers: true,
+                                readOnly : true,
+                            }).setSize("100%", "100%")
+                        </script>
+                    </div>
+                    <div>
+                        <sl-input label="请输入方法签名"  placeholder="全限定类名#方法名"></sl-input>
+                        <sl-button variant="primary">watch</sl-button>
+                    </div>
+                </sl-card>
 
-        </sl-tab-panel>
-        <sl-tab-panel name="watch">This is the custom tab panel.</sl-tab-panel>
-        <sl-tab-panel name="retransform">This is the advanced tab panel.</sl-tab-panel>
-        <sl-tab-panel name="spring">This is a disabled tab panel.</sl-tab-panel>
-    </sl-tab-group>
+            </sl-tab-panel>
+            <sl-tab-panel name="watch">This is the custom tab panel.</sl-tab-panel>
+            <sl-tab-panel name="retransform">This is the advanced tab panel.</sl-tab-panel>
+            <sl-tab-panel name="spring">This is a disabled tab panel.</sl-tab-panel>
+        </sl-tab-group>
+        <div style="border: solid 1px salmon; width: 100%">
+            <textarea id="log-text"></textarea>
+            <script>
+                var logText = document.getElementById('log-text');
+                var logMirror = CodeMirror.fromTextArea(logText, {
+                    mode: 'text/x-java',
+                    theme: 'duotone-light',
+                    lineNumbers: true,
+                    readOnly : true,
+                })
+                logMirror.setSize(null, "600px")
+                logMirror.setValue('var msg = "Hi";\n\n\n\n\nn\n\nn\n\\n\n\n\\n\n\n\n\nn\n\n\n\dfdsafdsaf\nn\n\\n\n\n\\n\n\n\n\nn\n\n\n\dfdsafdsaf\nn\n\\n\n\n\\n\n\n\n\nn\n\n\n\dfdsafdsaf');
+            </script>
+        </div>
+    </div>
 </body>
 <script>
     var ws = new WebSocket(`ws://${window.location.hostname}:18001`);

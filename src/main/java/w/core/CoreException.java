@@ -1,4 +1,4 @@
-package com.example.vmproxy.core;
+package w.core;
 
 public class CoreException extends RuntimeException {
 }

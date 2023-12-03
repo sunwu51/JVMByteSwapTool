@@ -1,4 +1,4 @@
-package com.example.vmproxy.core;
+package w.core;
 
 public enum ResultCode {
     SUCCESS(0, "SUCCESS"),

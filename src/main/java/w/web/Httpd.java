@@ -1,4 +1,4 @@
-package com.example.vmproxy.web;
+package w.web;
 
 import fi.iki.elonen.NanoHTTPD;
 import lombok.extern.slf4j.Slf4j;

@@ -1,7 +1,7 @@
-package com.example.vmproxy;
+package w;
 
-import com.example.vmproxy.web.message.LogMessage;
-import com.example.vmproxy.web.message.Message;
+import w.web.message.LogMessage;
+import w.web.message.Message;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fi.iki.elonen.NanoWSD;
@@ -15,6 +15,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class Global {
     public static Instrumentation instrumentation;
+
+    public static Object springApplicationContext;
 
     public final static ThreadLocal<NanoWSD.WebSocket> socketCtx = new ThreadLocal<>();
     public final static ThreadLocal<String> traceIdCtx = new ThreadLocal<>();
@@ -30,9 +32,6 @@ public class Global {
             NanoWSD.WebSocket ws = socketMap.get(traceIdCtx.get());
             socketCtx.set(ws);
         }
-        System.out.println(traceIdCtx.get());
-        System.out.println(socketMap);
-        System.out.println(socketMap.get(traceIdCtx.get()));
 
         if (socketCtx.get() != null && socketCtx.get().isOpen()) {
             try {
@@ -46,8 +45,7 @@ public class Global {
         }
     }
 
-    public static void main(String[] args) throws JsonProcessingException {
-        Message m = objectMapper.readValue("{\"id\":\"4408e127-f882-4ebb-9184-9e4ce5450c49\",\"type\":\"CHANGE_BODY\",\"paramTypes\":[],\"body\":\"{System.out.println(\\\"A$run\\\" + new java.util.Date());}\",\"className\":\"attach.A\",\"method\":\"run\"}", Message.class);
-        System.out.println(m);
+    public static void exec() {
+        info("exec....");
     }
 }
