@@ -1,6 +1,8 @@
 package w;
 
 import com.sun.tools.attach.*;
+
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Scanner;
@@ -52,8 +54,8 @@ public class Attach {
         System.out.printf("============The PID is %s%n", pid);
         System.out.println(">>>>>>>>>>>>Please enter the spring web server port, if not spring input enter key to skip");
 
+        scanner.nextLine();
         String line = scanner.nextLine();
-        line = scanner.nextLine();
 
         if (line != null && !line.trim().isEmpty()) {
             try {
@@ -65,7 +67,8 @@ public class Attach {
         }
 
         VirtualMachine jvm = VirtualMachine.attach(pid);
-        String agentJarPath = "swapper.jar";
+        File file = new File("swapper.jar");
+        String agentJarPath = file.getAbsoluteFile().getPath();
         String agentArgs = String.format("port=%s", port);
         jvm.loadAgent(agentJarPath, agentArgs);
         jvm.detach();
