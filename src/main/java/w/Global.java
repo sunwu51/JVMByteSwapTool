@@ -1,5 +1,8 @@
 package w;
 
+import javassist.ClassPool;
+import w.core.MethodId;
+import w.core.Retransformer;
 import w.web.message.LogMessage;
 import w.web.message.Message;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -24,6 +27,14 @@ public class Global {
     public final static ObjectMapper objectMapper = new ObjectMapper();
 
     public final static Map<String, NanoWSD.WebSocket> socketMap = new ConcurrentHashMap<>();
+
+    public final static Map<String, Map<MethodId, Retransformer>> traceId2MethodId2Trans = new ConcurrentHashMap<>();
+
+    public final static Map<MethodId, String> methodId2TraceId = new ConcurrentHashMap<>();
+
+    public static int wsPort = 0;
+
+    public static ClassPool classPool = ClassPool.getDefault();
 
     public static void info(String content) {
         log.info(content);

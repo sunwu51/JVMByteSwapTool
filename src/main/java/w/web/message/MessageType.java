@@ -1,6 +1,8 @@
 package w.web.message;
 
 /**
+ * Message Type Enum
+ *
  * @author Frank
  * @date 2023/11/25 21:58
  */

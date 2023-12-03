@@ -2,7 +2,7 @@ package w.web;
 
 import w.Global;
 import w.core.MethodId;
-import w.core.Retransformer;
+import w.core.Swapper;
 import w.web.message.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,7 +10,6 @@ import fi.iki.elonen.NanoWSD;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
-import java.util.ArrayList;
 
 /**
  * @author Frank
@@ -21,7 +20,7 @@ import java.util.ArrayList;
 public class Websocketd extends NanoWSD {
     ObjectMapper objectMapper = new ObjectMapper();
 
-    Retransformer retransformer = Retransformer.getInstance();
+    Swapper swapper = Swapper.getInstance();
 
     public Websocketd(int port) {
         super(port);
@@ -65,30 +64,30 @@ public class Websocketd extends NanoWSD {
                     Message message = objectMapper.readValue(msg, Message.class);
                     Global.socketCtx.set(this);
                     Global.traceIdCtx.set(message.getId());
+                    if (!"_".equals(message.getId())) {
+                        Global.socketMap.put(message.getId(), this);
+                    }
                     switch (message.getType()) {
-                        // 心跳包
                         case PING:
                             PongMessage m = new PongMessage();
                             m.setId(message.getId());
                             this.send(objectMapper.writeValueAsString(m));
                             break;
-                        // 修改方法的body
                         case CHANGE_BODY:
                             ChangeBodyMessage changeBodyMessage = (ChangeBodyMessage) message;
                             MethodId methodId = new MethodId(changeBodyMessage.getClassName(), changeBodyMessage.getMethod(), changeBodyMessage.getParamTypes());
-                            retransformer.changeBody(methodId,changeBodyMessage.getBody());
+                            swapper.changeBody(methodId,changeBodyMessage.getBody());
                             break;
-                        // 监控方法的执行时间和入参返回值
                         case WATCH:
                             WatchMessage watchMessage = (WatchMessage) message;
                             String[] arr = watchMessage.getSignature().split("#");
                             assert arr.length == 2;
                             methodId = new MethodId(arr[0], arr[1], null);
-                            retransformer.watch(methodId);
+                            swapper.watch(methodId, watchMessage.isUseJson());
                             break;
                         case EXEC:
                             ExecMessage execMessage = (ExecMessage) message;
-                            retransformer.changeExec(execMessage.getBody());
+                            swapper.changeExec(execMessage.getBody());
                             Global.exec();
                             break;
                         default:

@@ -3,11 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>vm proxy</title>
-    <!--    nouse-->
-    <link rel="stylesheet" href="./prism.css"/>
-    <script src="./prism.js"></script>
-
+    <title>Swapper</title>
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css" integrity="sha512-uf06llspW44/LZpHzHT6qBOIVODjWtv4MxCricRxkzvopAlSWnTf6hpZTFxuuZcuNE9CBQhqE0Seu1CoRk84nQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js" integrity="sha512-8RnEqURPUc5aqFEN04aQEiPlSAdE0jlFS/9iGgUyNtwFnSKCXhmB6ZTNl7LnDtDWKabJIASzXrzD0K+LYexU9g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/theme/darcula.min.css" integrity="sha512-kqCOYFDdyQF4JM8RddA6rMBi9oaLdR0aEACdB95Xl1EgaBhaXMIe8T4uxmPitfq4qRmHqo+nBU2d1l+M4zUx1g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -17,104 +14,155 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/themes/light.css" />
     <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/shoelace-autoloader.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/theme/ayu-dark.min.css" integrity="sha512-mV3RUXi1gt22jDb4UyRBFhZVFgAIiOfRE6ul+2l1Hcj6glyg6x4xlnjPH+neGm/t6XrFmsMRu4++McQu0asjqg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-
     <style>
         .CodeMirror
         {
             line-height: 25px;
         }
+        #left-container{
+            flex-basis: 50%;
+            line-height: 30px;
+        }
+        #right-container{
+            flex-basis: 50%;
+        }
+        .card-overview{
+            width: 100%;
+        }
 
     </style>
 </head>
 <body>
-    <sl-alert open id="alert">
-
+    <sl-alert variant="success" open>
+        <sl-icon slot="icon" name="check2-circle"></sl-icon>
+        <strong>被修改的类列表:</strong><br />
+        <b id="activeMethods"></b>
     </sl-alert>
-    <div style="display: flex">
-        <script>
-            // fetch("/jvmInfo", {method:"POST"}).then(res=>res.text()).then(text => document.getElementById("alert").textContent = text)
-        </script>
-        <sl-tab-group>
-            <sl-tab slot="nav" panel="retransform">字节码替换</sl-tab>
-            <sl-tab slot="nav" panel="spring">Spring</sl-tab>
 
-            <sl-tab-panel name="retransform">
+    <div style="display: flex">
+        <div id="left-container">
+            <sl-tab-group>
+            <sl-tab slot="nav" panel="watch">Watch</sl-tab>
+            <sl-tab slot="nav" panel="change-body">ChangeBody</sl-tab>
+            <sl-tab slot="nav" panel="execute">Execute</sl-tab>
+            <sl-tab-panel name="watch">
                 <sl-card class="card-overview">
                     <div slot="header">
                         <strong>Watch</strong><br />
                         watch的原理也是字节码替换，进行环绕增强，打印函数执行时间和入参返回值。<br>
-                        与cglib不同，并非用子类代理而是直接修改当前类的字节码
-                        <textarea id="watch-text">{
-    // 在函数运行开始执行
-    long start = System.currentTimeMillis();
-    ......
-    // 在函数运行结束执行
-    long end = System.currentTimeMillis();
-    long duration = end - start;
-    // $args是入参数组， $_是原返回值指针
-    String req = w.Global.objectMapper.writeValueAsString($args);
-    String res = w.Global.objectMapper.writeValueAsString($_);
-    // 打印log并传到web端
-    log("cost:"+duration+"ms,req:"+req+",res:"+res);
-    return $_;
-}</textarea>
-                        <script>
-                            CodeMirror.fromTextArea(document.getElementById("watch-text"), {
-                                mode: 'text/x-java',
-                                theme: 'darcula',
-                                lineNumbers: true,
-                                readOnly : true,
-                            }).setSize("100%", "100%")
-                        </script>
+                        与cglib不同，并非用子类代理而是用javaassist直接修改当前类的字节码
+                        <textarea id="watch-text"></textarea>
                     </div>
                     <div>
-                        <sl-input label="请输入方法签名"  placeholder="全限定类名#方法名"></sl-input>
-                        <sl-button variant="primary">watch</sl-button>
+                        <sl-input label="请输入方法签名" id="wt-input1" placeholder="全限定类名#方法名"></sl-input>
+                        <sl-radio-group label="出入参的打印格式" id="wt-radio1" value="1">
+                            <sl-radio value="1">toString</sl-radio>
+                            <sl-radio value="2">toJson</sl-radio>
+                        </sl-radio-group>
+                        <sl-button variant="primary" id="wt-btn">watch</sl-button>
                     </div>
                 </sl-card>
-
             </sl-tab-panel>
-            <sl-tab-panel name="watch">This is the custom tab panel.</sl-tab-panel>
-            <sl-tab-panel name="retransform">This is the advanced tab panel.</sl-tab-panel>
-            <sl-tab-panel name="spring">This is a disabled tab panel.</sl-tab-panel>
+            <sl-tab-panel name="change-body">
+                <sl-card class="card-overview">
+                    <div slot="header">
+                        <strong>ChangeBody</strong><br />
+                        热替换整个方法的代码，原理是用javaassist直接修改当前类当前方法的字节码，并重新加载类
+                    </div>
+                    <div>
+                        <sl-input id="cb-input1" label="请输入方法签名"  placeholder="全限定类名#方法名"></sl-input>
+                        <sl-input id="cb-input2" label="请输入方法参数类型列表，英文逗号隔开"
+                                  placeholder="类名1, 类名2..."
+                                  help-text="类名使用全限定类名例如com.example.Person，java.lang包下的可以使用简写例如int,Integer,String">
+                        </sl-input>
+                        <textarea id="cb-text"></textarea>
+                        <sl-button variant="primary" id="cb-btn">ChangeBody</sl-button>
+                    </div>
+                </sl-card>
+            </sl-tab-panel>
+            <sl-tab-panel name="execute">
+                <sl-card class="card-overview">
+                    <div slot="header">
+                        <strong>Execute</strong><br />
+                        用一个新线程去运行一段代码，对于类型需要使用全限定类名<br>
+                        可以查看下方的examples来使用
+                    </div>
+                    <div>
+                        <textarea id="ex-text"></textarea>
+                        <sl-button variant="primary" id="ex-btn">Execute</sl-button>
+                    </div>
+                </sl-card>
+                <sl-card class="card-overview">
+                    <div slot="header">
+                        <strong>Examples</strong><br />
+                    </div>
+                    <div>
+                        注意要使用全限定类名进行编码，java.lang下的不需要（注意：import只是编译器的语法糖）
+                        <textarea id="execute-example-text1"></textarea>
+                        内置了一些有用的方法和变量
+                        <textarea id="execute-example-text2"></textarea>
+                    </div>
+                </sl-card>
+            </sl-tab-panel>
         </sl-tab-group>
-        <div style="border: solid 1px salmon; width: 100%">
+        </div>
+        <div id="right-container">
             <textarea id="log-text"></textarea>
-            <script>
-                var logText = document.getElementById('log-text');
-                var logMirror = CodeMirror.fromTextArea(logText, {
-                    mode: 'text/x-java',
-                    theme: 'duotone-light',
-                    lineNumbers: true,
-                    readOnly : true,
-                })
-                logMirror.setSize(null, "600px")
-                logMirror.setValue('var msg = "Hi";\n\n\n\n\nn\n\nn\n\\n\n\n\\n\n\n\n\nn\n\n\n\dfdsafdsaf\nn\n\\n\n\n\\n\n\n\n\nn\n\n\n\dfdsafdsaf\nn\n\\n\n\n\\n\n\n\n\nn\n\n\n\dfdsafdsaf');
-            </script>
         </div>
     </div>
 </body>
 <script>
-    var ws = new WebSocket(`ws://${window.location.hostname}:18001`);
-    var heartbeats = setInterval(() => ws.send(JSON.stringify({id: "_", type: "PING"})), 1000);
-    ws.onmessage = (msg) => {
-        var m = JSON.parse(msg.data);
-        if (m.type == 'PING' || m.type == 'PONG') {return}
-        console.log(m);
-    }
-    ws.onclose = console.log
-    function uuid() {
-        var s = [];
-        var hexDigits = "0123456789abcdef";
-        for (var i = 0; i < 36; i++) {
-            s[i] = hexDigits.substr(Math.floor(Math.random() * 0x10), 1);
-        }
-        s[14] = "4"; // bits 12-15 of the time_hi_and_version field to 0010
-        s[19] = hexDigits.substr((s[19] & 0x3) | 0x8, 1); // bits 6-7 of the clock_seq_hi_and_reserved to 01
-        s[8] = s[13] = s[18] = s[23] = "-";
+    initCodeMirror("watch-text", true, "{\n" +
+        "    // 在函数运行开始执行\n" +
+        "    long start = System.currentTimeMillis();\n" +
+        "    ......\n" +
+        "    // 在函数运行结束执行\n" +
+        "    long end = System.currentTimeMillis();\n" +
+        "    long duration = end - start;\n" +
+        "    // $args是入参数组， $_是原返回值指针\n" +
+        "    String req = w.Global.objectMapper.writeValueAsString($args);\n" +
+        "    String res = w.Global.objectMapper.writeValueAsString($_);\n" +
+        "    // 打印log并传到web端\n" +
+        "    log(\"cost:\"+duration+\"ms,req:\"+req+\",res:\"+res);\n" +
+        "    return $_;\n" +
+        "}");
+    var cbCode = initCodeMirror("cb-text", false, "{\n\t// write some java code\n}");
+    var exCode = initCodeMirror("ex-text", false, "{\n\t// write some java code to run\n}");
 
-        var uuid = s.join("");
-        return uuid;
+    initCodeMirror("execute-example-text1", true, "{\n" +
+        "\tSystem.out.println(UUID.randomUUID());\n" +
+        "  \tSystem.out.println(new java.awt.Point(100,200));\n" +
+        "}");
+    initCodeMirror("execute-example-text2", true, "{\n" +
+        "\t// 可直接用info方法做debug\n" +
+        "    info(\"打印log，且回传前端显示在右边→_→\");\n" +
+        "  \n" +
+        "    // 直接用ctx变量，是注入的spring上下文，但注意getBean返回Object\n" +
+        "    // 需要类型转换\n" +
+        "    com.example.UserMapper mapper = (com.example.UserMapper)ctx.getBean(\"userMapper\");\n" +
+        "    com.example.User user = mapper.getUserById(1);\n" +
+        "    info(user.toString());\n" +
+        "}");
+    var logs = [];
+    var logMirror = CodeMirror.fromTextArea(document.getElementById('log-text'), {
+        mode: 'text/x-java',
+        theme: 'darcula',
+        lineNumbers: true,
+        readOnly: true,
+        lineWrapping: true,
+    });
+    logMirror.setSize("100%", "98vh")
+    function initCodeMirror(id, readOnly, value) {
+        var codeArea = CodeMirror.fromTextArea(document.getElementById(id), {
+            mode: 'text/x-java',
+            theme: 'darcula',
+            lineNumbers: true,
+            readOnly,
+        });
+        codeArea.setSize("100%", "100%")
+        codeArea.setValue(value);
+        return codeArea;
     }
 </script>
+<script src="main.js"></script>
 </html>

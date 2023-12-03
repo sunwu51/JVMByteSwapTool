@@ -2,6 +2,7 @@ package w.web;
 
 import fi.iki.elonen.NanoHTTPD;
 import lombok.extern.slf4j.Slf4j;
+import w.Global;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -45,8 +46,8 @@ public class Httpd extends NanoHTTPD {
         }
         if (method == Method.POST) {
             switch (uri) {
-                case "jvmInfo":
-
+                case "/wsPort":
+                    return newFixedLengthResponse(Global.wsPort + "");
             }
         }
 

@@ -7,6 +7,8 @@ import lombok.Data;
 import java.util.UUID;
 
 /**
+ *
+ * Message abstract class, to json ser/des
  * @author Frank
  * @date 2023/11/25 21:52
  */

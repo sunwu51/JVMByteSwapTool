@@ -2,10 +2,8 @@ package w.core;
 
 public enum ResultCode {
     SUCCESS(0, "SUCCESS"),
-    CLASS_NOT_FOUND(1, "class not found"),
-    METHOD_NOT_FOUND(2, "method not found"),
-
-    INSTRUMENT_NOT_FOUND(3, "instrument not found"),
+    CLASS_OR_METHOD_NOT_FOUND(1, "class or method not found"),
+    INSTRUMENT_NOT_FOUND(2, "instrument not found"),
 
     INTERNAL_ERROR(-1, "internal error");
 
