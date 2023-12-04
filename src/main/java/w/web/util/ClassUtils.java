@@ -1,18 +1,23 @@
 package w.web.util;
 
-import javassist.ClassPool;
-import javassist.CtClass;
-import javassist.CtMethod;
-import javassist.NotFoundException;
+import javassist.*;
 import lombok.extern.slf4j.Slf4j;
+import w.Global;
 
 import java.util.List;
 import java.util.Objects;
 
-@Slf4j
 public class ClassUtils {
     public static CtMethod checkMethodExists(String className, String method, List<String> paramTypes) throws NotFoundException {
-        CtClass c = ClassPool.getDefault().get(className);
+        for (Class c : Global.instrumentation.getAllLoadedClasses()) {
+            if (c.getName().equals(className)) {
+                System.out.println(c.getName() + " loaded by " + c.getClassLoader());
+                Global.classPool.appendClassPath(new LoaderClassPath(c.getClassLoader()));
+                Thread.currentThread().setContextClassLoader(c.getClassLoader());
+            }
+        }
+
+        CtClass c = Global.classPool.get(className);
         out: for (CtMethod declaredMethod : c.getDeclaredMethods()) {
             if (Objects.equals(declaredMethod.getName(), method)) {
                 if (paramTypes == null) return declaredMethod;

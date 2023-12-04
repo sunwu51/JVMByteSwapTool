@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.jar.JarFile;
 
 import fi.iki.elonen.NanoWSD;
 import javassist.ClassPool;
@@ -19,10 +20,8 @@ import w.core.Retransformer;
 import w.core.Swapper;
 import w.web.Httpd;
 import w.web.Websocketd;
-import lombok.extern.slf4j.Slf4j;
 import w.web.util.HttpUtil;
 
-@Slf4j
 public class App {
     private static final int DEFAULT_HTTP_PORT = 8000;
     private static final int DEFAULT_WEBSOCKET_PORT = 18000;
@@ -31,32 +30,43 @@ public class App {
 
     private static int springWebPort = -1;
 
+    private static boolean uber;
+
     private static ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
 
     public static void agentmain(String arg, Instrumentation instrumentation) throws Exception {
         Thread.currentThread().setContextClassLoader(App.class.getClassLoader());
         Global.classPool.appendSystemPath();
         Global.instrumentation = instrumentation;
+        Set<ClassLoader> s = new HashSet<>();
+        for (Class c : Global.instrumentation.getAllLoadedClasses()) {
+            if (c.getClassLoader() != null && !c.getClassLoader().toString().startsWith("jdk"))
+                s.add(c.getClassLoader());
+        }
+        System.out.println(s);
         Map<String, String> params = parseQueryString(arg);
         springWebPort = Integer.parseInt(params.get(PORT_KEY));
+        uber = Boolean.parseBoolean(params.get(PORT_KEY));
         main(new String[0]);
     }
 
     public static void main(String[] args) throws Exception {
         startHttpd(DEFAULT_HTTP_PORT);
         startWebsocketd(DEFAULT_WEBSOCKET_PORT);
-        ingestSpringApplicationContext(springWebPort);
+        if (springWebPort > 0) {
+            ingestSpringApplicationContext(springWebPort, uber);
+        }
         schedule();
     }
 
     private static void startHttpd(int port) throws IOException {
         if (port > 8100) {
-            log.error("Httpd start failed " + port);
+            System.err.println("Httpd start failed " + port);
             throw new IOException("Httpd start failed");
         }
         try {
             new Httpd(port).start(5000, false);
-            log.info("Http server start at port {}", port);
+            System.out.println("Http server start at port "+ port);
         } catch (IOException e) {
             startHttpd(port + 1);
         }
@@ -64,12 +74,12 @@ public class App {
 
     private static void startWebsocketd(int port) throws IOException {
         if (port > 18100) {
-            log.error("Websocketd start failed");
+            System.err.println("Websocketd start failed");
             throw new IOException("Websocketd start failed");
         }
         try {
             new Websocketd(port).start(30000, false);
-            log.info("Websocket server start at port {}", port);
+            System.out.println("Websocket server start at port  " +  port);
             Global.wsPort = port;
         } catch (IOException e) {
             startWebsocketd(port + 1);
@@ -81,13 +91,13 @@ public class App {
      * @param port
      */
 
-    private static void ingestSpringApplicationContext(int port) {
+    private static void ingestSpringApplicationContext(int port, boolean uberJar) {
         try {
             Swapper.getInstance().getSpringCtx();
             HttpUtil.doGet("http://127.0.0.1:" + port);
             assert Global.springApplicationContext != null;
         } catch (Exception e) {
-            log.warn("Ingest spring context error", e);
+            System.err.println("Ingest spring context error " + e);
         }
     }
 

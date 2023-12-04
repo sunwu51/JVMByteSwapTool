@@ -67,7 +67,7 @@ public class Attach {
         }
 
         VirtualMachine jvm = VirtualMachine.attach(pid);
-        File file = new File("swapper.jar");
+        File file = new File("swapper-0.0.1-SNAPSHOT.jar");
         String agentJarPath = file.getAbsoluteFile().getPath();
         String agentArgs = String.format("port=%s", port);
         jvm.loadAgent(agentJarPath, agentArgs);

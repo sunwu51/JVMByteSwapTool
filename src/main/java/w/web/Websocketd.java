@@ -16,7 +16,6 @@ import java.io.IOException;
  * @date 2023/11/25 16:46
  */
 
-@Slf4j
 public class Websocketd extends NanoWSD {
     ObjectMapper objectMapper = new ObjectMapper();
 
@@ -53,7 +52,7 @@ public class Websocketd extends NanoWSD {
 
             @Override
             protected void onException(IOException e) {
-                log.error("ws error", e);
+                System.err.println("ws error " + e);
             }
 
             private void dispatch(String msg) {

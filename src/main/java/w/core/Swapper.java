@@ -48,7 +48,7 @@ public class Swapper {
         Global.instrumentation.addTransformer(transformer, true);
         try {
             Global.info("☕ Reload the class" + methodId.getClassName());
-            Global.instrumentation.retransformClasses(Class.forName(methodId.getClassName()));
+            Global.instrumentation.retransformClasses(Thread.currentThread().getContextClassLoader().loadClass(methodId.getClassName()));
         } catch (ClassNotFoundException e1) {
             return ResultCode.CLASS_OR_METHOD_NOT_FOUND;
         }
@@ -94,7 +94,18 @@ public class Swapper {
                 byte[] result = classfileBuffer;
                 try {
                     if (clssName.equals(methodId.className)) {
-                        CtClass curClass = ClassPool.getDefault().get(clssName);
+                        Class origin = null;
+                        for (Class c : Global.instrumentation.getAllLoadedClasses()) {
+                            if (c.getName().equals(clssName)) {
+                                origin = c;
+                                Global.info("✔\uFE0F find loaded class with classLoader " + c.getClassLoader());
+                                break;
+                            }
+                        }
+                        if (origin != null) {
+                            Global.classPool.appendClassPath(new LoaderClassPath(origin.getClassLoader()));
+                        }
+                        CtClass curClass = Global.classPool.getCtClass(clssName);
                         CtMethod ctMethod = getCtMethod(curClass, methodId);
                         ctMethod.addLocalVariable("startTime", CtClass.longType);
                         ctMethod.addLocalVariable("endTime", CtClass.longType);

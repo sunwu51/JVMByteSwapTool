@@ -4,18 +4,14 @@ import javassist.ClassPool;
 import w.core.MethodId;
 import w.core.Retransformer;
 import w.web.message.LogMessage;
-import w.web.message.Message;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fi.iki.elonen.NanoWSD;
-import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.lang.instrument.Instrumentation;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Slf4j
 public class Global {
     public static Instrumentation instrumentation;
 
@@ -36,8 +32,10 @@ public class Global {
 
     public static ClassPool classPool = ClassPool.getDefault();
 
+    public static ClassLoader springCl = null;
+
     public static void info(String content) {
-        log.info(content);
+        System.out.println(content);
 
         if (socketCtx.get() == null && traceIdCtx.get() != null) {
             NanoWSD.WebSocket ws = socketMap.get(traceIdCtx.get());
@@ -51,7 +49,7 @@ public class Global {
                 message.setContent(content);
                 socketCtx.get().send(objectMapper.writeValueAsString(message));
             } catch (IOException e) {
-                log.error("send message error", e);
+                System.err.println("send message error" + e);
             }
         }
     }

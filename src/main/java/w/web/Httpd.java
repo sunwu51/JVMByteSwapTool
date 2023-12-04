@@ -6,6 +6,7 @@ import w.Global;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import static fi.iki.elonen.NanoHTTPD.Response.Status.*;
@@ -14,7 +15,6 @@ import static fi.iki.elonen.NanoHTTPD.Response.Status.*;
  * @author Frank
  * @date 2023/11/25 16:12
  */
-@Slf4j
 public class Httpd extends NanoHTTPD {
 
     public Httpd(int port) {
@@ -70,13 +70,13 @@ public class Httpd extends NanoHTTPD {
             assert in != null;
             len = in.read(content);
         } catch (Exception e) {
-            log.debug("file {} not found in the resource, try to find it from current dir", fileName);
+//            log.debug("file {} not found in the resource, try to find it from current dir", fileName);
             try (FileInputStream in = new FileInputStream(fileName.substring(1))) {
                 len = in.read(content);
             } catch (Exception ex) {
                 return newFixedLengthResponse(NOT_FOUND, NanoHTTPD.MIME_PLAINTEXT, "NOT FOUND");
             }
         }
-        return newFixedLengthResponse(OK, NanoHTTPD.MIME_HTML, new String(content, 0, len));
+        return newFixedLengthResponse(OK, NanoHTTPD.MIME_HTML, new String(content, 0, len, StandardCharsets.UTF_8));
     }
 }
