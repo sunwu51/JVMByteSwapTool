@@ -2,7 +2,7 @@ package w.web;
 
 import w.Global;
 import w.core.MethodId;
-import w.core.Retransformer;
+import w.core.Swapper;
 import w.web.message.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,18 +10,16 @@ import fi.iki.elonen.NanoWSD;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
-import java.util.ArrayList;
 
 /**
  * @author Frank
  * @date 2023/11/25 16:46
  */
 
-@Slf4j
 public class Websocketd extends NanoWSD {
     ObjectMapper objectMapper = new ObjectMapper();
 
-    Retransformer retransformer = Retransformer.getInstance();
+    Swapper swapper = Swapper.getInstance();
 
     public Websocketd(int port) {
         super(port);
@@ -54,7 +52,7 @@ public class Websocketd extends NanoWSD {
 
             @Override
             protected void onException(IOException e) {
-                log.error("ws error", e);
+                System.err.println("ws error " + e);
             }
 
             private void dispatch(String msg) {
@@ -65,38 +63,37 @@ public class Websocketd extends NanoWSD {
                     Message message = objectMapper.readValue(msg, Message.class);
                     Global.socketCtx.set(this);
                     Global.traceIdCtx.set(message.getId());
+                    if (!"_".equals(message.getId())) {
+                        Global.socketMap.put(message.getId(), this);
+                    }
                     switch (message.getType()) {
-                        // 心跳包
                         case PING:
                             PongMessage m = new PongMessage();
                             m.setId(message.getId());
                             this.send(objectMapper.writeValueAsString(m));
                             break;
-                        // 修改方法的body
                         case CHANGE_BODY:
                             ChangeBodyMessage changeBodyMessage = (ChangeBodyMessage) message;
                             MethodId methodId = new MethodId(changeBodyMessage.getClassName(), changeBodyMessage.getMethod(), changeBodyMessage.getParamTypes());
-                            retransformer.changeBody(methodId,changeBodyMessage.getBody());
+                            swapper.changeBody(methodId,changeBodyMessage.getBody());
                             break;
-                        // 监控方法的执行时间和入参返回值
                         case WATCH:
                             WatchMessage watchMessage = (WatchMessage) message;
                             String[] arr = watchMessage.getSignature().split("#");
                             assert arr.length == 2;
                             methodId = new MethodId(arr[0], arr[1], null);
-                            retransformer.watch(methodId);
+                            swapper.watch(methodId, watchMessage.isUseJson());
                             break;
                         case EXEC:
                             ExecMessage execMessage = (ExecMessage) message;
-                            retransformer.changeExec(execMessage.getBody());
-                            Global.exec();
+                            Global.execBundle.changeBodyAndInvoke(execMessage.getBody());
                             break;
                         default:
-                            Global.info("message type not support");
+                            Global.log(2, "message type not support");
                     }
                 } catch (JsonProcessingException e) {
                     e.printStackTrace();
-                    Global.info("not a valid message");
+                    Global.log(2, "not a valid message");
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 } catch (Exception e) {
@@ -104,6 +101,7 @@ public class Websocketd extends NanoWSD {
                 } finally {
                     Global.socketCtx.remove();
                     Global.traceIdCtx.remove();
+                    Global.classToLoader.remove();
                 }
             }
         };

@@ -1,8 +1,8 @@
 package w;
 
-import w.web.Httpd;
 import com.sun.tools.attach.*;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Scanner;
@@ -13,43 +13,65 @@ import java.util.Scanner;
  */
 public class Attach {
 
-    static int HTTP_PORT = 16000;
-
     public static void main(String[] args) throws IOException, AttachNotSupportedException, AgentLoadException, AgentInitializationException {
-        List<VirtualMachineDescriptor> jps = VirtualMachine.list();
-        for (int i = 0; i< jps.size(); i++) {
-            System.out.println(String.format("[%s] %s %s", i, jps.get(i).id(), jps.get(i).displayName()));
-        }
 
-        System.out.println("请出入序号>>>>>>>>>>>>>>");
-
+        // Get the jvm process PID from args[0] or manual input
+        // And get the spring http port from manual input
+        String pid = null;
+        int port = -1;
         Scanner scanner = new Scanner(System.in);
-        while (true) {
-            int index = scanner.nextInt();
 
-            if (index < 0  || index >= jps.size()) continue;
-
-            String pid = jps.get(index).id();
-
-            VirtualMachine jvm = VirtualMachine.attach(pid);
-
-            String agentJarPath = "C:\\Users\\sunwu\\Desktop\\code\\Vmproxy\\target\\vmproxy-0.0.1-SNAPSHOT.jar";
-
-            String agentArgs =  args == null || args.length == 0 ? "8080" : args[0];
-
-            jvm.loadAgent(agentJarPath, agentArgs);
-            while (true) {
-                try {
-                    new Httpd(HTTP_PORT).start(10000, false);
-                    System.out.println("http启动完成，监听端口" + HTTP_PORT);
-                    break;
-                } catch (Exception e) {
-                    System.out.println(HTTP_PORT + "端口占用， 尝试切换端口");
-                    HTTP_PORT ++;
-                }
+        if (args.length > 0) {
+            pid = args[0].trim();
+            try {
+                Integer.parseInt(pid);
+            } catch (Exception e) {
+                System.err.println("The pid should be integer.");
+                throw e;
             }
-            break;
+        } else {
+            List<VirtualMachineDescriptor> jps = VirtualMachine.list();
+            int i = 0;
+            for (; i < jps.size(); i++) {
+                System.out.printf("[%s] %s %s%n", i, jps.get(i).id(), jps.get(i).displayName());
+            }
+            System.out.printf("[%s] %s%n", i, "Custom PID");
+            System.out.println(">>>>>>>>>>>>Please enter the serial number");
+
+            while (true) {
+                int index = scanner.nextInt();
+                if (index < 0 || index > i) continue;
+                if (index == i) {
+                    System.out.println(">>>>>>>>>>>>Please enter the serial number");
+                    pid = String.valueOf(scanner.nextInt());
+                    break;
+                }
+                pid = jps.get(index).id();
+                break;
+            }
         }
 
+        System.out.printf("============The PID is %s%n", pid);
+        System.out.println(">>>>>>>>>>>>Please enter the spring web server port, if not spring input enter key to skip");
+
+        scanner.nextLine();
+        String line = scanner.nextLine();
+
+        if (line != null && !line.trim().isEmpty()) {
+            try {
+                port = Integer.parseInt(line.trim());
+            } catch (Exception e) {
+                System.err.println("port is not a integer");
+                throw e;
+            }
+        }
+
+        VirtualMachine jvm = VirtualMachine.attach(pid);
+        File file = new File("swapper-0.0.1-SNAPSHOT.jar");
+        String agentJarPath = file.getAbsoluteFile().getPath();
+        String agentArgs = String.format("port=%s", port);
+        jvm.loadAgent(agentJarPath, agentArgs);
+        jvm.detach();
+        System.out.println("============Attach finish");
     }
 }

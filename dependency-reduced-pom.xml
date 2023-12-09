@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.example.vmproxy</groupId>
-  <artifactId>vmproxy</artifactId>
-  <name>vmproxy</name>
+  <groupId>w</groupId>
+  <artifactId>swapper</artifactId>
+  <name>swapper</name>
   <version>0.0.1-SNAPSHOT</version>
-  <description>vmproxy</description>
+  <description>swapper</description>
   <build>
     <plugins>
       <plugin>
@@ -23,11 +23,18 @@
           <transformers>
             <transformer>
               <manifestEntries>
+                <Main-Class>w.Attach</Main-Class>
                 <Agent-Class>w.App</Agent-Class>
                 <Can-Retransform-Classes>true</Can-Retransform-Classes>
               </manifestEntries>
             </transformer>
           </transformers>
+          <relocations>
+            <relocation>
+              <pattern>com.fasterxml.jackson</pattern>
+              <shadedPattern>wshade.com.fasterxml.jackson</shadedPattern>
+            </relocation>
+          </relocations>
         </configuration>
       </plugin>
       <plugin>

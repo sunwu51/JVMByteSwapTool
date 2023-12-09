@@ -5,15 +5,16 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.HashMap;
-import java.util.Map;
 
 
 public class HttpUtil {
 
+    /**
+     * Start a http get request and discard the content
+     * @param httpUrl
+     */
     public static void doGet(String httpUrl) {
         HttpURLConnection connection = null;
-        StringBuffer result = new StringBuffer();
         try {
             URL url = new URL(httpUrl);
             connection = (HttpURLConnection) url.openConnection();
@@ -27,6 +28,7 @@ public class HttpUtil {
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
+            assert connection != null;
             connection.disconnect();
         }
     }
