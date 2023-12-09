@@ -5,10 +5,14 @@
 
 此外arthas想要主动触发函数，尤其是spring的bean下的方法，需要复杂的操作流程，想要对其进行一些简化，所以有了这个小工具。
 
+【使用须知】如果你的项目是spring boot项目或者没有复杂的类加载器的普通项目，那么这个工具适合你。
+
+如果是具有非常错综复杂的类加载器的庞大项目，那么这个工具可能并不能正常运行。
+
 # requirement
 - jdk >= 1.8
 # start
-从github release下载`swapper.jar`，运行指令，根据提示输入即可，如下：
+从github release下载`swapper-xx.jar`，运行指令，根据提示输入即可，如下：
 ```bash
 $ java -jar swapper.jar
 [0] 36200 swapper.jar
