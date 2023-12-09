@@ -29,9 +29,13 @@ async function init() {
         }
     }
 
-    ws.onclose = console.log
+    ws.onclose = () => {
+        console.log("ws close... try to reconnect...")
+        init()
+    }
 }
 init();
+
 
 var latestId = "";
 // 当点击watch的时候

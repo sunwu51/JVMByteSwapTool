@@ -7,12 +7,11 @@ import w.web.util.ClassUtils;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.security.ProtectionDomain;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class Swapper {
     private static final Swapper INSTANCE = new Swapper();
@@ -24,33 +23,40 @@ public class Swapper {
     }
 
     private synchronized ResultCode retransform(MethodId methodId, Callable<ClassFileTransformer> callable) throws Exception {
-        Global.info("☕ Checking whether method exists...");
+        Global.log(1, "Checking whether method exists...");
         try {
             ClassUtils.checkMethodExists(methodId.getClassName(), methodId.getMethod(), methodId.getParamTypes());
         } catch (NotFoundException e1) {
-            Global.info("❌ Class or method not exits: " + e1);
+            Global.log(1, "Class or method not exits: " + e1);
             return ResultCode.CLASS_OR_METHOD_NOT_FOUND;
         }
-        Global.info("✔\uFE0F Check exist finish");
-
-        Global.info("☕ Checking whether method is re-transformed...");
+        Global.log(1, "Check exist finish");
+        Global.log(1, "Checking whether method is re-transformed...");
         String traceId = Global.methodId2TraceId.get(methodId);
         if (traceId != null) {
-            Global.info("✔\uFE0F Yes, removing the origin re-transformer...");
+            Global.log(1, "Yes, removing the origin re-transformer...");
             Retransformer origin = Global.traceId2MethodId2Trans.getOrDefault(traceId, new HashMap<>()).remove(methodId);
             if (origin != null) Global.instrumentation.removeTransformer(origin.getClassFileTransformer());
-            Global.info("✔\uFE0F Yes, removed the origin re-transformer...");
+            Global.log(1, "Removed the origin re-transformer...");
         }
-        Global.info("✔\uFE0F Check re-transformer finish");
+        Global.log(1, "Check re-transformer finish");
 
-        Global.info("☕ Prepare new re-transformer...");
+        Global.log(1, "Prepare new re-transformer...");
         ClassFileTransformer transformer = callable.call();
         Global.instrumentation.addTransformer(transformer, true);
-        try {
-            Global.info("☕ Reload the class" + methodId.getClassName());
-            Global.instrumentation.retransformClasses(Thread.currentThread().getContextClassLoader().loadClass(methodId.getClassName()));
-        } catch (ClassNotFoundException e1) {
-            return ResultCode.CLASS_OR_METHOD_NOT_FOUND;
+
+        Global.log(1, "Reload the class" + methodId.getClassName());
+
+        List<Class> cls = Global.classToLoader.get().getOrDefault(methodId.className, new HashSet<>()).stream().flatMap(it -> {
+            try {
+                return Stream.of(it.loadClass(methodId.className));
+            } catch (ClassNotFoundException e) {
+                return Stream.empty();
+            }
+        }).collect(Collectors.toList());
+        System.out.println("cls" + cls);
+        for (Class c : cls) {
+            Global.instrumentation.retransformClasses(c);
         }
         return ResultCode.SUCCESS;
     }
@@ -66,17 +72,19 @@ public class Swapper {
                 byte[] result = classfileBuffer;
                 if (methodId.getClassName().equals(clssName)) {
                     try {
+                        if (traceId != null) {
+                            Global.traceId2MethodId2Trans.computeIfAbsent(traceId, k -> new ConcurrentHashMap<>())
+                                    .put(methodId, new Retransformer(RetransformType.CHANGE_BODY, this));
+                            Global.methodId2TraceId.put(methodId, traceId);
+                        }
                         CtClass ctClass = getCtClass(loader, methodId);
                         CtMethod ctMethod = getCtMethod(ctClass, methodId);
                         ctMethod.setBody(body);
                         result =  ctClass.toBytecode();
-                        ctClass.detach();
-                        Global.traceId2MethodId2Trans.computeIfAbsent(traceId, k -> new ConcurrentHashMap<>())
-                                .put(methodId, new Retransformer(RetransformType.CHANGE_BODY, this));
-                        Global.methodId2TraceId.put(methodId, traceId);
-                        Global.info("✔\uFE0F Change body success: " + clssName + "#" + methodId.getMethod());
+                        Global.log(1, Thread.currentThread().getName() + "Change body success: " + loader + ", " + clssName + "#" + methodId.getMethod());
                     } catch (Exception e) {
-                        Global.info("❌ Change body fail: " + e.getMessage());
+                        e.printStackTrace();
+                        Global.log(2, Thread.currentThread().getName() +  "Change body fail: " + loader + ", " + clssName + "#" + methodId.getMethod() + e.getMessage());
                     }
                     return result;
                 }
@@ -94,16 +102,10 @@ public class Swapper {
                 byte[] result = classfileBuffer;
                 try {
                     if (clssName.equals(methodId.className)) {
-                        Class origin = null;
-                        for (Class c : Global.instrumentation.getAllLoadedClasses()) {
-                            if (c.getName().equals(clssName)) {
-                                origin = c;
-                                Global.info("✔\uFE0F find loaded class with classLoader " + c.getClassLoader());
-                                break;
-                            }
-                        }
-                        if (origin != null) {
-                            Global.classPool.appendClassPath(new LoaderClassPath(origin.getClassLoader()));
+                        if (traceId != null) {
+                            Global.traceId2MethodId2Trans.computeIfAbsent(traceId, k -> new ConcurrentHashMap<>())
+                                    .put(methodId, new Retransformer(RetransformType.CHANGE_BODY, this));
+                            Global.methodId2TraceId.put(methodId, traceId);
                         }
                         CtClass curClass = Global.classPool.getCtClass(clssName);
                         CtMethod ctMethod = getCtMethod(curClass, methodId);
@@ -127,41 +129,13 @@ public class Swapper {
                         ctMethod.insertAfter("w.Global.socketCtx.remove();");
                         result = curClass.toBytecode();
                         curClass.detach();
-                        Global.traceId2MethodId2Trans.computeIfAbsent(traceId, k -> new ConcurrentHashMap<>())
-                                .put(methodId, new Retransformer(RetransformType.WATCH, this));
-                        Global.methodId2TraceId.put(methodId, traceId);
-                        Global.info("✔\uFE0F Watch success: " + clssName + "#" + methodId.getMethod());
+                        Global.log(1, "Watch success: " + clssName + "#" + methodId.getMethod());
                     }
                 } catch (Exception e) {
-                    Global.info("❌ Watch fail: " + e.getMessage());
+                    Global.log(2, "Watch fail: " + e.getMessage());
                 }
                 return result;
             }
-        });
-    }
-
-    public ResultCode changeExec(String body) throws Exception {
-        MethodId methodId = new MethodId("w.Global", "exec", new ArrayList<>());
-        return retransform(methodId, () -> (loader, clssName, classBeingRedefined, protectionDomain, classfileBuffer) -> {
-            clssName = clssName.replace("/", ".");
-            byte[] result = classfileBuffer;
-            if (methodId.getClassName().equals(clssName)) {
-                try {
-                    CtClass ctClass = getCtClass(loader, methodId);
-                    CtMethod ctMethod = getCtMethod(ctClass, methodId);
-                    ctMethod.setBody("{" +
-                            (Global.springApplicationContext != null ?
-                                "org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext ctx = (org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext) w.Global.springApplicationContext;\n"
-                                : "") + body +
-                            "}");
-                    result = ctClass.toBytecode();
-                    ctClass.detach();
-                    Global.info("✔\uFE0F Change execute method success");
-                } catch (Exception e) {
-                    Global.info("❌ Change execute method fail");
-                }
-            }
-            return result;
         });
     }
 
@@ -179,11 +153,11 @@ public class Swapper {
                         CtMethod ctMethod = getCtMethod(curClass, methodId);
                         ctMethod.insertAfter("{if (w.Global.springApplicationContext == null) {w.Global.springApplicationContext = $0.getApplicationContext();}}");
                         result = curClass.toBytecode();
-                        Global.info("✔\uFE0F Change body success: " + clssName + "#" + methodId.getMethod());
+                        Global.log(1, "Change body success: " + clssName + "#" + methodId.getMethod());
                     }
                 }
             } catch (Exception e) {
-                Global.info("❌ Change body fail: "+ e.getMessage());
+                Global.log(2, "Change body fail: "+ e.getMessage());
             }
             return result;
         });
@@ -211,7 +185,7 @@ public class Swapper {
                 }
                 for (int i = 0; i< pc.length; i++) {
                     if (!pc[i].getName().equals(methodId.getParamTypes().get(i))) {
-                        Global.info(String.format("同名方法，但是参数类型不一致。%s!=%s", pc[i].getName(), methodId.paramTypes.get(i)));
+                        Global.log(2, String.format("Param not same %s!=%s", pc[i].getName(), methodId.paramTypes.get(i)));
                         continue out;
                     }
                 }

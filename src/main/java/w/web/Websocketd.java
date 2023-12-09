@@ -86,15 +86,14 @@ public class Websocketd extends NanoWSD {
                             break;
                         case EXEC:
                             ExecMessage execMessage = (ExecMessage) message;
-                            swapper.changeExec(execMessage.getBody());
-                            Global.exec();
+                            Global.execBundle.changeBodyAndInvoke(execMessage.getBody());
                             break;
                         default:
-                            Global.info("message type not support");
+                            Global.log(2, "message type not support");
                     }
                 } catch (JsonProcessingException e) {
                     e.printStackTrace();
-                    Global.info("not a valid message");
+                    Global.log(2, "not a valid message");
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 } catch (Exception e) {
@@ -102,6 +101,7 @@ public class Websocketd extends NanoWSD {
                 } finally {
                     Global.socketCtx.remove();
                     Global.traceIdCtx.remove();
+                    Global.classToLoader.remove();
                 }
             }
         };

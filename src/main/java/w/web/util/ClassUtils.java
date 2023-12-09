@@ -4,16 +4,21 @@ import javassist.*;
 import lombok.extern.slf4j.Slf4j;
 import w.Global;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.logging.Logger;
 
 public class ClassUtils {
+    static Logger log = Logger.getLogger(ClassUtils.class.getName());
+
     public static CtMethod checkMethodExists(String className, String method, List<String> paramTypes) throws NotFoundException {
+        // append the class path if necessary
         for (Class c : Global.instrumentation.getAllLoadedClasses()) {
             if (c.getName().equals(className)) {
-                System.out.println(c.getName() + " loaded by " + c.getClassLoader());
+                log.info(c.getName() + " loaded by " + c.getClassLoader());
                 Global.classPool.appendClassPath(new LoaderClassPath(c.getClassLoader()));
-                Thread.currentThread().setContextClassLoader(c.getClassLoader());
+                Global.classToLoader.get().computeIfAbsent(className, k -> new HashSet<>()).add(c.getClassLoader());
             }
         }
 

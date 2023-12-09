@@ -3,18 +3,18 @@ package w;
 import java.io.IOException;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
+import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.jar.JarFile;
 
 import fi.iki.elonen.NanoWSD;
-import javassist.ClassPool;
+import javassist.*;
+import w.core.ExecBundle;
 import w.core.MethodId;
 import w.core.Retransformer;
 import w.core.Swapper;
@@ -28,35 +28,43 @@ public class App {
 
     private static final String PORT_KEY = "port";
 
-    private static int springWebPort = -1;
-
     private static boolean uber;
 
     private static ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
 
     public static void agentmain(String arg, Instrumentation instrumentation) throws Exception {
-        Thread.currentThread().setContextClassLoader(App.class.getClassLoader());
-        Global.classPool.appendSystemPath();
         Global.instrumentation = instrumentation;
-        Set<ClassLoader> s = new HashSet<>();
+
+
+        // 1 record the spring boot classloader
         for (Class c : Global.instrumentation.getAllLoadedClasses()) {
-            if (c.getClassLoader() != null && !c.getClassLoader().toString().startsWith("jdk"))
-                s.add(c.getClassLoader());
+            // if it is a spring boot fat jar, the class loader will be LaunchedURLClassLoader, for spring boot >1 and <3
+            if (c.getClassLoader().toString().startsWith("org.springframework.boot.loader.LaunchedURLClassLoader")) {
+                Global.springBootCl = c.getClassLoader();
+                break;
+            }
         }
-        System.out.println(s);
+
+        // 2 start http and websocket server
+        startHttpd(DEFAULT_HTTP_PORT);
+        startWebsocketd(DEFAULT_WEBSOCKET_PORT);
+
+        // 3 catch spring ctx by visit http endpoint
         Map<String, String> params = parseQueryString(arg);
-        springWebPort = Integer.parseInt(params.get(PORT_KEY));
-        uber = Boolean.parseBoolean(params.get(PORT_KEY));
-        main(new String[0]);
+        int springWebPort = Integer.parseInt(params.get(PORT_KEY));
+        if (springWebPort > 0) {
+            ingestSpringApplicationContext(springWebPort);
+        }
+
+        // 4 init execInstance
+        initExecInstance();
+
+        // 5 task to clean closed ws and related enhancer
+        schedule();
     }
 
     public static void main(String[] args) throws Exception {
-        startHttpd(DEFAULT_HTTP_PORT);
-        startWebsocketd(DEFAULT_WEBSOCKET_PORT);
-        if (springWebPort > 0) {
-            ingestSpringApplicationContext(springWebPort, uber);
-        }
-        schedule();
+
     }
 
     private static void startHttpd(int port) throws IOException {
@@ -91,7 +99,7 @@ public class App {
      * @param port
      */
 
-    private static void ingestSpringApplicationContext(int port, boolean uberJar) {
+    private static void ingestSpringApplicationContext(int port) {
         try {
             Swapper.getInstance().getSpringCtx();
             HttpUtil.doGet("http://127.0.0.1:" + port);
@@ -111,6 +119,22 @@ public class App {
             result.put(arr[0], arr[1]);
         }
         return result;
+    }
+
+    private static void initExecInstance() throws CannotCompileException, InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException, NotFoundException, IOException {
+        Global.traceIdCtx.set("0000");
+        CtClass ctClass = Global.classPool.makeClass("w.Exec");
+        ctClass.defrost();
+        CtMethod ctMethod = CtMethod.make("public void exec() {System.out.println(123);}", ctClass);
+        ctClass.addMethod(ctMethod);
+        Class c = ctClass.toClass(Global.getClassLoader());
+        ExecBundle bundle = new ExecBundle();
+        bundle.setInst(c.newInstance());
+        bundle.setCtClass(ctClass);
+        bundle.setCtMethod(ctMethod);
+        ctClass.writeFile();
+        Global.execBundle = bundle;
+        bundle.invoke();
     }
 
     private static void schedule() {
@@ -140,4 +164,6 @@ public class App {
 
         }, 0, 3, TimeUnit.SECONDS);
     }
+
+
 }

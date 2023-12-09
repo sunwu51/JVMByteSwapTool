@@ -45,12 +45,6 @@
 			<artifactId>jackson-databind</artifactId>
 			<version>2.13.5</version>
 		</dependency>
-		<!-- https://mvnrepository.com/artifact/com.google.code.gson/gson -->
-<!--		<dependency>-->
-<!--			<groupId>com.google.code.gson</groupId>-->
-<!--			<artifactId>gson</artifactId>-->
-<!--			<version>2.10.1</version>-->
-<!--		</dependency>-->
 
 	</dependencies>
 	<build>
@@ -69,6 +63,12 @@
 							</manifestEntries>
 						</transformer>
 					</transformers>
+					<relocations>
+						<relocation>
+							<pattern>com.fasterxml.jackson</pattern>
+							<shadedPattern>wshade.com.fasterxml.jackson</shadedPattern>
+						</relocation>
+					</relocations>
 				</configuration>
 				<executions>
 					<execution>

@@ -29,6 +29,12 @@
               </manifestEntries>
             </transformer>
           </transformers>
+          <relocations>
+            <relocation>
+              <pattern>com.fasterxml.jackson</pattern>
+              <shadedPattern>wshade.com.fasterxml.jackson</shadedPattern>
+            </relocation>
+          </relocations>
         </configuration>
       </plugin>
       <plugin>
