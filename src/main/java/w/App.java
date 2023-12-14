@@ -86,7 +86,7 @@ public class App {
             throw new IOException("Websocketd start failed");
         }
         try {
-            new Websocketd(port).start(30000, false);
+            new Websocketd(port).start(24 * 60 * 60000, false);
             System.out.println("Websocket server start at port  " +  port);
             Global.wsPort = port;
         } catch (IOException e) {
