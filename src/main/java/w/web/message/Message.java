@@ -16,9 +16,11 @@ import java.util.UUID;
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
 @JsonSubTypes({
         @JsonSubTypes.Type(value = ChangeBodyMessage.class, name = "CHANGE_BODY"),
+        @JsonSubTypes.Type(value = ChangeResultMessage.class, name = "CHANGE_RESULT"),
         @JsonSubTypes.Type(value = PingMessage.class, name = "PING"),
         @JsonSubTypes.Type(value = PongMessage.class, name = "PONG"),
         @JsonSubTypes.Type(value = WatchMessage.class, name = "WATCH"),
+        @JsonSubTypes.Type(value = OuterWatchMessage.class, name = "OUTER_WATCH"),
         @JsonSubTypes.Type(value = ExecMessage.class, name = "EXEC")
 })
 @Data

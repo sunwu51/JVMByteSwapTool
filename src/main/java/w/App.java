@@ -28,8 +28,6 @@ public class App {
 
     private static final String PORT_KEY = "port";
 
-    private static boolean uber;
-
     private static ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
 
     public static void agentmain(String arg, Instrumentation instrumentation) throws Exception {
@@ -39,6 +37,7 @@ public class App {
         // 1 record the spring boot classloader
         for (Class c : Global.instrumentation.getAllLoadedClasses()) {
             // if it is a spring boot fat jar, the class loader will be LaunchedURLClassLoader, for spring boot >1 and <3
+            if (c.getClassLoader() == null) continue;
             if (c.getClassLoader().toString().startsWith("org.springframework.boot.loader.LaunchedURLClassLoader")) {
                 Global.springBootCl = c.getClassLoader();
                 break;
@@ -125,7 +124,7 @@ public class App {
         Global.traceIdCtx.set("0000");
         CtClass ctClass = Global.classPool.makeClass("w.Exec");
         ctClass.defrost();
-        CtMethod ctMethod = CtMethod.make("public void exec() {System.out.println(123);}", ctClass);
+        CtMethod ctMethod = CtMethod.make("public void exec() {}", ctClass);
         ctClass.addMethod(ctMethod);
         Class c = ctClass.toClass(Global.getClassLoader());
         ExecBundle bundle = new ExecBundle();
@@ -154,7 +153,7 @@ public class App {
                     map.forEach(((methodId, retransformer) -> {
                         Global.instrumentation.removeTransformer(retransformer.getClassFileTransformer());
                         try {
-                            Global.instrumentation.retransformClasses(Class.forName(methodId.getClassName()));
+                            Global.instrumentation.retransformClasses(Global.getClassLoader().loadClass(methodId.getClassName()));
                         } catch (UnmodifiableClassException e) {
                         } catch (ClassNotFoundException e) {
                         }

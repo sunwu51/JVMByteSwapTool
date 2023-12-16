@@ -42,7 +42,7 @@ public class Attach {
                 int index = scanner.nextInt();
                 if (index < 0 || index > i) continue;
                 if (index == i) {
-                    System.out.println(">>>>>>>>>>>>Please enter the serial number");
+                    System.out.println(">>>>>>>>>>>>Please enter the PID");
                     pid = String.valueOf(scanner.nextInt());
                     break;
                 }

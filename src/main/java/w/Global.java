@@ -44,8 +44,12 @@ public class Global {
 
     public static ClassPool classPool = ClassPool.getDefault();
 
-    public static void info(String content) {
-        log(1, content);
+    public static void info(Object content) {
+        log(1, "" + content);
+    }
+
+    static {
+        classPool.importPackage("java.util");
     }
 
     // 1 info 2 error

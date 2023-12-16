@@ -77,12 +77,28 @@ public class Websocketd extends NanoWSD {
                             MethodId methodId = new MethodId(changeBodyMessage.getClassName(), changeBodyMessage.getMethod(), changeBodyMessage.getParamTypes());
                             swapper.changeBody(methodId,changeBodyMessage.getBody());
                             break;
+                        case CHANGE_RESULT:
+                            ChangeResultMessage changeResultMessage = (ChangeResultMessage) message;
+                            methodId = new MethodId(changeResultMessage.getClassName(), changeResultMessage.getMethod(), changeResultMessage.getParamTypes());
+                            MethodId inner = new MethodId(changeResultMessage.getInnerClassName(), changeResultMessage.getInnerMethod(), null);
+                            swapper.changeResult(methodId, inner, changeResultMessage.getBody());
+                            break;
                         case WATCH:
                             WatchMessage watchMessage = (WatchMessage) message;
                             String[] arr = watchMessage.getSignature().split("#");
                             assert arr.length == 2;
                             methodId = new MethodId(arr[0], arr[1], null);
                             swapper.watch(methodId, watchMessage.isUseJson());
+                            break;
+                        case OUTER_WATCH:
+                            OuterWatchMessage outerWatchMessage = (OuterWatchMessage) message;
+                            String[] arr2 = outerWatchMessage.getSignature().split("#");
+                            assert arr2.length == 2;
+                            String[] arr3 = outerWatchMessage.getInnerSignature().split("#");
+                            assert arr3.length == 2;
+                            methodId = new MethodId(arr2[0], arr2[1], null);
+                            inner = new MethodId(arr3[0], arr3[1], null);
+                            swapper.outerWatch(methodId, inner, outerWatchMessage.isUseJson());
                             break;
                         case EXEC:
                             ExecMessage execMessage = (ExecMessage) message;

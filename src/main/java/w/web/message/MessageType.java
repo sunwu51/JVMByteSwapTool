@@ -11,8 +11,11 @@ public enum MessageType {
      * 修改方法的body的消息
      */
     CHANGE_BODY,
+    CHANGE_RESULT,
 
     WATCH,
+
+    OUTER_WATCH,
 
     EXEC,
 

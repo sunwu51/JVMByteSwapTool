@@ -1,6 +1,8 @@
 package w.core;
 
 import javassist.*;
+import javassist.expr.ExprEditor;
+import javassist.expr.MethodCall;
 import w.*;
 import w.web.util.ClassUtils;
 
@@ -48,6 +50,10 @@ public class Swapper {
         Global.log(1, "Reload the class" + methodId.getClassName());
 
         List<Class> cls = Global.classToLoader.get().getOrDefault(methodId.className, new HashSet<>()).stream().flatMap(it -> {
+            if (it == null) {
+                Global.log(2, "cannot change this class loaded by System classLoader");
+                return Stream.empty();
+            }
             try {
                 return Stream.of(it.loadClass(methodId.className));
             } catch (ClassNotFoundException e) {
@@ -93,13 +99,55 @@ public class Swapper {
         });
     }
 
+    public ResultCode changeResult(MethodId methodId, MethodId innerMethodId, String body) throws Exception {
+        String traceId = Global.traceIdCtx.get();
+        return retransform(methodId, () -> new ClassFileTransformer() {
+            @Override
+            public byte[] transform(ClassLoader loader, String clssName,
+                                    Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
+                                    byte[] classfileBuffer) throws IllegalClassFormatException {
+                clssName = clssName.replace("/", ".");
+                byte[] result = null;
+                if (methodId.getClassName().equals(clssName)) {
+                    try {
+                        if (traceId != null) {
+                            Global.traceId2MethodId2Trans.computeIfAbsent(traceId, k -> new ConcurrentHashMap<>())
+                                    .put(methodId, new Retransformer(RetransformType.CHANGE_BODY, this));
+                            Global.methodId2TraceId.put(methodId, traceId);
+                        }
+                        CtClass ctClass = getCtClass(loader, methodId);
+                        CtMethod ctMethod = getCtMethod(ctClass, methodId);
+
+                        ctMethod.instrument(new ExprEditor() {
+                            public void edit(MethodCall m) throws CannotCompileException {
+                                if (m.getMethodName().equals(innerMethodId.getMethod())) {
+                                    if (innerMethodId.getClassName().equals("*") || innerMethodId.getClassName().equals(m.getClassName())) {
+                                        w.Global.info("hit at " + m);
+                                        m.replace("{"+body+"}");
+                                    }
+                                }
+                            }
+                        });
+                        result =  ctClass.toBytecode();
+                        ctClass.detach();
+                        Global.log(1, Thread.currentThread().getName() + "Change body success: " + loader + ", " + clssName + "#" + methodId.getMethod() + "inner:" + innerMethodId.getClassName() +"#" +innerMethodId.getMethod());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Global.log(2, Thread.currentThread().getName() +  "Change body fail: " + loader + ", " + clssName + "#" + methodId.getMethod() + "inner:" + innerMethodId.getClassName() +"#" +innerMethodId.getMethod()+ e.getMessage());
+                    }
+                }
+                return result;
+            }
+        });
+    }
+
     public ResultCode watch(MethodId methodId, boolean useJson) throws Exception {
         String traceId = Global.traceIdCtx.get();
         return retransform(methodId, () -> new ClassFileTransformer() {
             @Override
             public byte[] transform(ClassLoader loader, String clssName, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
                 clssName = clssName.replace("/", ".");
-                byte[] result = classfileBuffer;
+                byte[] result = null;
                 try {
                     if (clssName.equals(methodId.className)) {
                         if (traceId != null) {
@@ -138,6 +186,61 @@ public class Swapper {
             }
         });
     }
+
+    public ResultCode outerWatch(MethodId outerMethodId, MethodId innerMethodId, boolean useJson) throws Exception {
+        String traceId = Global.traceIdCtx.get();
+        return retransform(outerMethodId, () -> new ClassFileTransformer() {
+            @Override
+            public byte[] transform(ClassLoader loader, String clssName, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
+                clssName = clssName.replace("/", ".");
+                byte[] result = null;
+                try {
+                    if (clssName.equals(outerMethodId.className)) {
+                        if (traceId != null) {
+                            Global.traceId2MethodId2Trans.computeIfAbsent(traceId, k -> new ConcurrentHashMap<>())
+                                    .put(outerMethodId, new Retransformer(RetransformType.CHANGE_BODY, this));
+                            Global.methodId2TraceId.put(outerMethodId, traceId);
+                        }
+                        CtClass curClass = Global.classPool.getCtClass(clssName);
+                        CtMethod ctMethod = getCtMethod(curClass, outerMethodId);
+
+                        ctMethod.instrument(new ExprEditor() {
+                            public void edit(MethodCall m) throws CannotCompileException {
+                                if (m.getMethodName().equals(innerMethodId.getMethod())) {
+                                    if (innerMethodId.getClassName().equals("*") || m.getClassName().equals(innerMethodId.getClassName())) {
+                                        m.replace("{" +
+                                                "long start = System.currentTimeMillis();" +
+                                                "$_ = $proceed($$);" +
+                                                "long duration = System.currentTimeMillis() - start;" +
+                                                "String req = Arrays.toString($args);" +
+                                                "String res = \"\" + $_;" +
+                                                (useJson ? "try{" +
+                                                        "req = w.Global.objectMapper.writeValueAsString($args);" +
+                                                        "res = w.Global.objectMapper.writeValueAsString($_);" +
+                                                        "}catch (Exception e) {req = \"convert json error\"; res=req;}" : "") +
+                                                "w.Global.traceIdCtx.set(\"" + traceId + "\");" +
+                                                "w.Global.info(\"line" + m.getLineNumber() + ",cost:\"+duration+\"ms,req:\"+req+\",res:\"+res);" +
+                                                "w.Global.socketCtx.remove();" +
+                                                "}");
+                                    }
+                                }
+                            }
+                        });
+
+
+
+                        result = curClass.toBytecode();
+                        curClass.detach();
+                        Global.log(1, "Watch success: out=" + clssName + "#" + outerMethodId.getMethod() + ", inner=" + innerMethodId.getClassName() + "#" + innerMethodId.getMethod());
+                    }
+                } catch (Exception e) {
+                    Global.log(2, "Watch fail: " + e.getMessage());
+                }
+                return result;
+            }
+        });
+    }
+
 
     public ResultCode getSpringCtx() throws Exception {
         MethodId methodId = new MethodId("org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter", "invokeHandlerMethod", null);
