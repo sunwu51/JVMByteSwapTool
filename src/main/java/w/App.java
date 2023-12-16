@@ -131,7 +131,6 @@ public class App {
         bundle.setInst(c.newInstance());
         bundle.setCtClass(ctClass);
         bundle.setCtMethod(ctMethod);
-        ctClass.writeFile();
         Global.execBundle = bundle;
         bundle.invoke();
     }

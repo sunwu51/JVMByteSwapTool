@@ -33,6 +33,8 @@ init()
 setInterval(() => {
     if (!ws || ws.readyState === ws.CLOSED) {
         init();
+    } else {
+        ws.send(JSON.stringify({id: "_", type: "PING"}));
     }
 }, 3000)
 

@@ -87,6 +87,9 @@ public class Swapper {
                         CtMethod ctMethod = getCtMethod(ctClass, methodId);
                         ctMethod.setBody(body);
                         result =  ctClass.toBytecode();
+                        if (!methodId.className.equals("w.Exec")) {
+                            ctClass.detach();
+                        }
                         Global.log(1, Thread.currentThread().getName() + "Change body success: " + loader + ", " + clssName + "#" + methodId.getMethod());
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -234,7 +237,7 @@ public class Swapper {
                         Global.log(1, "Watch success: out=" + clssName + "#" + outerMethodId.getMethod() + ", inner=" + innerMethodId.getClassName() + "#" + innerMethodId.getMethod());
                     }
                 } catch (Exception e) {
-                    Global.log(2, "Watch fail: " + e.getMessage());
+                    Global.log(2, "Out Watch fail: " + e.getMessage());
                 }
                 return result;
             }
