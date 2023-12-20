@@ -1,10 +1,12 @@
 package w;
 
 import javassist.ClassPool;
-import sun.reflect.Reflection;
+import m3.prettyobject.PrettyFormat;
+import m3.prettyobject.PrettyFormatRegistry;
 import w.core.ExecBundle;
 import w.core.MethodId;
 import w.core.Retransformer;
+import w.util.NativeUtils;
 import w.web.message.LogMessage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fi.iki.elonen.NanoWSD;
@@ -30,6 +32,8 @@ public class Global {
 
     public final static ObjectMapper objectMapper = new ObjectMapper();
 
+    public final static PrettyFormat prettyFormat = new PrettyFormat(PrettyFormatRegistry.createDefaultInstance());
+
     public final static Map<String, NanoWSD.WebSocket> socketMap = new ConcurrentHashMap<>();
 
     public final static Map<String, Map<MethodId, Retransformer>> traceId2MethodId2Trans = new ConcurrentHashMap<>();
@@ -50,7 +54,34 @@ public class Global {
 
     static {
         classPool.importPackage("java.util");
+        classPool.importPackage("ognl");
+        String lib = null;
+        String os = System.getProperty("os.name").toLowerCase();
+        String arch = System.getProperty("os.arch").toLowerCase();
+        if (os.contains("win") && (arch.equals("x86_64") || arch.equals("amd64"))) {
+            lib = "w_amd64.dll";
+        } else if (os.contains("linux") && (arch.equals("x86_64") || arch.equals("amd64"))) {
+            lib = "w_amd64.so";
+        } else if (os.contains("mac")) {
+            if (arch.equals("x86_64") || arch.equals("amd64")) {
+                lib = "w_amd64.dylib";
+            } else if (arch.equals("aarch64")) {
+                lib = "w_aarch64.dylib";
+            }
+        }
+        if (lib == null){
+            System.err.println("os " + os +" not support");
+            throw new RuntimeException("os " + os +" not support");
+        }
+
+        try {
+            NativeUtils.loadLibraryFromJar("/" + lib);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
+
+    public static native Object[] getInstances(Class<?> cls);
 
     // 1 info 2 error
     public static void log(int level, String content) {
@@ -80,6 +111,16 @@ public class Global {
             } catch (IOException e) {
                 System.err.println("send message error" + e);
             }
+        }
+    }
+
+    public static String toString(Object obj) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            Global.prettyFormat.format(obj, sb);
+            return sb.toString();
+        } catch (Exception e) {
+            return "toString error";
         }
     }
 

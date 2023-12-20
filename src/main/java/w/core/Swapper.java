@@ -4,7 +4,7 @@ import javassist.*;
 import javassist.expr.ExprEditor;
 import javassist.expr.MethodCall;
 import w.*;
-import w.web.util.ClassUtils;
+import w.util.ClassUtils;
 
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
@@ -60,7 +60,6 @@ public class Swapper {
                 return Stream.empty();
             }
         }).collect(Collectors.toList());
-        System.out.println("cls" + cls);
         for (Class c : cls) {
             Global.instrumentation.retransformClasses(c);
         }
@@ -75,7 +74,7 @@ public class Swapper {
                                     Class<?> classBeingRedefined, ProtectionDomain protectionDomain,
                                     byte[] classfileBuffer) throws IllegalClassFormatException {
                 clssName = clssName.replace("/", ".");
-                byte[] result = classfileBuffer;
+                byte[] result = null;
                 if (methodId.getClassName().equals(clssName)) {
                     try {
                         if (traceId != null) {
@@ -95,9 +94,8 @@ public class Swapper {
                         e.printStackTrace();
                         Global.log(2, Thread.currentThread().getName() +  "Change body fail: " + loader + ", " + clssName + "#" + methodId.getMethod() + e.getMessage());
                     }
-                    return result;
                 }
-                return classfileBuffer;
+                return result;
             }
         });
     }
@@ -172,8 +170,8 @@ public class Swapper {
                             ctMethod.insertAfter("try {req = w.Global.objectMapper.writeValueAsString($args);} catch (Exception e) {req = \"convert json error\";}");
                             ctMethod.insertAfter("try {res = w.Global.objectMapper.writeValueAsString($_);} catch (Exception e) {res = \"convert json error\";}");
                         } else {
-                            ctMethod.insertAfter("req = java.util.Arrays.toString($args);");
-                            ctMethod.insertAfter("res = \"\" + $_;");
+                            ctMethod.insertAfter("req = w.Global.toString($args);");
+                            ctMethod.insertAfter("res = w.Global.toString($_);");
                         }
                         ctMethod.insertAfter("w.Global.traceIdCtx.set(\"" + traceId + "\");");
                         ctMethod.insertAfter("w.Global.info(\"cost:\"+duration+\"ms,req:\"+req+\",res:\"+res);");
@@ -246,27 +244,29 @@ public class Swapper {
 
 
     public ResultCode getSpringCtx() throws Exception {
-        MethodId methodId = new MethodId("org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter", "invokeHandlerMethod", null);
-        return retransform(methodId, () -> (loader, clssName, classBeingRedefined, protectionDomain, classfileBuffer) -> {
-            clssName = clssName.replace("/", ".");
-            byte[] result = classfileBuffer;
-            try {
-                if (clssName.equals(methodId.className)) {
-                    CtClass curClass = ClassPool.getDefault().get(clssName);
-                    CtClass tarClass = ClassPool.getDefault().get(methodId.className);
-                    // 对于watch方法需要，修改所有的子类的方法
-                    if (curClass == tarClass) {
-                        CtMethod ctMethod = getCtMethod(curClass, methodId);
-                        ctMethod.insertAfter("{if (w.Global.springApplicationContext == null) {w.Global.springApplicationContext = $0.getApplicationContext();}}");
-                        result = curClass.toBytecode();
-                        Global.log(1, "Change body success: " + clssName + "#" + methodId.getMethod());
-                    }
-                }
-            } catch (Exception e) {
-                Global.log(2, "Change body fail: "+ e.getMessage());
-            }
-            return result;
-        });
+
+//        MethodId methodId = new MethodId("org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter", "invokeHandlerMethod", null);
+//        return retransform(methodId, () -> (loader, clssName, classBeingRedefined, protectionDomain, classfileBuffer) -> {
+//            clssName = clssName.replace("/", ".");
+//            byte[] result = null;
+//            try {
+//                if (clssName.equals(methodId.className)) {
+//                    CtClass curClass = ClassPool.getDefault().get(clssName);
+//                    CtClass tarClass = ClassPool.getDefault().get(methodId.className);
+//                    // 对于watch方法需要，修改所有的子类的方法
+//                    if (curClass == tarClass) {
+//                        CtMethod ctMethod = getCtMethod(curClass, methodId);
+//                        ctMethod.insertAfter("{if (w.Global.springApplicationContext == null) {w.Global.springApplicationContext = $0.getApplicationContext();}}");
+//                        result = curClass.toBytecode();
+//                        Global.log(1, "Change body success: " + clssName + "#" + methodId.getMethod());
+//                    }
+//                }
+//            } catch (Exception e) {
+//                Global.log(2, "Change body fail: "+ e.getMessage());
+//            }
+//            return result;
+//        });
+        return null;
     }
 
     private CtClass getCtClass(ClassLoader loader, MethodId methodId) throws NotFoundException {

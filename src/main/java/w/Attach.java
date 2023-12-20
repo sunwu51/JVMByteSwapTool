@@ -4,6 +4,9 @@ import com.sun.tools.attach.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Scanner;
 
@@ -13,12 +16,11 @@ import java.util.Scanner;
  */
 public class Attach {
 
-    public static void main(String[] args) throws IOException, AttachNotSupportedException, AgentLoadException, AgentInitializationException {
+    public static void main(String[] args) throws IOException, AttachNotSupportedException, AgentLoadException, AgentInitializationException, URISyntaxException {
 
         // Get the jvm process PID from args[0] or manual input
         // And get the spring http port from manual input
         String pid = null;
-        int port = -1;
         Scanner scanner = new Scanner(System.in);
 
         if (args.length > 0) {
@@ -50,27 +52,11 @@ public class Attach {
                 break;
             }
         }
-
         System.out.printf("============The PID is %s%n", pid);
-        System.out.println(">>>>>>>>>>>>Please enter the spring web server port, if not spring input enter key to skip");
-
-        scanner.nextLine();
-        String line = scanner.nextLine();
-
-        if (line != null && !line.trim().isEmpty()) {
-            try {
-                port = Integer.parseInt(line.trim());
-            } catch (Exception e) {
-                System.err.println("port is not a integer");
-                throw e;
-            }
-        }
-
         VirtualMachine jvm = VirtualMachine.attach(pid);
-        File file = new File("swapper-0.0.1-SNAPSHOT.jar");
-        String agentJarPath = file.getAbsoluteFile().getPath();
-        String agentArgs = String.format("port=%s", port);
-        jvm.loadAgent(agentJarPath, agentArgs);
+        URL jarUrl = Attach.class.getProtectionDomain().getCodeSource().getLocation();
+        String curJarPath = Paths.get(jarUrl.toURI()).toString();
+        jvm.loadAgent(curJarPath);
         jvm.detach();
         System.out.println("============Attach finish");
     }

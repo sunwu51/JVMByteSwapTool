@@ -20,13 +20,11 @@ import w.core.Retransformer;
 import w.core.Swapper;
 import w.web.Httpd;
 import w.web.Websocketd;
-import w.web.util.HttpUtil;
+import w.util.HttpUtil;
 
 public class App {
     private static final int DEFAULT_HTTP_PORT = 8000;
     private static final int DEFAULT_WEBSOCKET_PORT = 18000;
-
-    private static final String PORT_KEY = "port";
 
     private static ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
 
@@ -38,7 +36,12 @@ public class App {
         for (Class c : Global.instrumentation.getAllLoadedClasses()) {
             // if it is a spring boot fat jar, the class loader will be LaunchedURLClassLoader, for spring boot >1 and <3
             if (c.getClassLoader() == null) continue;
-            if (c.getClassLoader().toString().startsWith("org.springframework.boot.loader.LaunchedURLClassLoader")) {
+            if (c.getName().equals("org.springframework.context.ApplicationContext")) {
+                Object[] instances = Global.getInstances(c);
+                assert instances.length == 1;
+                Global.springApplicationContext = instances[0];
+                ClassLoader cl = c.getClassLoader();
+                System.out.println("find springboot application context is loaded by " + cl);
                 Global.springBootCl = c.getClassLoader();
                 break;
             }
@@ -48,17 +51,10 @@ public class App {
         startHttpd(DEFAULT_HTTP_PORT);
         startWebsocketd(DEFAULT_WEBSOCKET_PORT);
 
-        // 3 catch spring ctx by visit http endpoint
-        Map<String, String> params = parseQueryString(arg);
-        int springWebPort = Integer.parseInt(params.get(PORT_KEY));
-        if (springWebPort > 0) {
-            ingestSpringApplicationContext(springWebPort);
-        }
-
-        // 4 init execInstance
+        // 3 init execInstance
         initExecInstance();
 
-        // 5 task to clean closed ws and related enhancer
+        // 4 task to clean closed ws and related enhancer
         schedule();
     }
 
@@ -91,33 +87,6 @@ public class App {
         } catch (IOException e) {
             startWebsocketd(port + 1);
         }
-    }
-
-    /**
-     * Ingest Spring ApplicationContext by visit the web endpoint
-     * @param port
-     */
-
-    private static void ingestSpringApplicationContext(int port) {
-        try {
-            Swapper.getInstance().getSpringCtx();
-            HttpUtil.doGet("http://127.0.0.1:" + port);
-            assert Global.springApplicationContext != null;
-        } catch (Exception e) {
-            System.err.println("Ingest spring context error " + e);
-        }
-    }
-
-    private static Map<String, String> parseQueryString(String queryString) {
-        Map<String, String> result = new HashMap<>();
-        if (queryString == null) return result;
-
-        for (String kv : queryString.split("&")) {
-            String[] arr = kv.split("=");
-            assert arr.length == 2;
-            result.put(arr[0], arr[1]);
-        }
-        return result;
     }
 
     private static void initExecInstance() throws CannotCompileException, InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException, NotFoundException, IOException {

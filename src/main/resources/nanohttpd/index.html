@@ -54,8 +54,8 @@
                     <div>
                         <sl-input label="请输入方法签名" id="wt-input1" placeholder="全限定类名#方法名"></sl-input>
                         <sl-radio-group label="出入参的打印格式" id="wt-radio1" value="1">
-                            <sl-radio value="1">toString</sl-radio>
-                            <sl-radio value="2">toJson</sl-radio>
+                            <sl-radio value="1">Pretty</sl-radio>
+                            <sl-radio value="2">Json</sl-radio>
                         </sl-radio-group>
                         <sl-button variant="primary" id="wt-btn">watch</sl-button>
                     </div>
@@ -63,16 +63,14 @@
                 <sl-card class="card-overview">
                     <div slot="header">
                         <strong>OuterWatch</strong><br />
-                        outer-watch用于无法修改的基础类例如java.util下的类，可以在调用他的地方进行环绕增强<br>
-                        myFunc中调用了HashMap#get方法，下面第一个input输入myFunc的签名，第二个输入java.util.HashMap#get<br>
-                        为了简化流程，更好的支持匿名类方法，第二个input中可以用*#get这种写法来匹配任意类的get方法
+                        outer-watch是增强调用方的代码，来监控，即方法1调用方法2，增强方法1中相关代码。
                     </div>
                     <div>
                         <sl-input label="请输入方法签名" id="wt-input2" placeholder="全限定类名#方法名"></sl-input>
                         <sl-input label="上述方法内调用其他方法签名" id="wt-input3" placeholder="全限定类名#方法名"></sl-input>
                         <sl-radio-group label="出入参的打印格式" id="wt-radio2" value="1">
-                            <sl-radio value="1">toString</sl-radio>
-                            <sl-radio value="2">toJson</sl-radio>
+                            <sl-radio value="1">Pretty</sl-radio>
+                            <sl-radio value="2">Json</sl-radio>
                         </sl-radio-group>
                         <sl-button variant="primary" id="wt-btn2">watch</sl-button>
                     </div>
@@ -96,11 +94,8 @@
                 </sl-card>
                 <sl-card class="card-overview">
                     <div slot="header">
-                        <strong>ChangeResult</strong><br />
-                        与outer-watch类似，对于一些无法直接篡改的基础类，可以在调用该类的方法中，从外侧进行修改其返回值<br>
-                        例如myFunc中调用HashMap#get方法，想要直接修改get的返回值，则下面前两个input是myFunc签名<br>
-                        第3个input可以写java.util.HashMap#get或者*#get<br>
-                        代码框中$_代表返回值，主要要匹配原方法返回值类型。
+                        <strong>OuterChange</strong><br />
+                        与out-watch类似，修改调用方的相关代码进行增强。
                     </div>
                     <div>
                         <sl-input id="cb-input3" label="请输入方法签名"  placeholder="全限定类名#方法名"></sl-input>
@@ -154,21 +149,34 @@
 <script>
     var cbCode = initCodeMirror("cb-text", false, "{\n\t// write some java code\n}");
     var cbCode2 = initCodeMirror("cb-text2", false, "// $_ = \"修改后的返回值\";");
-    var exCode = initCodeMirror("ex-text", false, "{\n\t// write some java code\n}");
+    var exCode = initCodeMirror("ex-text", false, "{\n" +
+        "    try {\n" +
+        "       // write some java code\n" +
+        "       // w.Global.info(Ognl.getValue(\"#root\", ctx));\n" +
+        "    } catch(Exception e) {\n" +
+        "       w.Global.info(e.toString());\n" +
+        "    }\n" +
+        "}");
 
     initCodeMirror("execute-example-text1", true, "{\n" +
         "\tSystem.out.println(UUID.randomUUID());\n" +
         "  \tSystem.out.println(new java.awt.Point(100,200));\n" +
         "}");
     initCodeMirror("execute-example-text2", true, "{\n" +
-        "\t// 可直接用info方法做debug\n" +
-        "    info(\"打印log，且回传前端显示在右边→_→\");\n" +
+        "\t// 可直接用w.Global.info方法做debug\n" +
+        "    w.Global.info(\"打印log，且回传前端显示在右边→_→\");\n" +
         "  \n" +
         "    // 直接用ctx变量，是注入的spring上下文，但注意getBean返回Object\n" +
         "    // 需要类型转换\n" +
-        "    com.example.UserMapper mapper = (com.example.UserMapper)ctx.getBean(\"userMapper\");\n" +
+        "    com.example.UserMapper mapper = \n" +
+        "       (com.example.UserMapper)ctx.getBean(\"userMapper\");\n" +
         "    com.example.User user = mapper.getUserById(1);\n" +
-        "    info(user.toString());\n" +
+        "    w.Global.info(user);\n" +
+        "\n" +
+        "   // 也可以用ognl，如果是spring项目则可以指定root为ctx，如下\n" +
+        "   String exp = \"#user=getBean(\\\"userMapper\\\").getUserById(1), #user.name\"\n" +
+        "   Object result = Ognl.getValue(Ognl.parseExpression(exp), ctx);\n" +
+        "   w.Global.info(result);\n" +
         "}");
     var logs = [];
     var logMirror = CodeMirror.fromTextArea(document.getElementById('log-text'), {

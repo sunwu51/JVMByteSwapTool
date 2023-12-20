@@ -22,7 +22,7 @@ public class PongMessage extends Message implements ResponseMessage {
         type = MessageType.PONG;
         for (Map<MethodId, Retransformer> m : Global.traceId2MethodId2Trans.values()) {
             activeMethods.addAll(m.keySet().stream().map(it -> it.getClassName() + "#" + it.getMethod())
-                    .collect(Collectors.toList()));
+                    .collect(Collectors.toSet()));
         }
     }
 }
