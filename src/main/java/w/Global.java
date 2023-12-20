@@ -40,6 +40,8 @@ public class Global {
 
     public final static Map<MethodId, String> methodId2TraceId = new ConcurrentHashMap<>();
 
+    public final static Map<String, Set<Class<?>>> tranceId2ReplaceClasses = new ConcurrentHashMap<>();
+
     public static ThreadLocal<Map<String, Set<ClassLoader>>> classToLoader = ThreadLocal.withInitial(HashMap::new);
 
     public static int wsPort = 0;

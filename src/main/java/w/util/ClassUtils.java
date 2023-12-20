@@ -20,6 +20,9 @@ public class ClassUtils {
                 Global.classToLoader.get().computeIfAbsent(className, k -> new HashSet<>()).add(c.getClassLoader());
             }
         }
+        if (method == null){
+            return null;
+        }
 
         CtClass c = Global.classPool.get(className);
         out: for (CtMethod declaredMethod : c.getDeclaredMethods()) {

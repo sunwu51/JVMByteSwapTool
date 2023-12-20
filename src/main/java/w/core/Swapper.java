@@ -60,8 +60,12 @@ public class Swapper {
                 return Stream.empty();
             }
         }).collect(Collectors.toList());
-        for (Class c : cls) {
-            Global.instrumentation.retransformClasses(c);
+        try {
+            for (Class c : cls) {
+                Global.instrumentation.retransformClasses(c);
+            }
+        } catch (Throwable e) {
+            Global.log(2, "retrans error " + e.getMessage());
         }
         return ResultCode.SUCCESS;
     }
@@ -228,8 +232,6 @@ public class Swapper {
                             }
                         });
 
-
-
                         result = curClass.toBytecode();
                         curClass.detach();
                         Global.log(1, "Watch success: out=" + clssName + "#" + outerMethodId.getMethod() + ", inner=" + innerMethodId.getClassName() + "#" + innerMethodId.getMethod());
@@ -243,30 +245,52 @@ public class Swapper {
     }
 
 
-    public ResultCode getSpringCtx() throws Exception {
+    public ResultCode replaceClass(String clsName, byte[] content) throws Exception {
+        System.out.println(clsName);
+        String traceId = Global.traceIdCtx.get();
+        Global.log(1, "remove relate transformer");
+        synchronized (Global.class) {
+            Global.traceId2MethodId2Trans.values().forEach(map -> {
+                Set<MethodId> toDel = new HashSet<>();
+                for (MethodId methodId : map.keySet()) {
+                    if (methodId.className.equals(clsName)) {
+                        toDel.add(methodId);
+                        Global.instrumentation.removeTransformer(map.get(methodId).getClassFileTransformer());
+                    }
+                }
+                for (MethodId methodId : toDel) {
+                    map.remove(methodId);
+                }
+            });
+        }
 
-//        MethodId methodId = new MethodId("org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter", "invokeHandlerMethod", null);
-//        return retransform(methodId, () -> (loader, clssName, classBeingRedefined, protectionDomain, classfileBuffer) -> {
-//            clssName = clssName.replace("/", ".");
-//            byte[] result = null;
-//            try {
-//                if (clssName.equals(methodId.className)) {
-//                    CtClass curClass = ClassPool.getDefault().get(clssName);
-//                    CtClass tarClass = ClassPool.getDefault().get(methodId.className);
-//                    // 对于watch方法需要，修改所有的子类的方法
-//                    if (curClass == tarClass) {
-//                        CtMethod ctMethod = getCtMethod(curClass, methodId);
-//                        ctMethod.insertAfter("{if (w.Global.springApplicationContext == null) {w.Global.springApplicationContext = $0.getApplicationContext();}}");
-//                        result = curClass.toBytecode();
-//                        Global.log(1, "Change body success: " + clssName + "#" + methodId.getMethod());
-//                    }
-//                }
-//            } catch (Exception e) {
-//                Global.log(2, "Change body fail: "+ e.getMessage());
-//            }
-//            return result;
-//        });
-        return null;
+        Global.log(1, "add new transformer");
+        Global.instrumentation.addTransformer(new ClassFileTransformer() {
+            @Override
+            public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
+                className = className.replace("/", ".");
+                if (className.equals(clsName)) {
+                    Global.traceId2MethodId2Trans.computeIfAbsent(traceId, k->new HashMap<>())
+                            .put(new MethodId(className, null, null), new Retransformer(RetransformType.REPLACE_CLASS, this));
+                    return content;
+                }
+                return null;
+            }
+        }, true);
+
+
+        try {
+            for (Class loadedClass : Global.instrumentation.getAllLoadedClasses()) {
+                if (loadedClass.getName().equals(clsName) && loadedClass.getClassLoader() != null) {
+                    Global.log(1, "retransform class");
+                    Global.instrumentation.retransformClasses(loadedClass);
+                }
+            }
+        } catch (Throwable e) {
+            Global.log(2, "retrans error " + e.getMessage());
+        }
+
+        return ResultCode.SUCCESS;
     }
 
     private CtClass getCtClass(ClassLoader loader, MethodId methodId) throws NotFoundException {

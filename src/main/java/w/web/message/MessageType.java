@@ -19,9 +19,8 @@ public enum MessageType {
 
     EXEC,
 
-    /**
-     * 通信的心跳類型
-     */
+    REPLACE_CLASS,
+
     PING,
 
     PONG,

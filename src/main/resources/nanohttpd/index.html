@@ -45,6 +45,7 @@
             <sl-tab slot="nav" panel="watch">Watch</sl-tab>
             <sl-tab slot="nav" panel="change-body">ChangeBody</sl-tab>
             <sl-tab slot="nav" panel="execute">Execute</sl-tab>
+            <sl-tab slot="nav" panel="replace-class">ReplaceClass</sl-tab>
             <sl-tab-panel name="watch">
                 <sl-card class="card-overview">
                     <div slot="header">
@@ -139,6 +140,20 @@
                     </div>
                 </sl-card>
             </sl-tab-panel>
+            <sl-tab-panel name="replace-class">
+                    <sl-card class="card-overview">
+                        <div slot="header">
+                            <strong>ReplaceClass</strong><br />
+                            上传class文件在线替换整个类，默认会将所有的ClassLoader加载过的同名类都替换<br>
+                        </div>
+                        <div>
+                            <input id="rc-input1" type="file"></input>
+                            <sl-input id="rc-input2" label="请输入全限定类名" >
+                            </sl-input>
+                            <sl-button variant="primary" id="rc-btn">Upload</sl-button>
+                        </div>
+                    </sl-card>
+                </sl-tab-panel>
         </sl-tab-group>
         </div>
         <div id="right-container">

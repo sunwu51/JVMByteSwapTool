@@ -10,6 +10,10 @@ import fi.iki.elonen.NanoWSD;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.lang.instrument.ClassFileTransformer;
+import java.lang.instrument.IllegalClassFormatException;
+import java.security.ProtectionDomain;
+import java.util.Base64;
 
 /**
  * @author Frank
@@ -57,7 +61,7 @@ public class Websocketd extends NanoWSD {
 
             private void dispatch(String msg) {
                 try {
-                    if (!msg.contains("_")) {
+                    if (!msg.contains("\"_\"")) {
                         System.out.println(msg);
                     }
                     Message message = objectMapper.readValue(msg, Message.class);
@@ -103,6 +107,11 @@ public class Websocketd extends NanoWSD {
                         case EXEC:
                             ExecMessage execMessage = (ExecMessage) message;
                             Global.execBundle.changeBodyAndInvoke(execMessage.getBody());
+                            break;
+                        case REPLACE_CLASS:
+                            ReplaceClassMessage replaceClassMessage = (ReplaceClassMessage) message;
+                            byte[] content = Base64.getDecoder().decode(replaceClassMessage.getContent());
+                            swapper.replaceClass(replaceClassMessage.getClassName(), content);
                             break;
                         default:
                             Global.log(2, "message type not support");

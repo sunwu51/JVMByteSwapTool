@@ -40,7 +40,6 @@ setInterval(() => {
 
 
 var latestId = "";
-// 当点击watch的时候
 document.getElementById("wt-btn").addEventListener("click", e => {
     var signature = document.getElementById("wt-input1").value;
     var useJson = document.getElementById('wt-radio1').value == 2;
@@ -85,7 +84,6 @@ document.getElementById("wt-btn2").addEventListener("click", e => {
     }
 })
 
-// 当点击changebody的时候
 document.getElementById("cb-btn").addEventListener("click", e => {
     var signature = document.getElementById("cb-input1").value;
     var paramTypesTxt = document.getElementById("cb-input2").value;
@@ -138,7 +136,6 @@ document.getElementById("cb-btn2").addEventListener("click", e => {
     }
 })
 
-// 当点击execute的时候
 document.getElementById("ex-btn").addEventListener("click", e => {
     latestId = uuid();
     if (ws) {
@@ -154,8 +151,53 @@ document.getElementById("ex-btn").addEventListener("click", e => {
 })
 
 
+document.getElementById("rc-btn").addEventListener("click", async e => {
+    latestId = uuid();
+    if (ws) {
+        var fileInput = document.getElementById("rc-input1");
+        var className = document.getElementById("rc-input2").value;
+        if (!fileInput.files || fileInput.files.length == 0) {
+            alert("请选择文件")
+            return
+        }
+        if (!className) {
+            alert("请出入类名")
+            return
+        }
+        fileInput.disabled = true;
+        try {
+            var file = fileInput.files[0];
+            var b64 = await fileToBase64(file)
+            ws.send(JSON.stringify({
+                id: latestId,
+                timestamp: new Date().getTime(),
+                type: "REPLACE_CLASS",
+                content: b64,
+                className
+            }))
+        } catch (e) {} finally {
+            fileInput.disabled = false;
+        }
+    } else {
+        alert("ws连接关闭")
+    }
+})
 
 
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64String = reader.result.split(',')[1];
+            resolve(base64String);
+        };
+        reader.onerror = (error) => {
+            reject(error);
+        };
+        reader.readAsDataURL(file);
+    });
+}
 
 
 function uuid() {

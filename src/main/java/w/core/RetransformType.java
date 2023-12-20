@@ -7,4 +7,6 @@ package w.core;
 public enum RetransformType {
     CHANGE_BODY,
     WATCH,
+
+    REPLACE_CLASS,
 }
