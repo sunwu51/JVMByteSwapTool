@@ -17,10 +17,9 @@ import javassist.*;
 import w.core.ExecBundle;
 import w.core.MethodId;
 import w.core.Retransformer;
-import w.core.Swapper;
+import w.util.SpringUtils;
 import w.web.Httpd;
 import w.web.Websocketd;
-import w.util.HttpUtil;
 
 public class App {
     private static final int DEFAULT_HTTP_PORT = 8000;
@@ -33,19 +32,7 @@ public class App {
 
 
         // 1 record the spring boot classloader
-        for (Class c : Global.instrumentation.getAllLoadedClasses()) {
-            // if it is a spring boot fat jar, the class loader will be LaunchedURLClassLoader, for spring boot >1 and <3
-            if (c.getClassLoader() == null) continue;
-            if (c.getName().equals("org.springframework.context.ApplicationContext")) {
-                Object[] instances = Global.getInstances(c);
-                assert instances.length == 1;
-                Global.springApplicationContext = instances[0];
-                ClassLoader cl = c.getClassLoader();
-                System.out.println("find springboot application context is loaded by " + cl);
-                Global.springBootCl = c.getClassLoader();
-                break;
-            }
-        }
+        SpringUtils.initFromLoadedClasses(instrumentation.getAllLoadedClasses());
 
         // 2 start http and websocket server
         startHttpd(DEFAULT_HTTP_PORT);

@@ -5,6 +5,7 @@ import javassist.expr.ExprEditor;
 import javassist.expr.MethodCall;
 import w.*;
 import w.util.ClassUtils;
+import w.util.RequestUtils;
 
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
@@ -25,24 +26,6 @@ public class Swapper {
     }
 
     private synchronized ResultCode retransform(MethodId methodId, Callable<ClassFileTransformer> callable) throws Exception {
-        Global.log(1, "Checking whether method exists...");
-        try {
-            ClassUtils.checkMethodExists(methodId.getClassName(), methodId.getMethod(), methodId.getParamTypes());
-        } catch (NotFoundException e1) {
-            Global.log(1, "Class or method not exits: " + e1);
-            return ResultCode.CLASS_OR_METHOD_NOT_FOUND;
-        }
-        Global.log(1, "Check exist finish");
-        Global.log(1, "Checking whether method is re-transformed...");
-        String traceId = Global.methodId2TraceId.get(methodId);
-        if (traceId != null) {
-            Global.log(1, "Yes, removing the origin re-transformer...");
-            Retransformer origin = Global.traceId2MethodId2Trans.getOrDefault(traceId, new HashMap<>()).remove(methodId);
-            if (origin != null) Global.instrumentation.removeTransformer(origin.getClassFileTransformer());
-            Global.log(1, "Removed the origin re-transformer...");
-        }
-        Global.log(1, "Check re-transformer finish");
-
         Global.log(1, "Prepare new re-transformer...");
         ClassFileTransformer transformer = callable.call();
         Global.instrumentation.addTransformer(transformer, true);
@@ -171,8 +154,8 @@ public class Swapper {
                         ctMethod.insertAfter("endTime = System.currentTimeMillis();");
                         ctMethod.insertAfter("duration = endTime - startTime;");
                         if (useJson) {
-                            ctMethod.insertAfter("try {req = w.Global.objectMapper.writeValueAsString($args);} catch (Exception e) {req = \"convert json error\";}");
-                            ctMethod.insertAfter("try {res = w.Global.objectMapper.writeValueAsString($_);} catch (Exception e) {res = \"convert json error\";}");
+                            ctMethod.insertAfter("try {req = w.Global.toJson($args);} catch (Exception e) {req = \"convert json error\";}");
+                            ctMethod.insertAfter("try {res = w.Global.toJson($_);} catch (Exception e) {res = \"convert json error\";}");
                         } else {
                             ctMethod.insertAfter("req = w.Global.toString($args);");
                             ctMethod.insertAfter("res = w.Global.toString($_);");
@@ -220,8 +203,8 @@ public class Swapper {
                                                 "String req = Arrays.toString($args);" +
                                                 "String res = \"\" + $_;" +
                                                 (useJson ? "try{" +
-                                                        "req = w.Global.objectMapper.writeValueAsString($args);" +
-                                                        "res = w.Global.objectMapper.writeValueAsString($_);" +
+                                                        "req = w.Global.toJson($args);" +
+                                                        "res = w.Global.toJson($_);" +
                                                         "}catch (Exception e) {req = \"convert json error\"; res=req;}" : "") +
                                                 "w.Global.traceIdCtx.set(\"" + traceId + "\");" +
                                                 "w.Global.info(\"line" + m.getLineNumber() + ",cost:\"+duration+\"ms,req:\"+req+\",res:\"+res);" +

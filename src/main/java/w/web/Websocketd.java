@@ -3,6 +3,7 @@ package w.web;
 import w.Global;
 import w.core.MethodId;
 import w.core.Swapper;
+import w.util.RequestUtils;
 import w.web.message.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -61,10 +62,12 @@ public class Websocketd extends NanoWSD {
 
             private void dispatch(String msg) {
                 try {
-                    if (!msg.contains("\"_\"")) {
-                        System.out.println(msg);
-                    }
                     Message message = objectMapper.readValue(msg, Message.class);
+                    if (message.getType() != MessageType.PING) {
+                        System.out.println(objectMapper.writeValueAsString(message));
+                        RequestUtils.initRequestCtx(this, message.getId());
+                    }
+
                     Global.socketCtx.set(this);
                     Global.traceIdCtx.set(message.getId());
                     if (!"_".equals(message.getId())) {
@@ -116,6 +119,7 @@ public class Websocketd extends NanoWSD {
                         default:
                             Global.log(2, "message type not support");
                     }
+
                 } catch (JsonProcessingException e) {
                     e.printStackTrace();
                     Global.log(2, "not a valid message");

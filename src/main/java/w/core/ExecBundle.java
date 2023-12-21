@@ -5,6 +5,7 @@ import javassist.CtClass;
 import javassist.CtMethod;
 import lombok.Data;
 import w.Global;
+import w.util.SpringUtils;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -28,15 +29,7 @@ public class ExecBundle {
     public synchronized void changeBodyAndInvoke(String body) throws Exception {
         Global.log(1, "start to change body");
         ctClass.defrost();
-        boolean spring = Global.springApplicationContext != null;
-        String sb = "{\n" +
-                (spring ?
-                        "org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext ctx " +
-                                "= (org.springframework.boot.web.servlet.context.AnnotationConfigServletWebServerApplicationContext) w.Global.springApplicationContext;\n"
-                        : "") +
-                body +
-                "}";
-        body = sb;
+        body = "{" + SpringUtils.generateSpringCtxCode() + body + "}";
         Swapper.getInstance().changeBody(
                 new MethodId(ctClass.getName(), ctMethod.getName(), new ArrayList<>()),
                 body
