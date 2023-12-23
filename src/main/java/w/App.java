@@ -78,45 +78,11 @@ public class App {
 
     private static void initExecInstance() throws CannotCompileException, InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException, NotFoundException, IOException {
         Global.traceIdCtx.set("0000");
-        CtClass ctClass = Global.classPool.makeClass("w.Exec");
-        ctClass.defrost();
-        CtMethod ctMethod = CtMethod.make("public void exec() {}", ctClass);
-        ctClass.addMethod(ctMethod);
-        Class c = ctClass.toClass(Global.getClassLoader());
-        ExecBundle bundle = new ExecBundle();
-        bundle.setInst(c.newInstance());
-        bundle.setCtClass(ctClass);
-        bundle.setCtMethod(ctMethod);
-        Global.execBundle = bundle;
-        bundle.invoke();
+        ExecBundle.invoke();
     }
 
     private static void schedule() {
-        pool.scheduleAtFixedRate(() -> {
-            // delete the closed ws and ctx
-            Set<String> removeTraces = new HashSet<>();
-            for (Map.Entry<String, NanoWSD.WebSocket> kv : Global.socketMap.entrySet()) {
-                NanoWSD.WebSocket ws = kv.getValue();
-                if (ws == null || !ws.isOpen()) {
-                    removeTraces.add(kv.getKey());
-                }
-            }
-            for (String removeTrace : removeTraces) {
-                Global.socketMap.remove(removeTrace);
-                Map<MethodId, Retransformer> map = Global.traceId2MethodId2Trans.remove(removeTrace);
-                if (map != null) {
-                    map.forEach(((methodId, retransformer) -> {
-                        Global.instrumentation.removeTransformer(retransformer.getClassFileTransformer());
-                        try {
-                            Global.instrumentation.retransformClasses(Global.getClassLoader().loadClass(methodId.getClassName()));
-                        } catch (UnmodifiableClassException e) {
-                        } catch (ClassNotFoundException e) {
-                        }
-                    }));
-                }
-            }
 
-        }, 0, 3, TimeUnit.SECONDS);
     }
 
 

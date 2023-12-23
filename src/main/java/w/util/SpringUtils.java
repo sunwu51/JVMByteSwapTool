@@ -3,7 +3,11 @@ package w.util;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
+import ognl.*;
 import w.Global;
+
+import java.lang.reflect.InvocationTargetException;
+import java.util.Map;
 
 /**
  * @author Frank
@@ -27,15 +31,23 @@ public class SpringUtils {
     }
 
 
-    public static void initFromLoadedClasses(Class<?>[] loadedClasses) {
+    public static void initFromLoadedClasses(Class<?>[] loadedClasses) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         for (Class<?> c : loadedClasses) {
             // if it is a spring boot fat jar, the class loader will be LaunchedURLClassLoader, for spring boot >1 and <3
             if (c.getClassLoader() == null) continue;
             if (c.getName().equals(SpringUtils.getAppCtxClassName())) {
                 Object[] instances = Global.getInstances(c);
+                int max = -1;
+                Object leader = null;
+                for (Object instance : instances) {
+                    int count = (int) instance.getClass().getMethod("getBeanDefinitionCount").invoke(instance);
+                    if (count > max) {
+                        leader = instance;
+                    }
+                }
                 ClassLoader cl = c.getClassLoader();
                 System.out.println("find springboot application context is loaded by " + cl);
-                SpringUtils.springBootApplicationContext = instances[0];
+                SpringUtils.springBootApplicationContext = leader;
                 SpringUtils.springBootClassLoader = c.getClassLoader();
                 break;
             }
@@ -49,4 +61,6 @@ public class SpringUtils {
         return String.format("%s ctx = (%s) (%s).getSpringBootApplicationContext();\n",
                 APP_CTX_CLASS_NAME, APP_CTX_CLASS_NAME, SpringUtils.class.getName());
     }
+
+
 }

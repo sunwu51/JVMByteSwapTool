@@ -18,5 +18,5 @@ public class WatchMessage extends Message implements RequestMessage {
      */
     String signature;
 
-    boolean useJson;
+    int printFormat;
 }

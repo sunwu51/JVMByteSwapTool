@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/themes/light.css" />
     <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/shoelace-autoloader.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/theme/ayu-dark.min.css" integrity="sha512-mV3RUXi1gt22jDb4UyRBFhZVFgAIiOfRE6ul+2l1Hcj6glyg6x4xlnjPH+neGm/t6XrFmsMRu4++McQu0asjqg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/javascript/javascript.min.js" integrity="sha512-I6CdJdruzGtvDyvdO4YsiAq+pkWf2efgd1ZUSK2FnM/u2VuRASPC7GowWQrWyjxCZn6CT89s3ddGI+be0Ak9Fg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <style>
         .CodeMirror
         {
@@ -33,12 +34,6 @@
     </style>
 </head>
 <body>
-    <sl-alert variant="success" open>
-        <sl-icon slot="icon" name="check2-circle"></sl-icon>
-        <strong>被修改的类列表:</strong><br />
-        <b id="activeMethods"></b>
-    </sl-alert>
-
     <div style="display: flex">
         <div id="left-container">
             <sl-tab-group>
@@ -55,8 +50,9 @@
                     <div>
                         <sl-input label="请输入方法签名" id="wt-input1" placeholder="全限定类名#方法名"></sl-input>
                         <sl-radio-group label="出入参的打印格式" id="wt-radio1" value="1">
-                            <sl-radio value="1">Pretty</sl-radio>
+                            <sl-radio value="1">toString</sl-radio>
                             <sl-radio value="2">Json</sl-radio>
+                            <sl-radio value="3">Pretty</sl-radio>
                         </sl-radio-group>
                         <sl-button variant="primary" id="wt-btn">watch</sl-button>
                     </div>
@@ -70,8 +66,9 @@
                         <sl-input label="请输入方法签名" id="wt-input2" placeholder="全限定类名#方法名"></sl-input>
                         <sl-input label="上述方法内调用其他方法签名" id="wt-input3" placeholder="全限定类名#方法名"></sl-input>
                         <sl-radio-group label="出入参的打印格式" id="wt-radio2" value="1">
-                            <sl-radio value="1">Pretty</sl-radio>
+                            <sl-radio value="1">toString</sl-radio>
                             <sl-radio value="2">Json</sl-radio>
+                            <sl-radio value="3">Pretty</sl-radio>
                         </sl-radio-group>
                         <sl-button variant="primary" id="wt-btn2">watch</sl-button>
                     </div>
@@ -157,7 +154,42 @@
         </sl-tab-group>
         </div>
         <div id="right-container">
-            <textarea id="log-text"></textarea>
+
+            <sl-button id="log-btn1">clear</sl-button>
+            <sl-dialog label="Dialog" class="dialog-width" style="--width: 50vw;">
+                <textarea id="log-text2"></textarea>
+                <sl-input id="log-input1" placeholder="输入结尾的uuid可以删除transformer"></sl-input>
+                <sl-button variant="warning" id="log-btn2">delete</sl-button>
+                <sl-button variant="danger" id="log-btn3">reset</sl-button>
+            </sl-dialog>
+            <sl-button id="log-btn2">effected class</sl-button>
+            <textarea id="log-text1"></textarea>
+
+
+            <script>
+                const dialog = document.querySelector('.dialog-width');
+                const openButton = dialog.nextElementSibling;
+                openButton.addEventListener('click', () => dialog.show());
+                var logs = [];
+                var logMirror = CodeMirror.fromTextArea(document.getElementById('log-text1'), {
+                    mode: 'text/x-java',
+                    theme: 'darcula',
+                    lineNumbers: true,
+                    readOnly: true,
+                    lineWrapping: true,
+                });
+                var logMirror2 = CodeMirror.fromTextArea(document.getElementById('log-text2'), {
+                    mode: { name: "javascript", json: true },
+                    lineNumbers: true,
+                    readOnly: true,
+                });
+                logMirror.setSize("100%", "98vh")
+                logMirror2.setSize(null, "400px")
+                document.getElementById("log-btn1").onclick = e => {
+                    logs = [];
+                    logMirror.setValue("");
+                }
+            </script>
         </div>
     </div>
 </body>
@@ -167,7 +199,7 @@
     var exCode = initCodeMirror("ex-text", false, "{\n" +
         "    try {\n" +
         "       // write some java code\n" +
-        "       // w.Global.info(Ognl.getValue(\"#root\", ctx));\n" +
+        "       // w.Global.info(w.Global.ognl(\"#root\", ctx));\n" +
         "    } catch(Exception e) {\n" +
         "       w.Global.info(e.toString());\n" +
         "    }\n" +
@@ -190,18 +222,10 @@
         "\n" +
         "   // 也可以用ognl，如果是spring项目则可以指定root为ctx，如下\n" +
         "   String exp = \"#user=getBean(\\\"userMapper\\\").getUserById(1), #user.name\"\n" +
-        "   Object result = Ognl.getValue(Ognl.parseExpression(exp), ctx);\n" +
+        "   Object result = w.Global.ognl(Ognl.parseExpression(exp), ctx);\n" +
         "   w.Global.info(result);\n" +
         "}");
-    var logs = [];
-    var logMirror = CodeMirror.fromTextArea(document.getElementById('log-text'), {
-        mode: 'text/x-java',
-        theme: 'darcula',
-        lineNumbers: true,
-        readOnly: true,
-        lineWrapping: true,
-    });
-    logMirror.setSize("100%", "98vh")
+
     function initCodeMirror(id, readOnly, value) {
         var codeArea = CodeMirror.fromTextArea(document.getElementById(id), {
             mode: 'text/x-java',

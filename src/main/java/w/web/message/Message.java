@@ -22,7 +22,8 @@ import java.util.UUID;
         @JsonSubTypes.Type(value = PongMessage.class, name = "PONG"),
         @JsonSubTypes.Type(value = WatchMessage.class, name = "WATCH"),
         @JsonSubTypes.Type(value = OuterWatchMessage.class, name = "OUTER_WATCH"),
-        @JsonSubTypes.Type(value = ExecMessage.class, name = "EXEC")
+        @JsonSubTypes.Type(value = ExecMessage.class, name = "EXEC"),
+        @JsonSubTypes.Type(value = DeleteMessage.class, name = "DELETE")
 })
 @Data
 public abstract class Message {

@@ -20,5 +20,5 @@ public class OuterWatchMessage extends Message implements RequestMessage {
 
     String innerSignature;
 
-    boolean useJson;
+    int printFormat;
 }

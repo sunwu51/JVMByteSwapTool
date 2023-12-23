@@ -1,11 +1,14 @@
 package w.web.message;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.Data;
 import w.Global;
 import w.core.MethodId;
 import w.core.Retransformer;
+import w.core.model.BaseClassTransformer;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -17,12 +20,15 @@ import java.util.stream.Collectors;
  */
 @Data
 public class PongMessage extends Message implements ResponseMessage {
-    List<String> activeMethods = new ArrayList<>();
+    Map<String, Map<String, List<String>>> content = new HashMap<>();
     {
         type = MessageType.PONG;
-        for (Map<MethodId, Retransformer> m : Global.traceId2MethodId2Trans.values()) {
-            activeMethods.addAll(m.keySet().stream().map(it -> it.getClassName() + "#" + it.getMethod())
-                    .collect(Collectors.toSet()));
+        synchronized (Global.class) {
+            Global.activeTransformers.forEach((cls, loader2Transs) -> {
+                loader2Transs.forEach((loader, transs) -> {
+                    content.computeIfAbsent(cls, o -> new HashMap<>()).computeIfAbsent(loader, o -> transs.stream().map(trans -> trans.getTraceId() + "_" + trans.desc() +"_" + trans.getUuid()).collect(Collectors.toList()));
+                });
+            });
         }
     }
 }

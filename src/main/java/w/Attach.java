@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Scanner;
 
@@ -33,6 +34,7 @@ public class Attach {
             }
         } else {
             List<VirtualMachineDescriptor> jps = VirtualMachine.list();
+            jps.sort(Comparator.comparing(VirtualMachineDescriptor::displayName));
             int i = 0;
             for (; i < jps.size(); i++) {
                 System.out.printf("[%s] %s %s%n", i, jps.get(i).id(), jps.get(i).displayName());

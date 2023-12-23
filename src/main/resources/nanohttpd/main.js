@@ -15,18 +15,19 @@ async function init() {
     ws.onmessage = (msg) => {
         var m = JSON.parse(msg.data);
         if (m.type === 'PONG') {
-            var {activeMethods} = m;
-            document.getElementById("activeMethods").innerText = activeMethods.join(", ")
+            logMirror2.setValue(JSON.stringify(m.content,0,2))
             return
         }
         if (m.type === 'LOG') {
-            logs.unshift(`[${m.id}][${moment(m.timestamp).format("YYYYMMDD HH:mm:ss")}]${m.content}`);
+            logs.unshift(`[${m.id}][${moment(m.timestamp).format("YYYYMMDD HH:mm:ss")}]\n${m.content}`);
             while (logs.length > 100) {
                 logs.pop();
             }
             logMirror.setValue(logs.join('\n'));
         }
     }
+    ws.onclose = e=> console.log("ws closed", e)
+    ws.onerror = console.error
 
 }
 init()
@@ -42,7 +43,7 @@ setInterval(() => {
 var latestId = "";
 document.getElementById("wt-btn").addEventListener("click", e => {
     var signature = document.getElementById("wt-input1").value;
-    var useJson = document.getElementById('wt-radio1').value == 2;
+    var printFormat = parseInt(document.getElementById('wt-radio1').value);
     if (signature.split("#").length === 2) {
         latestId = uuid();
         if (ws) {
@@ -50,7 +51,7 @@ document.getElementById("wt-btn").addEventListener("click", e => {
                 id: latestId,
                 timestamp: new Date().getTime(),
                 type: "WATCH",
-                useJson,
+                printFormat,
                 signature,
             }))
         } else {
@@ -64,7 +65,7 @@ document.getElementById("wt-btn").addEventListener("click", e => {
 document.getElementById("wt-btn2").addEventListener("click", e => {
     var signature = document.getElementById("wt-input2").value;
     var innerSignature = document.getElementById("wt-input3").value;
-    var useJson = document.getElementById('wt-radio2').value == 2;
+    var printFormat = parseInt(document.getElementById('wt-radio2').value);
     if (signature.split("#").length === 2 && innerSignature.split("#").length === 2) {
         latestId = uuid();
         if (ws) {
@@ -72,7 +73,7 @@ document.getElementById("wt-btn2").addEventListener("click", e => {
                 id: latestId,
                 timestamp: new Date().getTime(),
                 type: "OUTER_WATCH",
-                useJson,
+                printFormat,
                 signature,
                 innerSignature,
             }))
@@ -183,6 +184,30 @@ document.getElementById("rc-btn").addEventListener("click", async e => {
     }
 })
 
+document.getElementById("log-btn2").addEventListener("click", async e => {
+    latestId = uuid();
+    if (ws) {
+        var tail = document.getElementById("log-input1").value
+        if (!tail || tail.length < 3){
+            alert("uuid非法");
+        }
+        ws.send(JSON.stringify({
+            id: latestId,
+            timestamp: new Date().getTime(),
+            type: "DELETE",
+            uuid: tail
+        }))
+    } else {
+        alert("ws连接关闭")
+    }
+})
+
+document.getElementById("log-btn3").addEventListener("click", async e => {
+    fetch("reset").then(res => res.text()).then(text=> alert("reset完成")).catch(e => {
+        console.error(e);
+        alert("reset失败");
+    });
+})
 
 
 function fileToBase64(file) {

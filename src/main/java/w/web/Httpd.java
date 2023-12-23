@@ -42,6 +42,10 @@ public class Httpd extends NanoHTTPD {
                           Map<String, String> header, Map<String, String> parameters,
                           Map<String, String> files) {
         if (method == Method.GET) {
+            if (uri.equals("/reset")) {
+                Global.reset();
+                return newFixedLengthResponse("ok");
+            }
             return serveFile(uri);
         }
         if (method == Method.POST) {
