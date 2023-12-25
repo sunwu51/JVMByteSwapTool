@@ -2,68 +2,61 @@ package w;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import javassist.ClassPool;
-import m3.prettyobject.PrettyFormat;
-import m3.prettyobject.PrettyFormatRegistry;
 import ognl.*;
-import w.core.ExecBundle;
-import w.core.MethodId;
-import w.core.Retransformer;
 import w.core.model.BaseClassTransformer;
-import w.core.model.OuterWatchTransformer;
-import w.core.model.WatchTransformer;
 import w.util.NativeUtils;
 import w.util.PrintUtils;
 import w.util.RequestUtils;
 import w.util.SpringUtils;
-import w.util.model.TransformerDesc;
 import w.web.message.LogMessage;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import fi.iki.elonen.NanoWSD;
-import w.web.message.WatchMessage;
 
 import java.io.IOException;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class Global {
+    /**
+     * JVM instrumentation, will set at start up, won't be null
+     */
     public static Instrumentation instrumentation;
 
-    public static Map<String, Map<String, List<BaseClassTransformer>>> activeTransformers = new ConcurrentHashMap<>();
-
-    private static Set<NanoWSD.WebSocket> webSockets = new HashSet<>();
-
-    public static void addWs(NanoWSD.WebSocket ws) {
-        webSockets.add(ws);
-    }
-
-    public static void removeWs(NanoWSD.WebSocket ws) {
-        webSockets.remove(ws);
-    }
-
-    // 上下文相关的
-    public final static ThreadLocal<String> traceIdCtx = new ThreadLocal<>();
-    public final static Map<String, Map<MethodId, Retransformer>> traceId2MethodId2Trans = new ConcurrentHashMap<>();
-
-    public final static Map<MethodId, String> methodId2TraceId = new ConcurrentHashMap<>();
-
-
+    /**
+     * The WebSocket Server port, will set at start up, default to be 18000
+     */
     public static int wsPort = 0;
 
-    public static ExecBundle execBundle = null;
-
+    /**
+     * The Javassist ClassPool used in this project.
+     */
     public static ClassPool classPool = ClassPool.getDefault();
 
-    public static void info(Object content) {
-        log(1, "" + content);
-    }
+    /**
+     * Connected websocket set, used to send broadcast message
+     */
+    private static Set<NanoWSD.WebSocket> webSockets = new HashSet<>();
 
+    /**
+     * All transformers that added by this project, include all kinds of status
+     */
+    public static Set<BaseClassTransformer> transformers = new HashSet<>();
+
+    /**
+     * Active transformer cache where the transformer status should be 1, ClassName - ClassLoader - TransformerList
+     */
+    public static Map<String, Map<String, List<BaseClassTransformer>>> activeTransformers = new ConcurrentHashMap<>();
+
+
+    /**
+     * OgnlContext inited at static code block
+     */
     public static OgnlContext ognlContext;
+
     static {
         classPool.importPackage("java.util");
         String lib = null;
@@ -106,40 +99,53 @@ public class Global {
         );
     }
 
+
+    /**
+     * Native method to get instances by class, the return object array length at most 100.
+     * This method only for get the spring context in this project.
+     * @param cls
+     * @return
+     */
     public static native Object[] getInstances(Class<?> cls);
 
-    // 1 info 2 error
-    public static void log(int level, String content) {
-        Logger log = Logger.getLogger(Thread.currentThread().getStackTrace()[2].getClassName());
-        switch (level) {
-            case 1:
-                log.log(Level.INFO, "[info]" + content);
-                break;
-            case 2:
-            default:
-                log.log(Level.SEVERE, "[error]" + content);
-        }
-        send(content);
-    }
-    private static synchronized void send(String content) {
-        Iterator<NanoWSD.WebSocket> it = webSockets.iterator();
-        while (it.hasNext()) {
-            NanoWSD.WebSocket ws = it.next();
-            if (ws != null && ws.isOpen()) {
-                try {
-                    LogMessage message = new LogMessage();
-                    message.setId(RequestUtils.getCurTraceId());
-                    message.setContent(content);
-                    ws.send(toJson(message));
-                } catch (IOException e) {
-                    System.err.println("send message error" + e);
-                }
-            } else {
-                it.remove();
-            }
-        }
+
+    /**
+     * Add websocket client to set
+     * @param ws
+     */
+    public static void addWs(NanoWSD.WebSocket ws) {
+        webSockets.add(ws);
     }
 
+    /**
+     * Remove websocket
+     * @param ws
+     */
+    public static void removeWs(NanoWSD.WebSocket ws) {
+        webSockets.remove(ws);
+    }
+
+    /**
+     * Print info log, and broadcast to all websocket client
+     * @param content
+     */
+    public static void info(Object content) {
+        log(1, "" + content);
+    }
+
+    /**
+     * Print error log, and broadcast to all websocket client
+     * @param content
+     */
+    public static void error(Object content) {
+        log(2, "" + content);
+    }
+
+    /**
+     * To pretty string, by m3.prettyobjct.*
+     * @param obj
+     * @return
+     */
     public static String toString(Object obj) {
         try {
             StringBuilder sb = new StringBuilder();
@@ -150,41 +156,62 @@ public class Global {
         }
     }
 
+    /**
+     * To json string, by Jackson
+     * @param obj
+     * @return
+     * @throws JsonProcessingException
+     */
     public static String toJson(Object obj) throws JsonProcessingException {
         return PrintUtils.getObjectMapper().writeValueAsString(obj);
     }
 
+    /**
+     * Get the major class loader, if java process is a spring uber jar, will be org.springframework.boot.loader.LaunchedURLClassLoader
+     * Else will be AppClassLoader
+     * @return
+     */
     public static ClassLoader getClassLoader() {
         return SpringUtils.getSpringBootClassLoader() == null ? Global.class.getClassLoader() : SpringUtils.getSpringBootClassLoader();
     }
 
-    public static synchronized void record(Class<?> c, BaseClassTransformer transformer) {
+    /**
+     * Add a transformer, the transformer will be active after re transform
+     * @param transformer
+     */
+    public static synchronized void addTransformer(BaseClassTransformer transformer) {
+        instrumentation.addTransformer(transformer, true);
+        transformers.add(transformer);
+    }
+
+    /**
+     * Re transform and add active transformer
+     * @param c
+     * @param transformer
+     * @throws UnmodifiableClassException
+     */
+    public static synchronized void addActiveTransformer(Class<?> c, BaseClassTransformer transformer) throws UnmodifiableClassException {
+        instrumentation.retransformClasses(c);
         String className = c.getName();
         String classLoader = c.getClassLoader().toString();
         activeTransformers.computeIfAbsent(className, k->new HashMap<>()).computeIfAbsent(classLoader, k->new ArrayList<>()).add(transformer);
     }
 
+    /**
+     * Remove transformer By uuid
+     * @param uuid
+     */
     public static synchronized void deleteTransformer(UUID uuid) {
-        Set<BaseClassTransformer> set = activeTransformers.values().stream()
-                .flatMap(it -> it.values().stream().flatMap(Collection::stream)).collect(Collectors.toSet());
-
-        for (BaseClassTransformer transformer : set) {
-            if (transformer.getUuid().equals(uuid)) {
-                transformer.setStatus(-1);
-                instrumentation.removeTransformer(transformer);
-                for (Class<?> c : instrumentation.getAllLoadedClasses()) {
-                    if (Objects.equals(c.getName(), transformer.getClassName())) {
-                        try {
-                            instrumentation.retransformClasses(c);
-                        } catch (UnmodifiableClassException e) {
-                            Global.log(2, "delete transformer error " + e.getMessage());
-                        }
-                    }
-                }
-                Global.info("uninstall transformer " + transformer.desc() + " finished");
-            }
-        }
         Set<String> delClass = new HashSet<>();
+        transformers.removeIf(it -> {
+            if (it.getUuid().equals(uuid)) {
+                it.setStatus(-1);
+                instrumentation.removeTransformer(it);
+                delClass.add(it.getClassName());
+                return true;
+            }
+            return false;
+        });
         activeTransformers.forEach((c, m) -> {
             m.forEach((l, list) -> {
                 list.removeIf(transformer -> transformer.getStatus() == -1);
@@ -205,13 +232,14 @@ public class Global {
         for (String aClass : delClass) {
             activeTransformers.remove(aClass);
         }
-
     }
+
+    /**
+     * Remove all transformer
+     */
     public static synchronized void reset() {
-        Set<BaseClassTransformer> set = activeTransformers.values().stream()
-                .flatMap(it -> it.values().stream().flatMap(Collection::stream)).collect(Collectors.toSet());
-        Set<String> cls = set.stream().map(transformer -> transformer.getClassName()).collect(Collectors.toSet());
-        for (BaseClassTransformer transformer : set) {
+        Set<String> cls = transformers.stream().map(BaseClassTransformer::getClassName).collect(Collectors.toSet());
+        for (BaseClassTransformer transformer : transformers) {
             instrumentation.removeTransformer(transformer);
         }
         for (Class<?> loadedClass : instrumentation.getAllLoadedClasses()) {
@@ -223,11 +251,54 @@ public class Global {
                 }
             }
         }
+        transformers.clear();
         activeTransformers.clear();
         Global.info("uninstall all transformer finished");
     }
 
+    /**
+     * Run ognl using major classloader
+     * @param exp
+     * @param root
+     * @return
+     * @throws OgnlException
+     */
     public static Object ognl(String exp, Object root) throws OgnlException {
         return Ognl.getValue(exp, ognlContext, root);
+    }
+
+
+
+    // 1 info 2 error
+    private static void log(int level, String content) {
+        Logger log = Logger.getLogger(Thread.currentThread().getStackTrace()[2].getClassName());
+        switch (level) {
+            case 1:
+                log.log(Level.INFO, "[info]" + content);
+                break;
+            case 2:
+            default:
+                log.log(Level.SEVERE, "[error]" + content);
+        }
+        send(content);
+    }
+
+    private static synchronized void send(String content) {
+        Iterator<NanoWSD.WebSocket> it = webSockets.iterator();
+        while (it.hasNext()) {
+            NanoWSD.WebSocket ws = it.next();
+            if (ws != null && ws.isOpen()) {
+                try {
+                    LogMessage message = new LogMessage();
+                    message.setId(RequestUtils.getCurTraceId());
+                    message.setContent(content);
+                    ws.send(toJson(message));
+                } catch (IOException e) {
+                    System.err.println("send message error" + e);
+                }
+            } else {
+                it.remove();
+            }
+        }
     }
 }

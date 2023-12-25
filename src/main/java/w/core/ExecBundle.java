@@ -33,7 +33,7 @@ public class ExecBundle {
         }
     }
     public static void invoke() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
-        Global.log(1, "start to invoke");
+        Global.info("start to invoke");
         inst.getClass().getDeclaredMethod("exec")
                 .invoke(inst);
     }

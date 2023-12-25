@@ -1,11 +1,11 @@
 # JVM ByteSwap Tool
-一个简单的jvm字节码替换工具，基于java instrumentation技术，使用javaassist库进行字节码替换。
+一个简单的jvm字节码替换工具，基于java instrumentation技术，使用javassist库进行字节码替换。 代码仍在建设中。
 
 集中解决日常debug的过程中，最常遇到的一些痛点：
 - jar包运行时查看函数入参和返回值。
 - 直接修改方法体内容。
 - 立即触发一段代码，通常是spring bean的一个函数。
-- todo替换整个类的字节码
+- 替换整个类的字节码
 
 【使用须知】如果你的项目是spring boot项目或者没有复杂的类加载器的普通项目，那么这个工具适合你。
 
@@ -37,7 +37,6 @@ $ java -jar swapper.jar
 然后根据页面提示就可以对jvm进行修改操作。
 
 注意：
-- 当websocket链接断开的时候，会自动清理该链接进行的字节码改动。
 - 在java8 + springboot2下进行的测试，其他版本理论上是兼容，如果有问题可以issue反馈。
 
 

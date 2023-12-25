@@ -1,9 +1,6 @@
 package w.util;
 
 import fi.iki.elonen.NanoWSD;
-import w.core.MethodId;
-import w.core.Retransformer;
-import w.util.model.ClassFileTransformerWrapper;
 
 import java.lang.instrument.ClassFileTransformer;
 import java.util.*;
@@ -19,13 +16,6 @@ public class RequestUtils {
 
     public final static Map<String, NanoWSD.WebSocket> traceId2Ws = new ConcurrentHashMap<>();
 
-    public static Map<String, Map<String, List<ClassFileTransformerWrapper>>> activeTransformer = new HashMap<>();
-
-
-    private static ThreadLocal<Map<String, Set<ClassLoader>>> classToLoader = ThreadLocal.withInitial(HashMap::new);
-
-    public final static Map<String, Map<MethodId, Retransformer>> traceId2MethodId2Trans = new ConcurrentHashMap<>();
-
     public static void initRequestCtx(NanoWSD.WebSocket ws, String traceId) {
         socketCtx.set(ws);
         traceIdCtx.set(traceId);
@@ -38,20 +28,6 @@ public class RequestUtils {
         socketCtx.remove();
         traceIdCtx.remove();
     }
-
-    public static void addTransformer(String className, String loader, ClassFileTransformer transformer) {
-        activeTransformer.computeIfAbsent(className, k -> new HashMap<>())
-                .computeIfAbsent(loader, k -> new ArrayList<>())
-                .add(new ClassFileTransformerWrapper(transformer));
-    }
-
-    public static void updateTransformerStatus(String className, String loader, ClassFileTransformer transformer, int status) {
-        activeTransformer.computeIfAbsent(className, k -> new HashMap<>())
-                .computeIfAbsent(loader, k -> new ArrayList<>())
-                .stream().filter(it -> it.getTransformer() == transformer)
-                .findFirst().ifPresent(it -> it.setStatus(status));
-    }
-
 
     public String getTraceId() {
         return traceIdCtx.get();

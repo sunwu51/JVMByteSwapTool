@@ -49,7 +49,7 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
                 return r;
             } catch (Exception e) {
                 e.printStackTrace();
-                Global.log(2, className + " re transform fail by " + uuid + " -(′д｀)-: " + e.getMessage());
+                Global.error(className + " re transform fail by " + uuid + " -(′д｀)-: " + e.getMessage());
             }
         }
         return null;

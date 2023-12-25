@@ -2,20 +2,14 @@ package w.web;
 
 import w.Global;
 import w.core.ExecBundle;
-import w.core.MethodId;
 import w.core.Swapper;
 import w.util.RequestUtils;
 import w.web.message.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import fi.iki.elonen.NanoWSD;
-import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
-import java.lang.instrument.ClassFileTransformer;
-import java.lang.instrument.IllegalClassFormatException;
-import java.security.ProtectionDomain;
-import java.util.Base64;
 import java.util.UUID;
 
 /**
@@ -35,9 +29,13 @@ public class Websocketd extends NanoWSD {
     protected WebSocket openWebSocket(IHTTPSession ihttpSession) {
         return new WebSocket(ihttpSession) {
             @Override
-            protected void onOpen() {}
+            protected void onOpen() {
+                Global.addWs(this);
+            }
             @Override
-            protected void onClose(WebSocketFrame.CloseCode closeCode, String s, boolean b) {}
+            protected void onClose(WebSocketFrame.CloseCode closeCode, String s, boolean b) {
+                Global.removeWs(this);
+            }
 
             @Override
             protected void onMessage(WebSocketFrame frame) {
@@ -79,7 +77,7 @@ public class Websocketd extends NanoWSD {
                                 try {
                                     Global.deleteTransformer(UUID.fromString(deleteMessage.getUuid()));
                                 } catch (Exception e) {
-                                    Global.log(2, e.getMessage());
+                                    Global.error(e.getMessage());
                                 }
                             }
                             break;
@@ -89,7 +87,7 @@ public class Websocketd extends NanoWSD {
 
                 } catch (JsonProcessingException e) {
                     e.printStackTrace();
-                    Global.log(2, "not a valid message");
+                    Global.error("not a valid message");
                 } catch (Throwable e) {
                     e.printStackTrace();
                 } finally {
