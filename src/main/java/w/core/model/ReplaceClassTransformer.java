@@ -22,7 +22,7 @@ public class ReplaceClassTransformer extends BaseClassTransformer {
     byte[] content;
 
     public ReplaceClassTransformer(ReplaceClassMessage message) throws IOException {
-        this.setClassName(message.getClassName());
+        this.className = message.getClassName();
         this.message = message;
         this.content = Base64.getDecoder().decode(message.getContent());;
         this.traceId = message.getId();

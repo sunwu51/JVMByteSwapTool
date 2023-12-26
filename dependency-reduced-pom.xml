@@ -46,61 +46,16 @@
       </plugin>
     </plugins>
   </build>
+  <dependencies>
+    <dependency>
+      <groupId>com.sun</groupId>
+      <artifactId>tools</artifactId>
+      <version>1.8</version>
+      <scope>system</scope>
+      <systemPath>c:/Program Files/Java/jdk1.8.0_77/lib/tools.jar</systemPath>
+    </dependency>
+  </dependencies>
   <properties>
     <java.version>1.8</java.version>
   </properties>
 </project>
-=======
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>w</groupId>
-  <artifactId>swapper</artifactId>
-  <name>swapper</name>
-  <version>0.0.1-SNAPSHOT</version>
-  <description>swapper</description>
-  <build>
-    <plugins>
-      <plugin>
-        <artifactId>maven-shade-plugin</artifactId>
-        <version>3.5.0</version>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <transformers>
-            <transformer>
-              <manifestEntries>
-                <Main-Class>w.Attach</Main-Class>
-                <Agent-Class>w.App</Agent-Class>
-                <Can-Retransform-Classes>true</Can-Retransform-Classes>
-              </manifestEntries>
-            </transformer>
-          </transformers>
-          <relocations>
-            <relocation>
-              <pattern>com.fasterxml.jackson</pattern>
-              <shadedPattern>wshade.com.fasterxml.jackson</shadedPattern>
-            </relocation>
-          </relocations>
-        </configuration>
-      </plugin>
-      <plugin>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <configuration>
-          <source>8</source>
-          <target>8</target>
-        </configuration>
-      </plugin>
-    </plugins>
-  </build>
-  <properties>
-    <java.version>1.8</java.version>
-  </properties>
-</project>
-

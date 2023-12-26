@@ -11,13 +11,13 @@
 		<java.version>1.8</java.version>
 	</properties>
 	<dependencies>
-<!--		这里默认会报错，如果是jdk>8那么删除这个tool依赖即可，因为8+已经内置。-->
-<!--		如果jdk=8，需要到`jdk目录/lib/`目录下运行下面指令，将tools安装到本地mvn库中-->
-<!--		mvn install:install-file -Dfile=tools.jar -DgroupId=com.sun -DartifactId=tools -Dversion=1.8 -Dpackaging=jar-->
+<!--		如果是java8 替换为自己的目录， 如果jdk>8 直接把该依赖删除即可，9+版本已经将tools内置了 -->
 		<dependency>
 			<groupId>com.sun</groupId>
 			<artifactId>tools</artifactId>
 			<version>1.8</version>
+			<scope>system</scope>
+			<systemPath>c:/Program Files/Java/jdk1.8.0_77/lib/tools.jar</systemPath>
 		</dependency>
 		<dependency>
 			<groupId>org.nanohttpd</groupId> <!-- <groupId>com.nanohttpd</groupId> for 2.1.0 and earlier -->

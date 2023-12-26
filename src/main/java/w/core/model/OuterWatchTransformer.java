@@ -34,7 +34,7 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
     public OuterWatchTransformer(OuterWatchMessage watchMessage) {
         this.message = watchMessage;
-        this.setClassName(watchMessage.getSignature().split("#")[0]);
+        this.className = watchMessage.getSignature().split("#")[0];
         this.method = watchMessage.getSignature().split("#")[1];
         this.innerClassName = watchMessage.getInnerSignature().split("#")[0];
         this.innerMethod = watchMessage.getInnerSignature().split("#")[1];

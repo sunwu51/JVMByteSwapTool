@@ -36,7 +36,7 @@ public class ChangeResultTransformer extends BaseClassTransformer {
     String innerMethod;
 
     public ChangeResultTransformer(ChangeResultMessage message) {
-        this.setClassName(message.getClassName());
+        this.className = message.getClassName();
         this.method = message.getMethod();
         this.paramTypes = message.getParamTypes();
         this.innerMethod = message.getInnerMethod();

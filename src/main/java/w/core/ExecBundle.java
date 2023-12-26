@@ -48,13 +48,4 @@ public class ExecBundle {
         Swapper.getInstance().swap(message);
         invoke();
     }
-//        Global.log(1, "start to change body");
-////        ctClass.defrost();
-//        body = "{" + SpringUtils.generateSpringCtxCode() + body + "}";
-////        Swapper.getInstance().changeBody(
-////                new MethodId(ctClass.getName(), ctMethod.getName(), new ArrayList<>()),
-////                body
-////        );
-//        invoke();
-//    }
 }

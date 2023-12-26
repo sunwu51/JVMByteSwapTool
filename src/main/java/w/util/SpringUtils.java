@@ -1,5 +1,6 @@
 package w.util;
 
+import javassist.LoaderClassPath;
 import lombok.Data;
 import lombok.Getter;
 import lombok.Setter;
@@ -7,7 +8,10 @@ import ognl.*;
 import w.Global;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * @author Frank
@@ -32,9 +36,11 @@ public class SpringUtils {
 
 
     public static void initFromLoadedClasses(Class<?>[] loadedClasses) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        Set<ClassLoader> classLoaders = new HashSet<>();
         for (Class<?> c : loadedClasses) {
             // if it is a spring boot fat jar, the class loader will be LaunchedURLClassLoader, for spring boot >1 and <3
             if (c.getClassLoader() == null) continue;
+            if (classLoaders.add(c.getClassLoader())) Global.classPool.appendClassPath(new LoaderClassPath(c.getClassLoader()));
             if (c.getName().equals(SpringUtils.getAppCtxClassName())) {
                 Object[] instances = Global.getInstances(c);
                 int max = -1;
