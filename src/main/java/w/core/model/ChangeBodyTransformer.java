@@ -27,7 +27,7 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
     List<String> paramTypes;
 
     public ChangeBodyTransformer(ChangeBodyMessage message) {
-        this.setClassName(message.getClassName());
+        this.className = message.getClassName();
         this.method = message.getMethod();
         this.message = message;
         this.traceId = message.getId();

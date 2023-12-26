@@ -18,22 +18,16 @@ import java.util.UUID;
 @Getter
 @Setter
 public abstract class BaseClassTransformer implements ClassFileTransformer {
-    private String className;
+
+    protected UUID uuid = UUID.randomUUID();
+
+    protected String className;
 
     protected String traceId;
 
     protected int status;
 
-    protected UUID uuid = UUID.randomUUID();
 
-    public void setClassName(String className) {
-        for (Class<?> c : Global.instrumentation.getAllLoadedClasses()) {
-            if (Objects.equals(c.getName(), className)) {
-                Global.classPool.appendClassPath(new LoaderClassPath(c.getClassLoader()));
-            }
-        }
-        this.className = className;
-    }
 
     public abstract byte[] transform(String className, byte[] origin) throws Exception;
 

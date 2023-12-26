@@ -25,7 +25,7 @@ public class WatchTransformer extends BaseClassTransformer {
     int printFormat;
 
     public WatchTransformer(WatchMessage watchMessage) {
-        this.setClassName(watchMessage.getSignature().split("#")[0]);
+        this.className = watchMessage.getSignature().split("#")[0];
         this.method = watchMessage.getSignature().split("#")[1];
         this.message = watchMessage;
         this.traceId = watchMessage.getId();

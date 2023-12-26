@@ -16,7 +16,11 @@
 # start
 从github release下载`swapper-xx.jar`，运行指令，根据提示输入即可，如下：
 ```bash
+# java >=9 
 $ java -jar swapper.jar
+# java == 8
+$ java -cp ${JAVA_HOME}/lib/tools.jar:swapper.jar w.Attach
+
 [0] 36200 swapper.jar
 [1] 55908 com.example.springweb.SpringWebApplication
 [2] Custom PID
