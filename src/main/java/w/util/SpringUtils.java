@@ -48,6 +48,7 @@ public class SpringUtils {
                 for (Object instance : instances) {
                     int count = (int) instance.getClass().getMethod("getBeanDefinitionCount").invoke(instance);
                     if (count > max) {
+                        max = count;
                         leader = instance;
                     }
                 }
