@@ -3,6 +3,9 @@ package w;
 import java.io.IOException;
 import java.lang.instrument.Instrumentation;
 import java.lang.reflect.InvocationTargetException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
 import javassist.*;
 
 import w.core.ExecBundle;
@@ -16,9 +19,10 @@ public class App {
 
     public static void agentmain(String arg, Instrumentation instrumentation) throws Exception {
         Global.instrumentation = instrumentation;
+        Global.allLoadedClasses = instrumentation.getAllLoadedClasses();
 
         // 1 record the spring boot classloader
-        SpringUtils.initFromLoadedClasses(instrumentation.getAllLoadedClasses());
+        SpringUtils.initFromLoadedClasses(Global.allLoadedClasses);
 
         // 2 start http and websocket server
         startHttpd(DEFAULT_HTTP_PORT);
@@ -67,7 +71,8 @@ public class App {
     }
 
     private static void schedule() {
-
+        Executors.newScheduledThreadPool(1)
+                .scheduleWithFixedDelay(()-> Global.allLoadedClasses = Global.instrumentation.getAllLoadedClasses(), 60, 60, TimeUnit.SECONDS);
     }
 
 

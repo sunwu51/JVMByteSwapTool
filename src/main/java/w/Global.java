@@ -26,6 +26,8 @@ public class Global {
      */
     public static Instrumentation instrumentation;
 
+    public static Class<?>[] allLoadedClasses;
+
     /**
      * The WebSocket Server port, will set at start up, default to be 18000
      */
@@ -242,7 +244,7 @@ public class Global {
         for (BaseClassTransformer transformer : transformers) {
             instrumentation.removeTransformer(transformer);
         }
-        for (Class<?> loadedClass : instrumentation.getAllLoadedClasses()) {
+        for (Class<?> loadedClass : Global.allLoadedClasses) {
             if (cls.contains(loadedClass.getName()) && loadedClass.getClassLoader() != null) {
                 try {
                     instrumentation.retransformClasses(loadedClass);

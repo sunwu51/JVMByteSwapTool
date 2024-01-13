@@ -47,7 +47,7 @@ public class Swapper {
         Global.addTransformer(transformer);
         Global.info("add transform finish, will retrans class");
 
-        for (Class<?> c : Global.instrumentation.getAllLoadedClasses()) {
+        for (Class<?> c : Global.allLoadedClasses) {
             if (Objects.equals(c.getName(), transformer.getClassName()) && c.getClassLoader() != null) {
                 try {
                     Global.addActiveTransformer(c, transformer);
