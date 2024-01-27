@@ -19,7 +19,6 @@
 # java >=9 
 $ java -jar swapper.jar
 
-
 # java == 8 Linux/MacOs:
 $ java -cp ${JAVA_HOME}/lib/tools.jar:swapper.jar w.Attach
 # java == 8 Windows
