@@ -9,6 +9,7 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Scanner;
 
 /**
@@ -58,8 +59,14 @@ public class Attach {
         VirtualMachine jvm = VirtualMachine.attach(pid);
         URL jarUrl = Attach.class.getProtectionDomain().getCodeSource().getLocation();
         String curJarPath = Paths.get(jarUrl.toURI()).toString();
-        jvm.loadAgent(curJarPath);
-        jvm.detach();
+        try {
+            jvm.loadAgent(curJarPath);
+            jvm.detach();
+        } catch (AgentLoadException e) {
+            if (!Objects.equals(e.getMessage(), "0")) {
+                throw e;
+            }
+        }
         System.out.println("============Attach finish");
     }
 }

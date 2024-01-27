@@ -1,5 +1,5 @@
 # JVM ByteSwap Tool
-一个简单的jvm字节码替换工具，基于java instrumentation技术，使用javassist库进行字节码替换。 代码仍在建设中。
+一个简单的jvm字节码替换工具，基于java instrumentation技术，使用javassist库进行字节码替换。 
 
 集中解决日常debug的过程中，最常遇到的一些痛点：
 - jar包运行时查看函数入参和返回值。
