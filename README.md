@@ -18,8 +18,12 @@
 ```bash
 # java >=9 
 $ java -jar swapper.jar
-# java == 8
+
+# java == 8 Linux/MacOs:
 $ java -cp ${JAVA_HOME}/lib/tools.jar:swapper.jar w.Attach
+# java == 8 Windows
+$ java -cp "%JAVA_HOME%\lib\tools.jar";swapper.jar w.Attach
+
 
 [0] 36200 swapper.jar
 [1] 55908 com.example.springweb.SpringWebApplication
