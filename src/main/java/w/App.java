@@ -72,7 +72,7 @@ public class App {
 
     private static void schedule() {
         Executors.newScheduledThreadPool(1)
-                .scheduleWithFixedDelay(()-> Global.allLoadedClasses = Global.instrumentation.getAllLoadedClasses(), 60, 60, TimeUnit.SECONDS);
+                .scheduleWithFixedDelay(()-> Global.allLoadedClasses = Global.instrumentation.getAllLoadedClasses(), 5, 60, TimeUnit.SECONDS);
     }
 
 

@@ -1,5 +1,5 @@
 # JVM ByteSwap Tool
-一个简单的jvm字节码替换工具，基于java instrumentation技术，使用javassist库进行字节码替换。 代码仍在建设中。
+一个简单的jvm字节码替换工具，基于java instrumentation技术，使用javassist库进行字节码替换。 
 
 集中解决日常debug的过程中，最常遇到的一些痛点：
 - jar包运行时查看函数入参和返回值。
@@ -18,8 +18,13 @@
 ```bash
 # java >=9 
 $ java -jar swapper.jar
-# java == 8
+
+
+# java == 8 Linux/MacOs:
 $ java -cp ${JAVA_HOME}/lib/tools.jar:swapper.jar w.Attach
+# java == 8 Windows
+$ java -cp "%JAVA_HOME%\lib\tools.jar";swapper.jar w.Attach
+
 
 [0] 36200 swapper.jar
 [1] 55908 com.example.springweb.SpringWebApplication
