@@ -59,7 +59,7 @@ public class Attach {
         VirtualMachine jvm = VirtualMachine.attach(pid);
         URL jarUrl = Attach.class.getProtectionDomain().getCodeSource().getLocation();
         String curJarPath = Paths.get(jarUrl.toURI()).toString();
-                try {
+        try {
             jvm.loadAgent(curJarPath);
             jvm.detach();
         } catch (AgentLoadException e) {
