@@ -10,6 +10,7 @@ import w.web.message.ChangeBodyMessage;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * @author Frank
@@ -45,6 +46,14 @@ public class ExecBundle {
         message.setParamTypes(new ArrayList<>());
         body = "{" + SpringUtils.generateSpringCtxCode() + body + "}";
         message.setBody(body);
+        // remove the old transformer
+        Global.activeTransformers
+                .getOrDefault("w.Exec", new HashMap<>()).values().forEach(baseClassTransformers -> {
+                    baseClassTransformers.forEach(transformer -> {
+                        Global.instrumentation.removeTransformer(transformer);
+                        Global.transformers.remove(transformer);
+                    });
+                });
         Swapper.getInstance().swap(message);
         invoke();
     }

@@ -27,6 +27,7 @@
         }
         #right-container{
             flex-basis: 45%;
+            min-width: 0px;
         }
         .card-overview{
             width: 100%;
@@ -163,7 +164,18 @@
                 <sl-button variant="warning" id="log-btn2">delete</sl-button>
                 <sl-button variant="danger" id="log-btn3">reset</sl-button>
             </sl-dialog>
-            <sl-button id="log-btn3">effected class</sl-button>
+            <sl-button>effected class</sl-button>
+            <sl-button id="log-btn4">full screen</sl-button>
+            <script>
+                var logBtn4 = document.getElementById("log-btn4");
+                var leftContainer = document.getElementById("left-container")
+                var rightContainer = document.getElementById("right-container")
+                logBtn4.addEventListener("click", () => {
+                    logBtn4.innerText = logBtn4.innerText == 'full screen' ? 'half screen' : 'full screen';
+                    leftContainer.style.display = leftContainer.style.display == 'none' ? 'block' : 'none';
+                    rightContainer.style.minWidth = rightContainer.style.minWidth == '2000px'  ? '0' : '2000px';
+                })
+            </script>
             <textarea id="log-text1"></textarea>
         </div>
     </div>

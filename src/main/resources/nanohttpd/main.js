@@ -47,7 +47,9 @@ setInterval(() => {
 const dialog = document.querySelector('.dialog-width');
 const openButton = dialog.nextElementSibling;
 openButton.addEventListener('click', async () => {
-    ws.send(JSON.stringify({id: "_", type: "PING"}));
+    try {
+        ws.send(JSON.stringify({id: "_", type: "PING"}));
+    } catch (e){}
     dialog.show();
 });
 
