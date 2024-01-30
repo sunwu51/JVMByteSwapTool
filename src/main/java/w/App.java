@@ -18,6 +18,10 @@ public class App {
     private static final int DEFAULT_WEBSOCKET_PORT = 18000;
 
     public static void agentmain(String arg, Instrumentation instrumentation) throws Exception {
+        if (Global.instrumentation != null) {
+            Global.info("Already attached before");
+            return;
+        }
         Global.instrumentation = instrumentation;
         Global.allLoadedClasses = instrumentation.getAllLoadedClasses();
 

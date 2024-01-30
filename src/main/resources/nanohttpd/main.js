@@ -2,6 +2,9 @@
 
 
 var ws = null;
+var logs = [];
+var latestId = "";
+
 async function init() {
     var res = await fetch('/wsPort',{
         headers:{
@@ -40,7 +43,20 @@ setInterval(() => {
 }, 3000)
 
 
-var latestId = "";
+
+const dialog = document.querySelector('.dialog-width');
+const openButton = dialog.nextElementSibling;
+openButton.addEventListener('click', async () => {
+    try {
+        ws.send(JSON.stringify({id: "_", type: "PING"}));
+    } catch (e){}
+    dialog.show();
+});
+
+document.getElementById("log-btn1").onclick = e => {
+    logs = [];
+    logMirror.setValue("");
+}
 document.getElementById("wt-btn").addEventListener("click", e => {
     var signature = document.getElementById("wt-input1").value;
     var printFormat = parseInt(document.getElementById('wt-radio1').value);

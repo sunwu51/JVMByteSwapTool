@@ -27,6 +27,7 @@
         }
         #right-container{
             flex-basis: 45%;
+            min-width: 0px;
         }
         .card-overview{
             width: 100%;
@@ -163,34 +164,19 @@
                 <sl-button variant="warning" id="log-btn2">delete</sl-button>
                 <sl-button variant="danger" id="log-btn3">reset</sl-button>
             </sl-dialog>
-            <sl-button id="log-btn2">effected class</sl-button>
-            <textarea id="log-text1"></textarea>
-
-
+            <sl-button>effected class</sl-button>
+            <sl-button id="log-btn4">full screen</sl-button>
             <script>
-                const dialog = document.querySelector('.dialog-width');
-                const openButton = dialog.nextElementSibling;
-                openButton.addEventListener('click', () => dialog.show());
-                var logs = [];
-                var logMirror = CodeMirror.fromTextArea(document.getElementById('log-text1'), {
-                    mode: 'text/x-java',
-                    theme: 'darcula',
-                    lineNumbers: true,
-                    readOnly: true,
-                    lineWrapping: true,
-                });
-                var logMirror2 = CodeMirror.fromTextArea(document.getElementById('log-text2'), {
-                    mode: { name: "javascript", json: true },
-                    lineNumbers: true,
-                    readOnly: true,
-                });
-                logMirror.setSize("100%", "98vh")
-                logMirror2.setSize(null, "400px")
-                document.getElementById("log-btn1").onclick = e => {
-                    logs = [];
-                    logMirror.setValue("");
-                }
+                var logBtn4 = document.getElementById("log-btn4");
+                var leftContainer = document.getElementById("left-container")
+                var rightContainer = document.getElementById("right-container")
+                logBtn4.addEventListener("click", () => {
+                    logBtn4.innerText = logBtn4.innerText == 'full screen' ? 'half screen' : 'full screen';
+                    leftContainer.style.display = leftContainer.style.display == 'none' ? 'block' : 'none';
+                    rightContainer.style.minWidth = rightContainer.style.minWidth == '2000px'  ? '0' : '2000px';
+                })
             </script>
+            <textarea id="log-text1"></textarea>
         </div>
     </div>
 </body>
@@ -239,6 +225,20 @@
         codeArea.setValue(value);
         return codeArea;
     }
+    var logMirror = CodeMirror.fromTextArea(document.getElementById('log-text1'), {
+        mode: 'text/x-java',
+        theme: 'darcula',
+        lineNumbers: true,
+        readOnly: true,
+        lineWrapping: true,
+    });
+    var logMirror2 = CodeMirror.fromTextArea(document.getElementById('log-text2'), {
+        mode: { name: "javascript", json: true },
+        lineNumbers: true,
+        readOnly: true,
+    });
+    logMirror.setSize("100%", "98vh")
+    logMirror2.setSize(null, "400px")
 </script>
 <script src="main.js"></script>
 </html>
