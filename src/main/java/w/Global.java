@@ -269,6 +269,19 @@ public class Global {
         return Ognl.getValue(exp, ognlContext, root);
     }
 
+    /**
+     * return the advised target if the object is instance of Advised
+     * @param bean
+     * @return
+     */
+    public static Object beanTarget(Object bean) {
+        try {
+            return ognl("#root.getTargetSource().getTarget()", bean);
+        } catch (Exception e) {
+            return bean;
+        }
+    }
+
 
 
     // 1 info 2 error
