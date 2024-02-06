@@ -47,10 +47,11 @@ public class Swapper {
         Global.addTransformer(transformer);
         Global.info("add transform finish, will retrans class");
 
-        for (Class<?> c : Global.allLoadedClasses) {
-            if (Objects.equals(c.getName(), transformer.getClassName()) && c.getClassLoader() != null) {
+
+        for (Class<?> aClass : Global.allLoadedClasses.getOrDefault(transformer.getClassName(), new HashSet<>())) {
+            if (aClass.getClassLoader() != null) {
                 try {
-                    Global.addActiveTransformer(c, transformer);
+                    Global.addActiveTransformer(aClass, transformer);
                 } catch (Throwable e) {
                     Global.error("re transform error " + e.getMessage());
                 }

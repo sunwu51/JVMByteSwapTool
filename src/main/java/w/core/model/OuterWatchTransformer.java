@@ -74,11 +74,11 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                                 "} else if (printFormat == 2) {" +
                                 "   try{" +
                                         "req = w.Global.toJson($args);" +
-                                        "res = w.Global.toJson($_);" +
+                                        "res = w.Global.toJson(($w)$_);" +
                                         "}catch (Exception e) {req = \"convert json error\"; res=req;}" +
                                 "} else {" +
                                 "   req = w.Global.toString($args);" +
-                                "   res = w.Global.toString($_);" +
+                                "   res = w.Global.toString(($w)$_);" +
                                 "}"  +
                                 "w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");" +
                                 "w.Global.info(\"line" + m.getLineNumber() + ",cost:\"+duration+\"ms,req:\"+req+\",res:\"+res);" +

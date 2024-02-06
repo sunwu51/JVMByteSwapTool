@@ -54,6 +54,8 @@ public class ExecBundle {
                         Global.transformers.remove(transformer);
                     });
                 });
+        Global.activeTransformers
+                .getOrDefault("w.Exec", new HashMap<>()).clear();
         Swapper.getInstance().swap(message);
         invoke();
     }

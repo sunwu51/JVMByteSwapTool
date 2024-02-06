@@ -23,10 +23,10 @@ public class App {
             return;
         }
         Global.instrumentation = instrumentation;
-        Global.allLoadedClasses = instrumentation.getAllLoadedClasses();
+        Global.fillLoadedClasses();
 
         // 1 record the spring boot classloader
-        SpringUtils.initFromLoadedClasses(Global.allLoadedClasses);
+        SpringUtils.initFromLoadedClasses();
 
         // 2 start http and websocket server
         startHttpd(DEFAULT_HTTP_PORT);
@@ -76,7 +76,7 @@ public class App {
 
     private static void schedule() {
         Executors.newScheduledThreadPool(1)
-                .scheduleWithFixedDelay(()-> Global.allLoadedClasses = Global.instrumentation.getAllLoadedClasses(), 5, 60, TimeUnit.SECONDS);
+                .scheduleWithFixedDelay(Global::fillLoadedClasses, 5, 60, TimeUnit.SECONDS);
     }
 
 
