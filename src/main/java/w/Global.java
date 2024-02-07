@@ -211,7 +211,6 @@ public class Global {
             if (it.getUuid().equals(uuid)) {
                 it.setStatus(-1);
                 instrumentation.removeTransformer(it);
-                delClass.add(it.getClassName());
                 return true;
             }
             return false;
