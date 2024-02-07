@@ -53,21 +53,36 @@ public class WatchTransformer extends BaseClassTransformer {
         ctMethod.addLocalVariable("req", Global.classPool.get("java.lang.String"));
         ctMethod.addLocalVariable("res", Global.classPool.get("java.lang.String"));
         ctMethod.insertBefore("startTime = System.currentTimeMillis();");
-        ctMethod.insertAfter("endTime = System.currentTimeMillis();");
-        ctMethod.insertAfter("duration = endTime - startTime;");
+
+        StringBuilder afterCode = new StringBuilder("{\n")
+                .append("endTime = System.currentTimeMillis();\n")
+                .append("duration = endTime - startTime;\n");
+        StringBuilder catchCode = new StringBuilder("{\n");
         if (printFormat == 1) {
-            ctMethod.insertAfter("req = Arrays.toString($args);");
-            ctMethod.insertAfter("res = \"\" + $_;");
+            afterCode.append("req = Arrays.toString($args);");
+            afterCode.append("res = \"\" + $_;");
+            catchCode.append("String req = Arrays.toString($args);");
         } else if (printFormat == 2) {
-            ctMethod.insertAfter("try {req = w.Global.toJson($args);} catch (Exception e) {req = \"convert json error\";}");
-            ctMethod.insertAfter("try {res = w.Global.toJson($_);} catch (Exception e) {res = \"convert json error\";}");
+            afterCode.append("try {req = w.Global.toJson($args);} catch (Exception e) {req = \"convert json error\";}");
+            afterCode.append("try {res = w.Global.toJson(($w)$_);} catch (Exception e) {res = \"convert json error\";}");
+            catchCode.append("String req = \"convert json error\";try {req = w.Global.toJson($args);} catch (Exception e) {}");
         } else {
-            ctMethod.insertAfter("req = w.Global.toString($args);");
-            ctMethod.insertAfter("res = w.Global.toString($_);");
+            afterCode.append("req = w.Global.toString($args);");
+            afterCode.append("res = w.Global.toString(($w)$_);");
+            catchCode.append("String req = w.Global.toString($args);");
         }
-        ctMethod.insertAfter("w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");");
-        ctMethod.insertAfter("w.Global.info(\"cost:\"+duration+\"ms,req:\"+req+\",res:\"+res);");
-        ctMethod.insertAfter("w.util.RequestUtils.clearRequestCtx();");
+        afterCode.append("w.util.RequestUtils.fillCurThread(\"").append(message.getId()).append("\");")
+                .append("w.Global.info(\"cost:\"+duration+\"ms,req:\"+req+\",res:\"+res);")
+                .append("w.util.RequestUtils.clearRequestCtx();")
+                .append("}");
+
+        catchCode.append("w.util.RequestUtils.fillCurThread(\"").append(message.getId()).append("\");")
+                .append("w.Global.info(\"req:\"+req+\",exception:\"+$e); throw $e;")
+                .append("w.util.RequestUtils.clearRequestCtx();")
+                .append("}");
+        ctMethod.insertAfter(afterCode.toString());
+        System.out.println(catchCode);
+        ctMethod.addCatch(catchCode.toString(), Global.classPool.get("java.lang.Throwable"));
     }
 
     public boolean equals(Object other) {

@@ -1,4 +1,6 @@
 # JVM ByteSwap Tool
+![logo](sw-ico.png)
+
 一个简单的jvm字节码替换工具，基于java instrumentation技术，使用javassist库进行字节码替换。 
 
 集中解决日常debug的过程中，最常遇到的一些痛点：
