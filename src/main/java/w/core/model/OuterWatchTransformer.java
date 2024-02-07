@@ -63,10 +63,16 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                     if (innerClassName.equals("*") || m.getClassName().equals(innerClassName)) {
                         m.replace("{" +
                                 "long start = System.currentTimeMillis();" +
-                                "$_ = $proceed($$);" +
-                                "long duration = System.currentTimeMillis() - start;" +
                                 "String req = null;" +
                                 "String res = null;" +
+                                "Throwable t = null;" +
+                                "try {" +
+                                "    $_ = $proceed($$);" +
+                                "} catch (Throwable e) {" +
+                                "   t = e;" +
+                                "   throw e;" +
+                                "} finally {" +
+                                "long duration = System.currentTimeMillis() - start;" +
                                 "int printFormat = " + printFormat +";" +
                                 "if (printFormat == 1) {" +
                                 "   req = Arrays.toString($args);" +
@@ -74,16 +80,17 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                                 "} else if (printFormat == 2) {" +
                                 "   try{" +
                                         "req = w.Global.toJson($args);" +
-                                        "res = w.Global.toJson($_);" +
-                                        "}catch (Exception e) {req = \"convert json error\"; res=req;}" +
+                                        "res = w.Global.toJson(($w)$_);" +
+                                        "} " +
+                                "   catch (Exception e) {req = \"convert json error\"; res=req;}" +
                                 "} else {" +
                                 "   req = w.Global.toString($args);" +
-                                "   res = w.Global.toString($_);" +
+                                "   res = w.Global.toString(($w)$_);" +
                                 "}"  +
                                 "w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");" +
-                                "w.Global.info(\"line" + m.getLineNumber() + ",cost:\"+duration+\"ms,req:\"+req+\",res:\"+res);" +
+                                "w.Global.info(\"line" + m.getLineNumber() + ",cost:\"+duration+\"ms,req:\"+req+\",res:\"+res+\",exception:\"+t);" +
                                 "w.util.RequestUtils.clearRequestCtx();" +
-                                "}");
+                                "}}");
                     }
                 }
             }

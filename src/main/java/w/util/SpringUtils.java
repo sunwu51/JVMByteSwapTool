@@ -35,7 +35,8 @@ public class SpringUtils {
     }
 
 
-    public static void initFromLoadedClasses(Class<?>[] loadedClasses) throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+    public static void initFromLoadedClasses() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+        Class<?>[] loadedClasses = Global.instrumentation.getAllLoadedClasses();
         Set<ClassLoader> classLoaders = new HashSet<>();
         for (Class<?> c : loadedClasses) {
             // if it is a spring boot fat jar, the class loader will be LaunchedURLClassLoader, for spring boot >1 and <3

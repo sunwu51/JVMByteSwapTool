@@ -4,10 +4,13 @@ import fi.iki.elonen.NanoHTTPD;
 import lombok.extern.slf4j.Slf4j;
 import w.Global;
 
+import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.Objects;
 
 import static fi.iki.elonen.NanoHTTPD.Response.Status.*;
 
@@ -68,6 +71,10 @@ public class Httpd extends NanoHTTPD {
             fileName = "/index.html";
         }
         fileName = fileName.startsWith("/") ? fileName : ("/" + fileName);
+        boolean favicon = Objects.equals(fileName, "/favicon.ico");
+        if (favicon) {
+            return newChunkedResponse(OK, "image/x-icon", this.getClass().getResourceAsStream("/nanohttpd" + fileName));
+        }
         byte[] content = new byte[40960];
         int len = 0;
         try (InputStream in = this.getClass().getResourceAsStream("/nanohttpd" + fileName)) {
@@ -82,5 +89,6 @@ public class Httpd extends NanoHTTPD {
             }
         }
         return newFixedLengthResponse(OK, NanoHTTPD.MIME_HTML, new String(content, 0, len, StandardCharsets.UTF_8));
+
     }
 }

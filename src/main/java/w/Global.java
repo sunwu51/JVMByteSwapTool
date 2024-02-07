@@ -2,6 +2,7 @@ package w;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import javassist.ClassPool;
+import lombok.Getter;
 import ognl.*;
 import w.core.model.BaseClassTransformer;
 import w.util.NativeUtils;
@@ -16,6 +17,7 @@ import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -26,7 +28,7 @@ public class Global {
      */
     public static Instrumentation instrumentation;
 
-    public static Class<?>[] allLoadedClasses;
+    public static Map<String, Set<Class<?>>> allLoadedClasses = new ConcurrentHashMap<>();
 
     /**
      * The WebSocket Server port, will set at start up, default to be 18000
@@ -209,7 +211,6 @@ public class Global {
             if (it.getUuid().equals(uuid)) {
                 it.setStatus(-1);
                 instrumentation.removeTransformer(it);
-                delClass.add(it.getClassName());
                 return true;
             }
             return false;
@@ -244,14 +245,17 @@ public class Global {
         for (BaseClassTransformer transformer : transformers) {
             instrumentation.removeTransformer(transformer);
         }
-        for (Class<?> loadedClass : Global.allLoadedClasses) {
-            if (cls.contains(loadedClass.getName()) && loadedClass.getClassLoader() != null) {
-                try {
-                    instrumentation.retransformClasses(loadedClass);
-                } catch (UnmodifiableClassException e) {
-                    log(2, "re transform error " + e.getMessage());
+        for (String cl : cls) {
+            for (Class<?> aClass : Global.allLoadedClasses.getOrDefault(cl, new HashSet<>())) {
+                if (aClass.getClassLoader() != null) {
+                    try {
+                        instrumentation.retransformClasses(aClass);
+                    } catch (UnmodifiableClassException e) {
+                        log(2, "re transform error " + e.getMessage());
+                    }
                 }
             }
+
         }
         transformers.clear();
         activeTransformers.clear();
@@ -314,6 +318,14 @@ public class Global {
             } else {
                 it.remove();
             }
+        }
+    }
+
+    public synchronized static void fillLoadedClasses() {
+        for (Class cls : instrumentation.getAllLoadedClasses()) {
+            String name = cls.getName();
+            allLoadedClasses.computeIfAbsent(name, k -> new HashSet<>())
+                    .add(cls);
         }
     }
 }
