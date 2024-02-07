@@ -172,8 +172,12 @@ public class TestService {
 ![image](https://i.imgur.com/eSkqTJt.png)
 
 
+## 7 others
+以上功能都是通过jvm retransform实现的字节码的替换，retransform可以指定多个transformer，例如在`watch`一个方法后，还可以对方法进行`changeBody`等其他操作，这些transformer的改动，会按照添加顺序，依次对类进行修改，作用是链式的。
 
+可以通过effected class按钮查看当前被修改的类，也可以指定uuid剔除某些transformer，或者reset删除全部。
 
+![image](https://github.com/sunwu51/JVMByteSwapTool/assets/15844103/3144aab1-c6a6-4df2-9737-6f0e503b36a2)
 
 
 
