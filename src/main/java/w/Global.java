@@ -322,10 +322,10 @@ public class Global {
         }
     }
 
-    public static void fillLoadedClasses() {
+    public synchronized static void fillLoadedClasses() {
         for (Class cls : instrumentation.getAllLoadedClasses()) {
             String name = cls.getName();
-            allLoadedClasses.computeIfAbsent(name, k -> new ConcurrentSkipListSet<>())
+            allLoadedClasses.computeIfAbsent(name, k -> new HashSet<>())
                     .add(cls);
         }
     }
