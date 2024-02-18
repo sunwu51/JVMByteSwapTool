@@ -4,6 +4,10 @@ import w.*;
 import w.core.model.*;
 import w.web.message.*;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.*;
 
 
@@ -16,7 +20,7 @@ public class Swapper {
         return INSTANCE;
     }
 
-    public void swap(Message message) {
+    public boolean swap(Message message) {
         BaseClassTransformer transformer = null;
         try {
             switch (message.getType()) {
@@ -40,8 +44,8 @@ public class Swapper {
                     throw new RuntimeException("message type not support");
             }
         } catch (Throwable e) {
-            e.printStackTrace();
-            Global.error("build transform error");
+            Global.error("build transform error:", e);
+            return false;
         }
 
         Global.addTransformer(transformer);
@@ -49,14 +53,15 @@ public class Swapper {
 
 
         for (Class<?> aClass : Global.allLoadedClasses.getOrDefault(transformer.getClassName(), new HashSet<>())) {
-            if (aClass.getClassLoader() != null) {
-                try {
-                    Global.addActiveTransformer(aClass, transformer);
-                } catch (Throwable e) {
-                    Global.error("re transform error " + e.getMessage());
-                }
+            try {
+                Global.addActiveTransformer(aClass, transformer);
+            } catch (Throwable e) {
+                Global.error("re transform error:", e);
+                return false;
             }
         }
+
+        return true;
     }
 }
 

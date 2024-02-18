@@ -52,7 +52,7 @@
       <artifactId>tools</artifactId>
       <version>1.8</version>
       <scope>system</scope>
-      <systemPath>c:/Program Files/Java/jdk1.8.0_77/lib/tools.jar</systemPath>
+      <systemPath>${JAVA_HOME}/lib/tools.jar</systemPath>
     </dependency>
   </dependencies>
   <properties>

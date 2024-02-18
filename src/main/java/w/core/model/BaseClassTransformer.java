@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.Setter;
 import w.Global;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.security.ProtectionDomain;
@@ -42,8 +44,7 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
                 Global.info(className + " re transform by " + uuid +  " success <(^－^)>");
                 return r;
             } catch (Exception e) {
-                e.printStackTrace();
-                Global.error(className + " re transform fail by " + uuid + " -(′д｀)-: " + e.getMessage());
+                Global.error(className + " re transform fail by " + uuid + " -(′д｀)-: ", e);
             }
         }
         return null;

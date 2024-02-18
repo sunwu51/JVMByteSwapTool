@@ -10,6 +10,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import fi.iki.elonen.NanoWSD;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.UUID;
 
 /**
@@ -77,7 +79,7 @@ public class Websocketd extends NanoWSD {
                                 try {
                                     Global.deleteTransformer(UUID.fromString(deleteMessage.getUuid()));
                                 } catch (Exception e) {
-                                    Global.error(e.getMessage());
+                                    Global.error("delete error:", e);
                                 }
                             }
                             break;
@@ -89,7 +91,7 @@ public class Websocketd extends NanoWSD {
                     e.printStackTrace();
                     Global.error("not a valid message");
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    Global.error("error:", e);
                 } finally {
                     RequestUtils.clearRequestCtx();
                 }

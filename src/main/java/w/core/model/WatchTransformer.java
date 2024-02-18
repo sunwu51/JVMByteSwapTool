@@ -63,9 +63,9 @@ public class WatchTransformer extends BaseClassTransformer {
             afterCode.append("res = \"\" + $_;");
             catchCode.append("String req = Arrays.toString($args);");
         } else if (printFormat == 2) {
-            afterCode.append("try {req = w.Global.toJson($args);} catch (Exception e) {req = \"convert json error\";}");
-            afterCode.append("try {res = w.Global.toJson(($w)$_);} catch (Exception e) {res = \"convert json error\";}");
-            catchCode.append("String req = \"convert json error\";try {req = w.Global.toJson($args);} catch (Exception e) {}");
+            afterCode.append("req = w.Global.toJson($args);");
+            afterCode.append("res = w.Global.toJson(($w)$_);");
+            catchCode.append("String req = w.Global.toJson($args);");
         } else {
             afterCode.append("req = w.Global.toString($args);");
             afterCode.append("res = w.Global.toString(($w)$_);");
@@ -81,8 +81,9 @@ public class WatchTransformer extends BaseClassTransformer {
                 .append("w.util.RequestUtils.clearRequestCtx();")
                 .append("}");
         ctMethod.insertAfter(afterCode.toString());
-        System.out.println(catchCode);
-        ctMethod.addCatch(catchCode.toString(), Global.classPool.get("java.lang.Throwable"));
+        if (Global.nonVerifying) {
+            ctMethod.addCatch(catchCode.toString(), Global.classPool.get("java.lang.Throwable"));
+        }
     }
 
     public boolean equals(Object other) {

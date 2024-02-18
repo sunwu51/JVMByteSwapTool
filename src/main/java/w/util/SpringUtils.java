@@ -7,11 +7,10 @@ import lombok.Setter;
 import ognl.*;
 import w.Global;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.InvocationTargetException;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author Frank
@@ -59,6 +58,19 @@ public class SpringUtils {
                 SpringUtils.springBootClassLoader = c.getClassLoader();
                 break;
             }
+        }
+
+        RuntimeMXBean runtimeMXBean = ManagementFactory.getRuntimeMXBean();
+        List<String> inputArguments = runtimeMXBean.getInputArguments();
+        String xverifyValue = null;
+        for (String a : inputArguments) {
+            if (a.startsWith("-Xverify:")) {
+                xverifyValue = a.substring("-Xverify:".length());
+                break;
+            }
+        }
+        if (Objects.equals("none", xverifyValue)) {
+            Global.nonVerifying = true;
         }
     }
 

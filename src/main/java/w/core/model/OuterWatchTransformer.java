@@ -61,7 +61,7 @@ public class OuterWatchTransformer extends BaseClassTransformer {
             public void edit(MethodCall m) throws CannotCompileException {
                 if (m.getMethodName().equals(innerMethod)) {
                     if (innerClassName.equals("*") || m.getClassName().equals(innerClassName)) {
-                        m.replace("{" +
+                        String code = "{" +
                                 "long start = System.currentTimeMillis();" +
                                 "String req = null;" +
                                 "String res = null;" +
@@ -78,11 +78,8 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                                 "   req = Arrays.toString($args);" +
                                 "   res = \"\" + $_;" +
                                 "} else if (printFormat == 2) {" +
-                                "   try{" +
-                                        "req = w.Global.toJson($args);" +
-                                        "res = w.Global.toJson(($w)$_);" +
-                                        "} " +
-                                "   catch (Exception e) {req = \"convert json error\"; res=req;}" +
+                                "req = w.Global.toJson($args);" +
+                                "res = w.Global.toJson(($w)$_);" +
                                 "} else {" +
                                 "   req = w.Global.toString($args);" +
                                 "   res = w.Global.toString(($w)$_);" +
@@ -90,7 +87,31 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                                 "w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");" +
                                 "w.Global.info(\"line" + m.getLineNumber() + ",cost:\"+duration+\"ms,req:\"+req+\",res:\"+res+\",exception:\"+t);" +
                                 "w.util.RequestUtils.clearRequestCtx();" +
-                                "}}");
+                                "}}";
+                     if (!Global.nonVerifying) {
+                         code = "{" +
+                                 "long start = System.currentTimeMillis();" +
+                                 "$_ = $proceed($$);" +
+                                 "long duration = System.currentTimeMillis() - start;" +
+                                 "String req = null;" +
+                                 "String res = null;" +
+                                 "int printFormat = " + printFormat +";" +
+                                 "if (printFormat == 1) {" +
+                                 "   req = Arrays.toString($args);" +
+                                 "   res = \"\" + $_;" +
+                                 "} else if (printFormat == 2) {" +
+                                 "req = w.Global.toJson($args);" +
+                                 "res = w.Global.toJson(($w)$_);" +
+                                 "} else {" +
+                                 "   req = w.Global.toString($args);" +
+                                 "   res = w.Global.toString(($w)$_);" +
+                                 "}"  +
+                                 "w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");" +
+                                 "w.Global.info(\"line" + m.getLineNumber() + ",cost:\"+duration+\"ms,req:\"+req+\",res:\"+res);" +
+                                 "w.util.RequestUtils.clearRequestCtx();" +
+                                 "}";
+                     }
+                     m.replace(code);
                     }
                 }
             }
