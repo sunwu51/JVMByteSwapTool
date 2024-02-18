@@ -20,7 +20,7 @@ public class Swapper {
         return INSTANCE;
     }
 
-    public void swap(Message message) {
+    public boolean swap(Message message) {
         BaseClassTransformer transformer = null;
         try {
             switch (message.getType()) {
@@ -49,7 +49,7 @@ public class Swapper {
             e.printStackTrace(pw);
             String stackTraceString = sw.toString();
             Global.error("build transform error:\n " + stackTraceString);
-            return;
+            return false;
         }
 
         Global.addTransformer(transformer);
@@ -65,8 +65,11 @@ public class Swapper {
                 e.printStackTrace(pw);
                 String stackTraceString = sw.toString();
                 Global.error("re transform error:\n " + stackTraceString);
+                return false;
             }
         }
+
+        return true;
     }
 }
 

@@ -56,7 +56,8 @@ public class ExecBundle {
                 });
         Global.activeTransformers
                 .getOrDefault("w.Exec", new HashMap<>()).clear();
-        Swapper.getInstance().swap(message);
-        invoke();
+        if (Swapper.getInstance().swap(message)) {
+            invoke();
+        }
     }
 }
