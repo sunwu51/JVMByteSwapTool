@@ -44,11 +44,7 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
                 Global.info(className + " re transform by " + uuid +  " success <(^－^)>");
                 return r;
             } catch (Exception e) {
-                StringWriter sw = new StringWriter();
-                PrintWriter pw = new PrintWriter(sw);
-                e.printStackTrace(pw);
-                String stackTraceString = sw.toString();
-                Global.error(className + " re transform fail by " + uuid + " -(′д｀)-: \n " + stackTraceString);
+                Global.error(className + " re transform fail by " + uuid + " -(′д｀)-: ", e);
             }
         }
         return null;

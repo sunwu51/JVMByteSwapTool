@@ -150,6 +150,19 @@ public class Global {
     }
 
     /**
+     * Print error log, and broadcast to all websocket client
+     * @param content
+     * @param e
+     */
+    public static void error(Object content, Throwable e) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        e.printStackTrace(pw);
+        String stackTraceString = sw.toString();
+        log(2, content + "\n" + stackTraceString);
+    }
+
+    /**
      * To pretty string, by m3.prettyobjct.*
      * @param obj
      * @return
@@ -174,11 +187,7 @@ public class Global {
         try {
             return PrintUtils.getObjectMapper().writeValueAsString(obj);
         } catch (Exception e) {
-            StringWriter sw = new StringWriter();
-            PrintWriter pw = new PrintWriter(sw);
-            e.printStackTrace(pw);
-            String stackTraceString = sw.toString();
-            Global.error("re transform error:\n " + stackTraceString);
+            Global.error("re transform error:", e);
             return "toJson error";
         }
     }
@@ -229,11 +238,7 @@ public class Global {
                     try {
                         instrumentation.retransformClasses(aClass);
                     } catch (UnmodifiableClassException e) {
-                        StringWriter sw = new StringWriter();
-                        PrintWriter pw = new PrintWriter(sw);
-                        e.printStackTrace(pw);
-                        String stackTraceString = sw.toString();
-                        Global.error("re transform error:\n " + stackTraceString);
+                        Global.error("re transform error:", e);
                     }
                 }
                 return true;
@@ -275,11 +280,7 @@ public class Global {
                 try {
                     instrumentation.retransformClasses(aClass);
                 } catch (Exception e) {
-                    StringWriter sw = new StringWriter();
-                    PrintWriter pw = new PrintWriter(sw);
-                    e.printStackTrace(pw);
-                    String stackTraceString = sw.toString();
-                    Global.error("reset re transform error:\n " + stackTraceString);
+                    Global.error("reset re transform error: ", e);
                 }
             }
 

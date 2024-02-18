@@ -79,11 +79,7 @@ public class Websocketd extends NanoWSD {
                                 try {
                                     Global.deleteTransformer(UUID.fromString(deleteMessage.getUuid()));
                                 } catch (Exception e) {
-                                    StringWriter sw = new StringWriter();
-                                    PrintWriter pw = new PrintWriter(sw);
-                                    e.printStackTrace(pw);
-                                    String stackTraceString = sw.toString();
-                                    Global.error("delete error:\n " + stackTraceString);
+                                    Global.error("delete error:", e);
                                 }
                             }
                             break;
@@ -95,11 +91,7 @@ public class Websocketd extends NanoWSD {
                     e.printStackTrace();
                     Global.error("not a valid message");
                 } catch (Throwable e) {
-                    StringWriter sw = new StringWriter();
-                    PrintWriter pw = new PrintWriter(sw);
-                    e.printStackTrace(pw);
-                    String stackTraceString = sw.toString();
-                    Global.error("error:\n " + stackTraceString);
+                    Global.error("error:", e);
                 } finally {
                     RequestUtils.clearRequestCtx();
                 }

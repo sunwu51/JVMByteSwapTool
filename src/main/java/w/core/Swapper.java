@@ -44,11 +44,7 @@ public class Swapper {
                     throw new RuntimeException("message type not support");
             }
         } catch (Throwable e) {
-            StringWriter sw = new StringWriter();
-            PrintWriter pw = new PrintWriter(sw);
-            e.printStackTrace(pw);
-            String stackTraceString = sw.toString();
-            Global.error("build transform error:\n " + stackTraceString);
+            Global.error("build transform error:", e);
             return false;
         }
 
@@ -60,11 +56,7 @@ public class Swapper {
             try {
                 Global.addActiveTransformer(aClass, transformer);
             } catch (Throwable e) {
-                StringWriter sw = new StringWriter();
-                PrintWriter pw = new PrintWriter(sw);
-                e.printStackTrace(pw);
-                String stackTraceString = sw.toString();
-                Global.error("re transform error:\n " + stackTraceString);
+                Global.error("re transform error:", e);
                 return false;
             }
         }
