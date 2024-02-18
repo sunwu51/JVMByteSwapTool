@@ -237,8 +237,8 @@ public class Global {
                 for (Class<?> aClass : allLoadedClasses.getOrDefault(it.getClassName(), new HashSet<>())) {
                     try {
                         instrumentation.retransformClasses(aClass);
-                    } catch (UnmodifiableClassException e) {
-                        Global.error("re transform error:", e);
+                    } catch (Exception e) {
+                        Global.error("delete re transform error:", e);
                     }
                 }
                 return true;
