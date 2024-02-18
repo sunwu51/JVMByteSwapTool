@@ -42,6 +42,8 @@ $ java -cp "%JAVA_HOME%\lib\tools.jar";swapper.jar w.Attach
 # usage
 根据上面log中去请求页面，`http://localhost:8000` 默认是8000端口，如果出现冲突会替换，以上面log中为准。
 
+建议测试环境，jvm启动参数添加`-Xverify:none`，否则部分信息不会打印。
+
 注意！！ 工具中所有的类名，只能是类，不能是接口。
 ## 1 watch
 watch作用是对函数环绕增强，打印出入参和函数耗时

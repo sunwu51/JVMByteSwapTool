@@ -13,6 +13,8 @@ import w.web.message.LogMessage;
 import fi.iki.elonen.NanoWSD;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
 import java.util.*;
@@ -34,6 +36,8 @@ public class Global {
      * The WebSocket Server port, will set at start up, default to be 18000
      */
     public static int wsPort = 0;
+
+    public static boolean nonVerifying;
 
     /**
      * The Javassist ClassPool used in this project.
@@ -167,7 +171,16 @@ public class Global {
      * @throws JsonProcessingException
      */
     public static String toJson(Object obj) throws JsonProcessingException {
-        return PrintUtils.getObjectMapper().writeValueAsString(obj);
+        try {
+            return PrintUtils.getObjectMapper().writeValueAsString(obj);
+        } catch (Exception e) {
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
+            e.printStackTrace(pw);
+            String stackTraceString = sw.toString();
+            Global.error("re transform error:\n " + stackTraceString);
+            return "toJson error";
+        }
     }
 
     /**
@@ -201,6 +214,7 @@ public class Global {
         activeTransformers.computeIfAbsent(className, k->new HashMap<>()).computeIfAbsent(classLoader, k->new ArrayList<>()).add(transformer);
     }
 
+
     /**
      * Remove transformer By uuid
      * @param uuid
@@ -211,6 +225,17 @@ public class Global {
             if (it.getUuid().equals(uuid)) {
                 it.setStatus(-1);
                 instrumentation.removeTransformer(it);
+                for (Class<?> aClass : allLoadedClasses.getOrDefault(it.getClassName(), new HashSet<>())) {
+                    try {
+                        instrumentation.retransformClasses(aClass);
+                    } catch (UnmodifiableClassException e) {
+                        StringWriter sw = new StringWriter();
+                        PrintWriter pw = new PrintWriter(sw);
+                        e.printStackTrace(pw);
+                        String stackTraceString = sw.toString();
+                        Global.error("re transform error:\n " + stackTraceString);
+                    }
+                }
                 return true;
             }
             return false;
@@ -247,12 +272,14 @@ public class Global {
         }
         for (String cl : cls) {
             for (Class<?> aClass : Global.allLoadedClasses.getOrDefault(cl, new HashSet<>())) {
-                if (aClass.getClassLoader() != null) {
-                    try {
-                        instrumentation.retransformClasses(aClass);
-                    } catch (UnmodifiableClassException e) {
-                        log(2, "re transform error " + e.getMessage());
-                    }
+                try {
+                    instrumentation.retransformClasses(aClass);
+                } catch (Exception e) {
+                    StringWriter sw = new StringWriter();
+                    PrintWriter pw = new PrintWriter(sw);
+                    e.printStackTrace(pw);
+                    String stackTraceString = sw.toString();
+                    Global.error("reset re transform error:\n " + stackTraceString);
                 }
             }
 
@@ -322,10 +349,17 @@ public class Global {
     }
 
     public synchronized static void fillLoadedClasses() {
+        int count = 0;
+        long start = System.currentTimeMillis();
         for (Class cls : instrumentation.getAllLoadedClasses()) {
-            String name = cls.getName();
-            allLoadedClasses.computeIfAbsent(name, k -> new HashSet<>())
-                    .add(cls);
+            if (cls.getClassLoader() != null) {
+                String name = cls.getName();
+                allLoadedClasses.computeIfAbsent(name, k -> new HashSet<>())
+                        .add(cls);
+                count ++;
+
+            }
         }
+        info("fill loaded classes cost: " + (System.currentTimeMillis() - start) + "ms, class num:" + count);
     }
 }
