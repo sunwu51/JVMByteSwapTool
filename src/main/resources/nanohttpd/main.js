@@ -4,6 +4,8 @@
 var ws = null;
 var logs = [];
 var latestId = "";
+var logLevel = 0;
+
 
 async function init() {
     var res = await fetch('/wsPort',{
@@ -21,7 +23,7 @@ async function init() {
             logMirror2.setValue(JSON.stringify(m.content,0,2))
             return
         }
-        if (m.type === 'LOG') {
+        if (m.type === 'LOG' && m.level >= logLevel) {
             logs.unshift(`[${m.id}][${moment(m.timestamp).format("YYYYMMDD HH:mm:ss")}]\n${m.content}`);
             while (logs.length > 100) {
                 logs.pop();
@@ -92,6 +94,25 @@ document.getElementById("wt-btn2").addEventListener("click", e => {
                 printFormat,
                 signature,
                 innerSignature,
+            }))
+        } else {
+            alert("ws连接关闭")
+        }
+    } else {
+        alert("参数格式错误");
+    }
+})
+
+document.getElementById("wt-btn3").addEventListener("click", e => {
+    var signature = document.getElementById("wt-input4").value;
+    if (signature.split("#").length === 2) {
+        latestId = uuid();
+        if (ws) {
+            ws.send(JSON.stringify({
+                id: latestId,
+                timestamp: new Date().getTime(),
+                type: "TRACE",
+                signature,
             }))
         } else {
             alert("ws连接关闭")

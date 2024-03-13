@@ -37,6 +37,7 @@ public class ExecBundle {
         Global.info("start to invoke");
         inst.getClass().getDeclaredMethod("exec")
                 .invoke(inst);
+        Global.info("finish invoking");
     }
 
     public synchronized static void changeBodyAndInvoke(String body) throws Exception {

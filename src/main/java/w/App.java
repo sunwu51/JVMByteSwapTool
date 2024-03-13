@@ -22,7 +22,7 @@ public class App {
 
     public static void agentmain(String arg, Instrumentation instrumentation) throws Exception {
         if (Global.instrumentation != null) {
-            Global.info("Already attached before");
+            Global.debug("Already attached before");
             return;
         }
         Global.instrumentation = instrumentation;

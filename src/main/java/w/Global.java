@@ -134,6 +134,14 @@ public class Global {
     }
 
     /**
+     * Print debug log, and broadcast to all websocket client
+     * @param content
+     */
+    public static void debug(Object content) {
+        log(0, "" + content);
+    }
+
+    /**
      * Print info log, and broadcast to all websocket client
      * @param content
      */
@@ -316,10 +324,13 @@ public class Global {
 
 
 
-    // 1 info 2 error
+    // 0 debug 1 info 2 error
     private static void log(int level, String content) {
         Logger log = Logger.getLogger(Thread.currentThread().getStackTrace()[2].getClassName());
         switch (level) {
+            case 0:
+                log.log(Level.CONFIG, "[debug]" + content);
+                break;
             case 1:
                 log.log(Level.INFO, "[info]" + content);
                 break;
@@ -327,10 +338,10 @@ public class Global {
             default:
                 log.log(Level.SEVERE, "[error]" + content);
         }
-        send(content);
+        send(level, content);
     }
 
-    private static synchronized void send(String content) {
+    private static synchronized void send(int level, String content) {
         Iterator<NanoWSD.WebSocket> it = webSockets.iterator();
         while (it.hasNext()) {
             NanoWSD.WebSocket ws = it.next();
@@ -339,6 +350,7 @@ public class Global {
                     LogMessage message = new LogMessage();
                     message.setId(RequestUtils.getCurTraceId());
                     message.setContent(content);
+                    message.setLevel(level);
                     ws.send(toJson(message));
                 } catch (IOException e) {
                     System.err.println("send message error" + e);
@@ -361,6 +373,6 @@ public class Global {
 
             }
         }
-        info("fill loaded classes cost: " + (System.currentTimeMillis() - start) + "ms, class num:" + count);
+        debug("fill loaded classes cost: " + (System.currentTimeMillis() - start) + "ms, class num:" + count);
     }
 }

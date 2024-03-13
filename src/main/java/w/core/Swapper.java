@@ -4,10 +4,7 @@ import w.*;
 import w.core.model.*;
 import w.web.message.*;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import java.lang.reflect.Modifier;
 import java.util.*;
 
 
@@ -39,6 +36,9 @@ public class Swapper {
                 case REPLACE_CLASS:
                     transformer = new ReplaceClassTransformer((ReplaceClassMessage) message);
                     break;
+                case TRACE:
+                    transformer = new TraceTransformer((TraceMessage) message);
+                    break;
                 default:
                     Global.error("type not support");
                     throw new RuntimeException("message type not support");
@@ -48,11 +48,24 @@ public class Swapper {
             return false;
         }
 
+        Set<Class<?>> classes = Global.allLoadedClasses.getOrDefault(transformer.getClassName(), new HashSet<>());
+
+        for (Class<?> aClass : classes) {
+            if (aClass.isInterface() || Modifier.isAbstract(aClass.getModifiers())) {
+                Set<String> candidates = new HashSet<>();
+                for (Object instances : Global.getInstances(aClass)) {
+                    candidates.add(instances.getClass().getName());
+                }
+                Global.error("Should use a simple pojo, but " + aClass.getName() + " is a Interface or Abstract class or something wired, \nmaybe you should use: " + candidates);
+                return false;
+            }
+        }
+
         Global.addTransformer(transformer);
-        Global.info("add transform finish, will retrans class");
+        Global.debug("add transform finish, will retrans class");
 
 
-        for (Class<?> aClass : Global.allLoadedClasses.getOrDefault(transformer.getClassName(), new HashSet<>())) {
+        for (Class<?> aClass : classes) {
             try {
                 Global.addActiveTransformer(aClass, transformer);
             } catch (Throwable e) {
