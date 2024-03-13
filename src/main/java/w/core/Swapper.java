@@ -50,26 +50,33 @@ public class Swapper {
 
         Set<Class<?>> classes = Global.allLoadedClasses.getOrDefault(transformer.getClassName(), new HashSet<>());
 
+        boolean exists = false;
         for (Class<?> aClass : classes) {
             if (aClass.isInterface() || Modifier.isAbstract(aClass.getModifiers())) {
                 Set<String> candidates = new HashSet<>();
                 for (Object instances : Global.getInstances(aClass)) {
                     candidates.add(instances.getClass().getName());
                 }
-                Global.error("Should use a simple pojo, but " + aClass.getName() + " is a Interface or Abstract class or something wired, \nmaybe you should use: " + candidates);
+                Global.error("!Error: Should use a simple pojo, but " + aClass.getName() + " is a Interface or Abstract class or something wired, \nmaybe you should use: " + candidates);
                 return false;
             }
+            exists = true;
+        }
+
+        if (!exists) {
+            Global.error("Class not exist" + transformer.getClassName());
+            return false;
         }
 
         Global.addTransformer(transformer);
-        Global.debug("add transform finish, will retrans class");
+        Global.debug("add transformer finish, will retrans class");
 
 
         for (Class<?> aClass : classes) {
             try {
                 Global.addActiveTransformer(aClass, transformer);
             } catch (Throwable e) {
-                Global.error("re transform error:", e);
+                Global.error("re transformer error:", e);
                 return false;
             }
         }

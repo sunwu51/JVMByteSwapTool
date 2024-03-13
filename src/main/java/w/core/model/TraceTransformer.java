@@ -20,6 +20,7 @@ public class TraceTransformer extends BaseClassTransformer {
     String method;
 
     public TraceTransformer(TraceMessage traceMessage) {
+        this.message = traceMessage;
         this.className = traceMessage.getSignature().split("#")[0];
         this.method = traceMessage.getSignature().split("#")[1];
         this.traceId = traceMessage.getId();
@@ -30,7 +31,7 @@ public class TraceTransformer extends BaseClassTransformer {
         CtClass ctClass = Global.classPool.makeClass(new ByteArrayInputStream(origin));
         for (CtMethod declaredMethod : ctClass.getDeclaredMethods()) {
             if (Objects.equals(declaredMethod.getName(), method)) {
-                addOuterWatchCodeToMethod(declaredMethod);
+                addTraceCodeToMethod(declaredMethod);
             }
         }
         byte[] result = ctClass.toBytecode();
@@ -39,19 +40,29 @@ public class TraceTransformer extends BaseClassTransformer {
         return result;
     }
 
-    private void addOuterWatchCodeToMethod(CtMethod ctMethod) throws CannotCompileException, NotFoundException {
+    private void addTraceCodeToMethod(CtMethod ctMethod) throws CannotCompileException, NotFoundException {
         ctMethod.instrument(new ExprEditor() {
             public void edit(MethodCall m) throws CannotCompileException {
                 String code = "{" +
-                        "long start = System.currentTimeMillis();" +
-                        "$_ = $proceed($$);" +
-                        "long duration = System.currentTimeMillis() - start;" +
-                        "w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");" +
-                        "w.Global.info(\"line" + m.getLineNumber() + "," + m.getSignature() + "cost:\"+duration+\"ms\");" +
-                        "w.util.RequestUtils.clearRequestCtx();" ;
+                        "long start = System.currentTimeMillis();\n" +
+                        "$_ = $proceed($$);\n" +
+                        "long duration = System.currentTimeMillis() - start;\n" +
+                        "w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");\n" +
+                        "w.Global.info(\"line" + m.getLineNumber() + "," + m.getClassName() + "#" + m.getMethodName() + ",cost:\"+duration+\"ms\");\n" +
+                        "w.util.RequestUtils.clearRequestCtx();" +
+                        "}";
                 m.replace(code);
             }
         });
+        ctMethod.addLocalVariable("s", CtClass.longType);
+        ctMethod.addLocalVariable("cost", CtClass.longType);
+        ctMethod.insertBefore("s = System.currentTimeMillis();");
+        ctMethod.insertAfter("{" +
+                "cost = System.currentTimeMillis() - s;" +
+                "w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");\n" +
+                "w.Global.info(\"" + className + "#" + method + ", total cost:\"+cost+\"ms\");\n" +
+                "w.util.RequestUtils.clearRequestCtx();" +
+                "}");
     }
     public boolean equals(Object other) {
         if (other instanceof OuterWatchTransformer) {
