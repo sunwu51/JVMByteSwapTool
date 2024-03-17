@@ -23,6 +23,7 @@ import java.util.UUID;
         @JsonSubTypes.Type(value = WatchMessage.class, name = "WATCH"),
         @JsonSubTypes.Type(value = OuterWatchMessage.class, name = "OUTER_WATCH"),
         @JsonSubTypes.Type(value = ExecMessage.class, name = "EXEC"),
+        @JsonSubTypes.Type(value = TraceMessage.class, name = "TRACE"),
         @JsonSubTypes.Type(value = DeleteMessage.class, name = "DELETE")
 })
 @Data

@@ -12,5 +12,6 @@ public class LogMessage extends Message {
     {
         type = MessageType.LOG;
     }
+    int level;
     String content;
 }

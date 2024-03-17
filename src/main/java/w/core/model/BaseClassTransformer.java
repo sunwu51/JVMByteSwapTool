@@ -41,10 +41,10 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
         if (Objects.equals(this.className, className)) {
             try{
                 byte[] r = transform(className, origin);
-                Global.info(className + " re transform by " + uuid +  " success <(^－^)>");
+                Global.info(className + " transformer " + uuid +  " added success <(^－^)>");
                 return r;
             } catch (Exception e) {
-                Global.error(className + " re transform fail by " + uuid + " -(′д｀)-: ", e);
+                Global.error(className + " transformer " + uuid + " added fail -(′д｀)-: ", e);
             }
         }
         return null;

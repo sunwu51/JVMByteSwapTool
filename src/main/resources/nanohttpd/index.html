@@ -75,6 +75,16 @@
                         <sl-button variant="primary" id="wt-btn2">watch</sl-button>
                     </div>
                 </sl-card>
+                <sl-card class="card-overview">
+                    <div slot="header">
+                        <strong>Trace</strong><br />
+                        trace监听方法内 调用其他方法的耗时。
+                    </div>
+                    <div>
+                        <sl-input label="请输入方法签名" id="wt-input4" placeholder="全限定类名#方法名"></sl-input>
+                        <sl-button variant="primary" id="wt-btn3">trace</sl-button>
+                    </div>
+                </sl-card>
             </sl-tab-panel>
             <sl-tab-panel name="change-body">
                 <sl-card class="card-overview">
@@ -156,24 +166,33 @@
         </sl-tab-group>
         </div>
         <div id="right-container">
-
-            <sl-button id="log-btn1">clear</sl-button>
-            <sl-dialog label="Dialog" class="dialog-width" style="--width: 50vw;">
-                <textarea id="log-text2"></textarea>
-                <sl-input id="log-input1" placeholder="输入结尾的uuid可以删除transformer"></sl-input>
-                <sl-button variant="warning" id="log-btn2">delete</sl-button>
-                <sl-button variant="danger" id="log-btn3">reset</sl-button>
-            </sl-dialog>
-            <sl-button>effected class</sl-button>
-            <sl-button id="log-btn4">full screen</sl-button>
+            <div style="display: flex;">
+                <sl-button id="log-btn1">clear</sl-button>
+                <sl-dialog label="Dialog" class="dialog-width" style="--width: 50vw;">
+                    <textarea id="log-text2"></textarea>
+                    <sl-input id="log-input1" placeholder="输入结尾的uuid可以删除transformer"></sl-input>
+                    <sl-button variant="warning" id="log-btn2">delete</sl-button>
+                    <sl-button variant="danger" id="log-btn3">reset</sl-button>
+                </sl-dialog>
+                <sl-button>effected class</sl-button>
+                <sl-button id="log-btn4">full screen</sl-button>
+                <sl-select id="log-select1" style="width: 30%" value="0">
+                    <sl-option value="0">DEBUG</sl-option>
+                    <sl-option value="1">INFO</sl-option>
+                </sl-select>
+            </div>
             <script>
                 var logBtn4 = document.getElementById("log-btn4");
                 var leftContainer = document.getElementById("left-container")
                 var rightContainer = document.getElementById("right-container")
+                var logLevelSelect = document.getElementById("log-select1")
                 logBtn4.addEventListener("click", () => {
                     logBtn4.innerText = logBtn4.innerText == 'full screen' ? 'half screen' : 'full screen';
                     leftContainer.style.display = leftContainer.style.display == 'none' ? 'block' : 'none';
                     rightContainer.style.minWidth = rightContainer.style.minWidth == '100%'  ? '0' : '100%';
+                })
+                logLevelSelect.addEventListener("sl-change", e=>{
+                    logLevel = parseInt(e.target.value);
                 })
             </script>
             <textarea id="log-text1"></textarea>

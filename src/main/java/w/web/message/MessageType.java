@@ -28,4 +28,6 @@ public enum MessageType {
     LOG,
 
     DELETE,
+
+    TRACE,
 }
