@@ -1,4 +1,4 @@
-package com.example;
+package w.client;
 
 import java.net.URI;
 

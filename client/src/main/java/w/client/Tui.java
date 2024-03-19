@@ -1,4 +1,4 @@
-package com.example;
+package w.client;
 
 import jexer.TAction;
 import jexer.TApplication;
