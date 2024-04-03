@@ -8,6 +8,7 @@ import w.Global;
 import w.web.message.ChangeBodyMessage;
 
 import java.io.ByteArrayInputStream;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -37,13 +38,18 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
     @Override
     public byte[] transform(String className, byte[] origin) throws Exception {
         CtClass ctClass = Global.classPool.makeClass(new ByteArrayInputStream(origin));
+        boolean effect = false;
         for (CtMethod declaredMethod : ctClass.getDeclaredMethods()) {
             if (Objects.equals(declaredMethod.getName(), method) &&
                     Arrays.equals(paramTypes.toArray(new String[0]),
                             Arrays.stream(declaredMethod.getParameterTypes()).map(CtClass::getName).toArray())
             ) {
                 declaredMethod.setBody(message.getBody());
+                effect = true;
             }
+        }
+        if (!effect) {
+            throw new IllegalArgumentException("Class or Method not exist.");
         }
         byte[] result = ctClass.toBytecode();
         ctClass.detach();

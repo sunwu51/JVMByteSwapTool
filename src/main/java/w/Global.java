@@ -18,8 +18,10 @@ import java.io.StringWriter;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -59,6 +61,14 @@ public class Global {
      */
     public static Map<String, Map<String, List<BaseClassTransformer>>> activeTransformers = new ConcurrentHashMap<>();
 
+    /**
+     * Transformer hitCounter, for watch trace the transformer effects 50 times at most by default.
+     * Change the default value by environment variable $HIT_COUNT
+     */
+    public static Map<String, AtomicInteger> hitCounter = new ConcurrentHashMap<>();
+
+
+    public static int maxHit = System.getenv("HIT_COUNT") == null || System.getenv("HIT_COUNT").isEmpty() ? 100 : Integer.parseInt(System.getenv("HIT_COUNT"));
 
     /**
      * OgnlContext inited at static code block
@@ -336,7 +346,7 @@ public class Global {
                 break;
             case 2:
             default:
-                log.log(Level.SEVERE, "[error]" + content);
+                log.log(Level.WARNING, "[error]" + content);
         }
         send(level, content);
     }
@@ -358,6 +368,12 @@ public class Global {
             } else {
                 it.remove();
             }
+        }
+    }
+
+    public void checkCountAndUnload(String uuid) {
+        if (hitCounter.computeIfAbsent(uuid, k -> new AtomicInteger(1)).incrementAndGet() >= maxHit) {
+            deleteTransformer(UUID.fromString(uuid));
         }
     }
 
