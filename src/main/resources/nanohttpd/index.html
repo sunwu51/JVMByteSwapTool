@@ -15,6 +15,7 @@
     <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.12.0/cdn/shoelace-autoloader.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/theme/ayu-dark.min.css" integrity="sha512-mV3RUXi1gt22jDb4UyRBFhZVFgAIiOfRE6ul+2l1Hcj6glyg6x4xlnjPH+neGm/t6XrFmsMRu4++McQu0asjqg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/mode/javascript/javascript.min.js" integrity="sha512-I6CdJdruzGtvDyvdO4YsiAq+pkWf2efgd1ZUSK2FnM/u2VuRASPC7GowWQrWyjxCZn6CT89s3ddGI+be0Ak9Fg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
     <style>
         .CodeMirror
         {
@@ -96,7 +97,7 @@
                         <sl-input id="cb-input1" label="请输入方法签名"  placeholder="全限定类名#方法名"></sl-input>
                         <sl-input id="cb-input2" label="请输入方法参数类型列表，英文逗号隔开"
                                   placeholder="类名1, 类名2..."
-                                  help-text="类名使用全限定类名例如com.example.Person，java.lang/java.util包下的可以使用简写例如int,Integer,HashMap">
+                                  help-text="类名使用全限定类名例如com.example.Person">
                         </sl-input>
                         <textarea id="cb-text"></textarea>
                         <sl-button variant="primary" id="cb-btn">ChangeBody</sl-button>
@@ -111,7 +112,7 @@
                         <sl-input id="cb-input3" label="请输入方法签名"  placeholder="全限定类名#方法名"></sl-input>
                         <sl-input id="cb-input4" label="请输入方法参数类型列表，英文逗号隔开"
                                   placeholder="类名1, 类名2..."
-                                  help-text="类名使用全限定类名例如com.example.Person，java.lang/java.util包下的可以使用简写例如int,Integer,HashMap">
+                                  help-text="类名使用全限定类名例如com.example.Person">
                         </sl-input>
                         <sl-input id="cb-input5" label="调用的方法签名"
                                   placeholder="全限定类名#方法名"
@@ -139,13 +140,11 @@
                 </sl-card>
                 <sl-card class="card-overview">
                     <div slot="header">
-                        <strong>Examples</strong><br />
+                        <strong>Final</strong><br />
                     </div>
                     <div>
-                        注意要使用全限定类名进行编码，java.lang下的不需要（注意：import只是编译器的语法糖）
-                        <textarea id="execute-example-text1"></textarea>
-                        内置了一些有用的方法和变量
-                        <textarea id="execute-example-text2"></textarea>
+                        最终上传的代码:
+                        <textarea id="ex-text2"></textarea>
                     </div>
                 </sl-card>
             </sl-tab-panel>
@@ -202,47 +201,59 @@
 <script>
     var cbCode = initCodeMirror("cb-text", false, "{\n\t// write some java code\n}");
     var cbCode2 = initCodeMirror("cb-text2", false, "// $_ = \"修改后的返回值\";");
-    var exCode = initCodeMirror("ex-text", false, "{\n" +
+    var exCodeStr = "import w.Global;\n" +
+        "\n" +
+        "{\n" +
         "    try {\n" +
         "       // write some java code\n" +
-        "       // w.Global.info(w.Global.ognl(\"#root\", ctx));\n" +
+        "       Global.info(Global.ognl(\"#root\", ctx));\n" +
         "    } catch(Exception e) {\n" +
-        "       w.Global.info(e.toString());\n" +
+        "       Global.error(e.toString(),e);\n" +
         "    }\n" +
-        "}");
+        "}";
+    var exCode = initCodeMirror("ex-text", false, exCodeStr);
+    exCode.on('change', function(cm, change) {
+        console.log('Content changed!', exCode2.setValue(replaceImports(cm.getValue())));
+    });
 
-    initCodeMirror("execute-example-text1", true, "{\n" +
-        "\tSystem.out.println(UUID.randomUUID());\n" +
-        "  \tSystem.out.println(new java.awt.Point(100,200));\n" +
-        "}");
-    initCodeMirror("execute-example-text2", true, "{\n" +
-        "\t// 可直接用w.Global.info方法做debug\n" +
-        "    w.Global.info(\"打印log，且回传前端显示在右边→_→\");\n" +
-        "  \n" +
-        "    // 直接用ctx变量，是注入的spring上下文，但注意getBean返回Object\n" +
-        "    // 需要类型转换\n" +
-        "    com.example.UserMapper mapper = \n" +
-        "       (com.example.UserMapper)ctx.getBean(\"userMapper\");\n" +
-        "    com.example.User user = mapper.getUserById(1);\n" +
-        "    w.Global.info(user);\n" +
-        "\n" +
-        "   // 也可以用ognl，如果是spring项目则可以指定root为ctx，如下\n" +
-        "   String exp = \"#user=getBean(\\\"userMapper\\\").getUserById(1), #user.name\"\n" +
-        "   Object result = w.Global.ognl(Ognl.parseExpression(exp), ctx);\n" +
-        "   w.Global.info(result);\n" +
-        "}");
-
+    var exCode2 = initCodeMirror("ex-text2", true, replaceImports(exCodeStr));
     function initCodeMirror(id, readOnly, value) {
         var codeArea = CodeMirror.fromTextArea(document.getElementById(id), {
             mode: 'text/x-java',
             theme: 'darcula',
             lineNumbers: true,
             lineWrapping: true,
-            readOnly,
+            readOnly
         });
         codeArea.setSize("100%", "100%")
         codeArea.setValue(value);
         return codeArea;
+    }
+
+    function replaceImports(str) {
+        var arr = str.split("\n");
+        var map = {};
+        var contentStart = 0;
+        for (var i = 0; i < arr.length; i++) {
+            if (arr[i].trim().startsWith("import ")) {
+                var matchRes = arr[i].trim().match(/^import ([\w\.]*\.(\w+));$/)
+                if (!matchRes) {
+                    return "";
+                }
+                map[matchRes[2]] = matchRes[1];
+                contentStart++;
+            } else {
+                break;
+            }
+        }
+        var newArr = arr.filter((v, i) => i>=contentStart).map(it=>{
+            Object.keys(map).forEach(k=>{
+                it = it.replace(new RegExp("(?<![A-Za-z0-9])" + k + "(?![A-Za-z0-9])", "g"), map[k]);
+            })
+            return it;
+        })
+        return newArr.join("\n");
+
     }
     var logMirror = CodeMirror.fromTextArea(document.getElementById('log-text1'), {
         mode: 'text/x-java',

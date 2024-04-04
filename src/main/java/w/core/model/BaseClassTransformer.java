@@ -45,6 +45,7 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
                 return r;
             } catch (Exception e) {
                 Global.error(className + " transformer " + uuid + " added fail -(′д｀)-: ", e);
+                Global.deleteTransformer(uuid);
             }
         }
         return null;
