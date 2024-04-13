@@ -35,7 +35,7 @@ async function init() {
     ws.onerror = console.error
 
 }
-init()
+// init()
 setInterval(() => {
     if (!ws || ws.readyState === ws.CLOSED) {
         init();
@@ -181,7 +181,7 @@ document.getElementById("ex-btn").addEventListener("click", e => {
             id: latestId,
             timestamp: new Date().getTime(),
             type: "EXEC",
-            body: exCode.getValue(),
+            body: exCode2.getValue(),
         }))
     } else {
         alert("ws连接关闭")

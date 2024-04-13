@@ -7,9 +7,12 @@ import w.Global;
 import w.web.message.WatchMessage;
 
 import java.io.ByteArrayInputStream;
+import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 /**
  * @author Frank
@@ -35,10 +38,15 @@ public class WatchTransformer extends BaseClassTransformer {
     @Override
     public byte[] transform(String className, byte[] origin) throws Exception {
         CtClass ctClass = Global.classPool.makeClass(new ByteArrayInputStream(origin));
+        boolean effect = false;
         for (CtMethod declaredMethod : ctClass.getDeclaredMethods()) {
             if (Objects.equals(declaredMethod.getName(), method)) {
                 addWatchCodeToMethod(declaredMethod);
+                effect = true;
             }
+        }
+        if (!effect) {
+            throw new IllegalArgumentException("Class or Method not exist.");
         }
         byte[] result = ctClass.toBytecode();
         ctClass.detach();
@@ -53,6 +61,7 @@ public class WatchTransformer extends BaseClassTransformer {
         ctMethod.addLocalVariable("req", Global.classPool.get("java.lang.String"));
         ctMethod.addLocalVariable("res", Global.classPool.get("java.lang.String"));
         ctMethod.insertBefore("startTime = System.currentTimeMillis();");
+        ctMethod.insertBefore("w.Global.checkCountAndUnload(\"" + uuid + "\");\n");
 
         StringBuilder afterCode = new StringBuilder("{\n")
                 .append("endTime = System.currentTimeMillis();\n")

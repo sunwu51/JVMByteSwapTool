@@ -1,8 +1,6 @@
 package w.core.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import fi.iki.elonen.NanoHTTPD;
 import javassist.*;
 import javassist.expr.ExprEditor;
 import javassist.expr.MethodCall;
@@ -45,10 +43,15 @@ public class OuterWatchTransformer extends BaseClassTransformer {
     @Override
     public byte[] transform(String className, byte[] origin) throws Exception {
         CtClass ctClass = Global.classPool.makeClass(new ByteArrayInputStream(origin));
+        boolean effect = false;
         for (CtMethod declaredMethod : ctClass.getDeclaredMethods()) {
             if (Objects.equals(declaredMethod.getName(), method)) {
                 addOuterWatchCodeToMethod(declaredMethod);
+                effect = true;
             }
+        }
+        if (!effect) {
+            throw new IllegalArgumentException("Class or Method not exist.");
         }
         byte[] result = ctClass.toBytecode();
         ctClass.detach();
@@ -62,6 +65,7 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                 if (m.getMethodName().equals(innerMethod)) {
                     if (innerClassName.equals("*") || m.getClassName().equals(innerClassName)) {
                         String code = "{" +
+                                "w.Global.checkCountAndUnload(\"" + uuid + "\");\n" +
                                 "long start = System.currentTimeMillis();" +
                                 "String req = null;" +
                                 "String res = null;" +

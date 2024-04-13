@@ -1,6 +1,7 @@
 package w.core.model;
 
 import java.io.ByteArrayInputStream;
+import java.lang.reflect.Method;
 import java.util.Objects;
 
 import javassist.CannotCompileException;
@@ -26,13 +27,18 @@ public class TraceTransformer extends BaseClassTransformer {
         this.traceId = traceMessage.getId();
     }
 
-     @Override
+    @Override
     public byte[] transform(String className, byte[] origin) throws Exception {
         CtClass ctClass = Global.classPool.makeClass(new ByteArrayInputStream(origin));
+        boolean effect = false;
         for (CtMethod declaredMethod : ctClass.getDeclaredMethods()) {
             if (Objects.equals(declaredMethod.getName(), method)) {
                 addTraceCodeToMethod(declaredMethod);
+                effect = true;
             }
+        }
+        if (!effect) {
+            throw new IllegalArgumentException("Class or Method not exist.");
         }
         byte[] result = ctClass.toBytecode();
         ctClass.detach();
@@ -57,6 +63,7 @@ public class TraceTransformer extends BaseClassTransformer {
         ctMethod.addLocalVariable("s", CtClass.longType);
         ctMethod.addLocalVariable("cost", CtClass.longType);
         ctMethod.insertBefore("s = System.currentTimeMillis();");
+        ctMethod.insertBefore("w.Global.checkCountAndUnload(\"" + uuid + "\");");
         ctMethod.insertAfter("{" +
                 "cost = System.currentTimeMillis() - s;" +
                 "w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");\n" +

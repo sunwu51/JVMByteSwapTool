@@ -17,9 +17,14 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -59,6 +64,11 @@ public class Global {
      */
     public static Map<String, Map<String, List<BaseClassTransformer>>> activeTransformers = new ConcurrentHashMap<>();
 
+    /**
+     * Transformer hitCounter, for watch trace the transformer effects 50 times at most by default.
+     * Change the default value by environment variable $HIT_COUNT
+     */
+    public static Map<String, AtomicInteger> hitCounter = new ConcurrentHashMap<>();
 
     /**
      * OgnlContext inited at static code block
@@ -225,10 +235,10 @@ public class Global {
      * @throws UnmodifiableClassException
      */
     public static synchronized void addActiveTransformer(Class<?> c, BaseClassTransformer transformer) throws UnmodifiableClassException {
-        instrumentation.retransformClasses(c);
         String className = c.getName();
         String classLoader = c.getClassLoader().toString();
         activeTransformers.computeIfAbsent(className, k->new HashMap<>()).computeIfAbsent(classLoader, k->new ArrayList<>()).add(transformer);
+        instrumentation.retransformClasses(c);
     }
 
 
@@ -237,6 +247,7 @@ public class Global {
      * @param uuid
      */
     public static synchronized void deleteTransformer(UUID uuid) {
+        debug("Deleting transformer " + uuid);
         Set<String> delClass = new HashSet<>();
         transformers.removeIf(it -> {
             if (it.getUuid().equals(uuid)) {
@@ -273,6 +284,7 @@ public class Global {
         for (String aClass : delClass) {
             activeTransformers.remove(aClass);
         }
+        debug("Deleted transformer " + uuid);
     }
 
     /**
@@ -336,7 +348,7 @@ public class Global {
                 break;
             case 2:
             default:
-                log.log(Level.SEVERE, "[error]" + content);
+                log.log(Level.WARNING, "[error]" + content);
         }
         send(level, content);
     }
@@ -361,6 +373,25 @@ public class Global {
         }
     }
 
+    public static void checkCountAndUnload(String uuid) {
+        if (hitCounter.computeIfAbsent(uuid, k -> new AtomicInteger()).incrementAndGet() >= getMaxHit()) {
+            info("Watch or trace hit counter exceeded maximum, deleted");
+            deleteTransformer(UUID.fromString(uuid));
+            hitCounter.remove(uuid);
+        }
+    }
+
+    public static int getMaxHit() {
+        try {
+            return Integer.parseInt(System.getProperty("maxHit"));
+        } catch (Exception e) {
+            return 100;
+        }
+    }
+    public static List<String> readFile(String path) throws IOException {
+        return Files.readAllLines(Paths.get(path));
+    }
+
     public synchronized static void fillLoadedClasses() {
         int count = 0;
         long start = System.currentTimeMillis();
@@ -373,6 +404,6 @@ public class Global {
 
             }
         }
-        debug("fill loaded classes cost: " + (System.currentTimeMillis() - start) + "ms, class num:" + count);
+//        debug("fill loaded classes cost: " + (System.currentTimeMillis() - start) + "ms, class num:" + count);
     }
 }

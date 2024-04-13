@@ -1,12 +1,15 @@
 package w;
 
-import com.sun.tools.attach.*;
+import com.sun.tools.attach.VirtualMachine;
+import com.sun.tools.attach.VirtualMachineDescriptor;
+import w.util.WClassLoader;
 
 import java.io.File;
-import java.io.IOException;
-import java.net.URISyntaxException;
+import java.lang.reflect.Method;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.security.CodeSource;
+import java.security.ProtectionDomain;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -17,8 +20,30 @@ import java.util.Scanner;
  * @date 2023/11/26 13:07
  */
 public class Attach {
-
-    public static void main(String[] args) throws IOException, AttachNotSupportedException, AgentLoadException, AgentInitializationException, URISyntaxException {
+    public static void main(String[] args) throws Exception {
+        if (!Attach.class.getClassLoader().toString().startsWith(WClassLoader.namePrefix)) {
+            String jdkVersion = System.getProperty("java.version");
+            if (jdkVersion.startsWith("1.")) {
+                if (jdkVersion.startsWith("1.8")) {
+                    try {
+                        // custom class loader to load current jar and tools.jar
+                        WClassLoader customClassLoader = new WClassLoader(
+                                new URL[]{toolsJarUrl(), currentUrl()},
+                                ClassLoader.getSystemClassLoader().getParent()
+                        );
+                        Class<?> mainClass = Class.forName("w.Attach", true, customClassLoader);
+                        Method mainMethod = mainClass.getMethod("main", String[].class);
+                        mainMethod.invoke(null, (Object) args);
+                        return;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    Global.error(jdkVersion + " is not supported");
+                    return;
+                }
+            }
+        }
 
         // Get the jvm process PID from args[0] or manual input
         // And get the spring http port from manual input
@@ -60,13 +85,36 @@ public class Attach {
         URL jarUrl = Attach.class.getProtectionDomain().getCodeSource().getLocation();
         String curJarPath = Paths.get(jarUrl.toURI()).toString();
         try {
-            jvm.loadAgent(curJarPath);
+            StringBuilder arg = new StringBuilder();
+            System.getProperties().forEach((k, v) -> {
+                if (k.toString().startsWith("w_") && k.toString().length() > 2) {
+                    arg.append(k.toString().substring(2)).append("=").append(v.toString()).append("&");
+                }
+            });
+
+            jvm.loadAgent(curJarPath, arg.toString());
             jvm.detach();
-        } catch (AgentLoadException e) {
+        } catch (Exception e) {
             if (!Objects.equals(e.getMessage(), "0")) {
                 throw e;
             }
         }
         System.out.println("============Attach finish");
+    }
+
+    private static URL toolsJarUrl() throws Exception {
+        String javaHome = System.getProperty("java.home");
+        File toolsJarFile = new File(javaHome, "../lib/tools.jar");
+        if (!toolsJarFile.exists()) {
+            throw new Exception("tools.jar not found at: " + toolsJarFile.getPath());
+        }
+        URL toolsJarUrl = toolsJarFile.toURI().toURL();
+        return toolsJarUrl;
+    }
+
+    private static URL currentUrl() throws Exception {
+        ProtectionDomain domain = Attach.class.getProtectionDomain();
+        CodeSource codeSource = domain.getCodeSource();
+        return codeSource.getLocation();
     }
 }

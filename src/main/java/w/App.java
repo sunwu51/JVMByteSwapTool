@@ -1,13 +1,16 @@
 package w;
 
-import java.io.IOException;
+import java.io.*;
 import java.lang.instrument.Instrumentation;
-import java.lang.management.ManagementFactory;
-import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.InvocationTargetException;
-import java.util.List;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 
 import javassist.*;
 
@@ -24,6 +27,17 @@ public class App {
         if (Global.instrumentation != null) {
             Global.debug("Already attached before");
             return;
+        }
+        if (arg != null && arg.length() > 0) {
+            String[] items = arg.split("&");
+            for (String item : items) {
+                String[] kv = item.split("=");
+                if (kv.length == 2) {
+                    if (System.getProperty(kv[0]) == null) {
+                        System.setProperty(kv[0], kv[1]);
+                    }
+                }
+            }
         }
         Global.instrumentation = instrumentation;
         Global.fillLoadedClasses();
@@ -81,6 +95,4 @@ public class App {
         Executors.newScheduledThreadPool(1)
                 .scheduleWithFixedDelay(Global::fillLoadedClasses, 5, 60, TimeUnit.SECONDS);
     }
-
-
 }
