@@ -92,8 +92,7 @@ public class Attach {
                 }
             });
 
-            String str = arg.length() > 1 ? arg.toString() : arg.substring(0, arg.length() - 1);
-            jvm.loadAgent(curJarPath, str);
+            jvm.loadAgent(curJarPath, arg.toString());
             jvm.detach();
         } catch (Exception e) {
             if (!Objects.equals(e.getMessage(), "0")) {
@@ -106,7 +105,6 @@ public class Attach {
     private static URL toolsJarUrl() throws Exception {
         String javaHome = System.getProperty("java.home");
         File toolsJarFile = new File(javaHome, "../lib/tools.jar");
-        System.out.println("Loading tools jar...");
         if (!toolsJarFile.exists()) {
             throw new Exception("tools.jar not found at: " + toolsJarFile.getPath());
         }

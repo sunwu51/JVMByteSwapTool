@@ -12,6 +12,7 @@ import java.lang.instrument.IllegalClassFormatException;
 import java.security.ProtectionDomain;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @author Frank
@@ -45,7 +46,8 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
                 return r;
             } catch (Exception e) {
                 Global.error(className + " transformer " + uuid + " added fail -(′д｀)-: ", e);
-                Global.deleteTransformer(uuid);
+                // async to delete, because current thread holds the class lock
+                CompletableFuture.runAsync(() -> Global.deleteTransformer(uuid));
             }
         }
         return null;

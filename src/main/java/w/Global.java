@@ -404,6 +404,6 @@ public class Global {
 
             }
         }
-        debug("fill loaded classes cost: " + (System.currentTimeMillis() - start) + "ms, class num:" + count);
+//        debug("fill loaded classes cost: " + (System.currentTimeMillis() - start) + "ms, class num:" + count);
     }
 }

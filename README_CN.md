@@ -18,15 +18,7 @@
 # start
 从github release下载`swapper-xx.jar`，运行指令，根据提示输入即可，如下：
 ```bash
-# java >=9 
-$ java -jar swapper.jar
-
-# java == 8 Linux/MacOs:
-$ java -cp ${JAVA_HOME}/lib/tools.jar:swapper.jar w.Attach
-# java == 8 Windows
-$ java -cp "%JAVA_HOME%\lib\tools.jar";swapper.jar w.Attach
-
-
+$ java -jar swapper-0.0.1-SNAPSHOT.jar
 [0] 36200 swapper.jar
 [1] 55908 com.example.springweb.SpringWebApplication
 [2] Custom PID
@@ -35,14 +27,10 @@ $ java -cp "%JAVA_HOME%\lib\tools.jar";swapper.jar w.Attach
 ============The PID is 55908
 ============Attach finish
 ```
-此时已经attach完成，到目标jvm的日志中可以看到如下log。
-
-![image](https://i.imgur.com/y8v0ptc.png)
-
 # usage
-根据上面log中去请求页面，`http://localhost:8000` 默认是8000端口，如果出现冲突会替换，以上面log中为准。
+根据上面log中监听的http端口去请求页面，`http://localhost:8000` 默认是8000端口，如果出现冲突会替换，以上面log中为准。
 
-建议测试环境，jvm启动参数添加`-Xverify:none`，否则部分信息不会打印。
+建议测试环境，jvm启动参数添加`-Xverify:none`，否则部分异常信息日志不会打印。
 
 注意！！ 工具中所有的类名，只能是类，不能是接口。
 ## 1 watch
@@ -182,7 +170,8 @@ public class TestService {
 可以通过effected class按钮查看当前被修改的类，也可以指定uuid剔除某些transformer，或者reset删除全部。
 
 ![image](https://github.com/sunwu51/JVMByteSwapTool/assets/15844103/3144aab1-c6a6-4df2-9737-6f0e503b36a2)
-
+# tui
+目前引入了tui，方便一些服务器不能ip直接访问，而无法打开页面的场景，tui-client在jbs-client目录，用法与网页类似，通过`tab`切换选项，`enter`进行选中。
 
 
 
