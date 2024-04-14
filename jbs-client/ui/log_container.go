@@ -30,7 +30,7 @@ func (m LogContainer) Update(msg tea.Msg) (LogContainer, tea.Cmd) {
 		}
 		m.text.SetValue(str)
 	case tea.WindowSizeMsg:
-		m.text.SetWidth(msg.Width/2 - 10)
+		m.text.SetWidth(msg.Width/2 - 4)
 	}
 	return m, nil
 }
@@ -46,7 +46,7 @@ func (m LogContainer) View() string {
 
 func NewLogContainer() LogContainer {
 	text := textarea.New()
-	text.SetHeight(34)
+	text.SetHeight(25)
 	text.ShowLineNumbers = false
 	text.Prompt = ""
 	text.Blur()
