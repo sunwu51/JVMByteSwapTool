@@ -40,8 +40,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	if m.width < 200 || m.height < 35 {
-		return "Window need to larger than 200x35"
+	if m.width < 150 || m.height < 30 {
+		return "Window need to larger than 150x30"
 	}
 	initializing := 0
 	if m.state == initializing {
