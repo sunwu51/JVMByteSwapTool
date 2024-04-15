@@ -1,6 +1,3 @@
-
-
-
 var ws = null;
 var logs = [];
 var latestId = "";
@@ -55,13 +52,13 @@ openButton.addEventListener('click', async () => {
     dialog.show();
 });
 
-document.getElementById("log-btn1").onclick = e => {
+document.getElementById("clear-btn").onclick = e => {
     logs = [];
     logMirror.setValue("");
 }
 document.getElementById("wt-btn").addEventListener("click", e => {
-    var signature = document.getElementById("wt-input1").value;
-    var printFormat = parseInt(document.getElementById('wt-radio1').value);
+    var signature = document.getElementById("wt-signature-input").value;
+    var printFormat = parseInt(document.getElementById('wt-format-radio').value);
     if (signature.split("#").length === 2) {
         latestId = uuid();
         if (ws) {
@@ -73,17 +70,17 @@ document.getElementById("wt-btn").addEventListener("click", e => {
                 signature,
             }))
         } else {
-            alert("ws连接关闭")
+            alert("ws closed");
         }
     } else {
-        alert("参数格式错误");
+        alert("params error");
     }
 })
 
-document.getElementById("wt-btn2").addEventListener("click", e => {
-    var signature = document.getElementById("wt-input2").value;
-    var innerSignature = document.getElementById("wt-input3").value;
-    var printFormat = parseInt(document.getElementById('wt-radio2').value);
+document.getElementById("owt-btn").addEventListener("click", e => {
+    var signature = document.getElementById("owt-outer-signature-input").value;
+    var innerSignature = document.getElementById("owt-inner-signature-input").value;
+    var printFormat = parseInt(document.getElementById('owt-format-radio').value);
     if (signature.split("#").length === 2 && innerSignature.split("#").length === 2) {
         latestId = uuid();
         if (ws) {
@@ -96,15 +93,15 @@ document.getElementById("wt-btn2").addEventListener("click", e => {
                 innerSignature,
             }))
         } else {
-            alert("ws连接关闭")
+            alert("ws closed")
         }
     } else {
-        alert("参数格式错误");
+        alert("params error");
     }
 })
 
-document.getElementById("wt-btn3").addEventListener("click", e => {
-    var signature = document.getElementById("wt-input4").value;
+document.getElementById("tc-btn").addEventListener("click", e => {
+    var signature = document.getElementById("tc-signature-input").value;
     if (signature.split("#").length === 2) {
         latestId = uuid();
         if (ws) {
@@ -115,16 +112,16 @@ document.getElementById("wt-btn3").addEventListener("click", e => {
                 signature,
             }))
         } else {
-            alert("ws连接关闭")
+            alert("ws closed")
         }
     } else {
-        alert("参数格式错误");
+        alert("params error");
     }
 })
 
 document.getElementById("cb-btn").addEventListener("click", e => {
-    var signature = document.getElementById("cb-input1").value;
-    var paramTypesTxt = document.getElementById("cb-input2").value;
+    var signature = document.getElementById("cb-signature-input").value;
+    var paramTypesTxt = document.getElementById("cb-params-input").value;
     if (signature.split("#").length === 2) {
         latestId = uuid();
         if (ws) {
@@ -139,17 +136,17 @@ document.getElementById("cb-btn").addEventListener("click", e => {
                     .filter(it => it.length !== 0),
             }))
         } else {
-            alert("ws连接关闭")
+            alert("ws closed")
         }
     } else {
-        alert("参数格式错误");
+        alert("params error");
     }
 })
 
-document.getElementById("cb-btn2").addEventListener("click", e => {
-    var signature = document.getElementById("cb-input3").value;
-    var paramTypesTxt = document.getElementById("cb-input4").value;
-    var innerSignature = document.getElementById("cb-input5").value;
+document.getElementById("ocb-btn").addEventListener("click", e => {
+    var signature = document.getElementById("ocb-outer-signature-input").value;
+    var paramTypesTxt = document.getElementById("ocb-outer-parmas-input").value;
+    var innerSignature = document.getElementById("ocb-inter-signature-input").value;
 
     if (signature.split("#").length === 2 && innerSignature.split("#").length === 2) {
         latestId = uuid();
@@ -167,10 +164,10 @@ document.getElementById("cb-btn2").addEventListener("click", e => {
                     .filter(it => it.length !== 0),
             }))
         } else {
-            alert("ws连接关闭")
+            alert("ws closed")
         }
     } else {
-        alert("参数格式错误");
+        alert("params error");
     }
 })
 
@@ -184,7 +181,7 @@ document.getElementById("ex-btn").addEventListener("click", e => {
             body: exCode2.getValue(),
         }))
     } else {
-        alert("ws连接关闭")
+        alert("ws closed")
     }
 })
 
@@ -192,14 +189,14 @@ document.getElementById("ex-btn").addEventListener("click", e => {
 document.getElementById("rc-btn").addEventListener("click", async e => {
     latestId = uuid();
     if (ws) {
-        var fileInput = document.getElementById("rc-input1");
-        var className = document.getElementById("rc-input2").value;
+        var fileInput = document.getElementById("rc-file-input");
+        var className = document.getElementById("rc-class-input").value;
         if (!fileInput.files || fileInput.files.length == 0) {
-            alert("请选择文件")
+            alert("Please select a file")
             return
         }
         if (!className) {
-            alert("请出入类名")
+            alert("Please select a class")
             return
         }
         fileInput.disabled = true;
@@ -217,16 +214,16 @@ document.getElementById("rc-btn").addEventListener("click", async e => {
             fileInput.disabled = false;
         }
     } else {
-        alert("ws连接关闭")
+        alert("ws closed")
     }
 })
 
-document.getElementById("log-btn2").addEventListener("click", async e => {
+document.getElementById("del-btn").addEventListener("click", async e => {
     latestId = uuid();
     if (ws) {
-        var tail = document.getElementById("log-input1").value
+        var tail = document.getElementById("uuid-input").value
         if (!tail || tail.length < 3){
-            alert("uuid非法");
+            alert("uuid invalid");
         }
         ws.send(JSON.stringify({
             id: latestId,
@@ -235,14 +232,14 @@ document.getElementById("log-btn2").addEventListener("click", async e => {
             uuid: tail
         }))
     } else {
-        alert("ws连接关闭")
+        alert("ws closed")
     }
 })
 
-document.getElementById("log-btn3").addEventListener("click", async e => {
-    fetch("reset").then(res => res.text()).then(text=> alert("reset完成")).catch(e => {
+document.getElementById("reset-btn").addEventListener("click", async e => {
+    fetch("reset").then(res => res.text()).then(text=> alert("reset finish~")).catch(e => {
         console.error(e);
-        alert("reset失败");
+        alert("reset error");
     });
 })
 
