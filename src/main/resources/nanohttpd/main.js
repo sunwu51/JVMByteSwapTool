@@ -17,7 +17,7 @@ async function init() {
     ws.onmessage = (msg) => {
         var m = JSON.parse(msg.data);
         if (m.type === 'PONG') {
-            logMirror2.setValue(JSON.stringify(m.content,0,2))
+            jsonArea.setValue(JSON.stringify(m.content,0,2))
             return
         }
         if (m.type === 'LOG' && m.level >= logLevel) {
