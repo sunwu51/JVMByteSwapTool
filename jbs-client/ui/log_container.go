@@ -31,6 +31,7 @@ func (m LogContainer) Update(msg tea.Msg) (LogContainer, tea.Cmd) {
 		m.text.SetValue(str)
 	case tea.WindowSizeMsg:
 		m.text.SetWidth(msg.Width/2 - 4)
+		m.text.SetHeight(25)
 	}
 	return m, nil
 }

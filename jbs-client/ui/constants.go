@@ -68,6 +68,8 @@ func TraceToJSON(params []string) string {
 	m["signature"] = params[0]
 	minCost, _ := strconv.Atoi(params[1])
 	m["minCost"] = minCost
+	ignoreZero, _ := strconv.ParseBool(params[2])
+	m["ignoreZero"] = ignoreZero
 	str, _ := json.Marshal(m)
 	return string(str)
 }
@@ -138,6 +140,7 @@ func init() {
 	}{
 		{"ClassName#MethodName", 0, ClassAndMethodChecker, ""},
 		{"MinCost", 0, func(s string) bool { return true }, "0"},
+		{"IgnoreSubMethodZeroCost", 0, func(s string) bool { return true }, "true"},
 	}, TraceToJSON}
 
 	changeBody := Function{"ChangeBody", []struct {

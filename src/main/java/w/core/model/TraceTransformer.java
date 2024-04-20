@@ -24,12 +24,15 @@ public class TraceTransformer extends BaseClassTransformer {
 
     int minCost;
 
+    boolean ignoreZero;
+
     public TraceTransformer(TraceMessage traceMessage) {
         this.message = traceMessage;
         this.className = traceMessage.getSignature().split("#")[0];
         this.method = traceMessage.getSignature().split("#")[1];
         this.traceId = traceMessage.getId();
         this.minCost = traceMessage.getMinCost();
+        this.ignoreZero = traceMessage.isIgnoreZero();
     }
 
     @Override
@@ -87,7 +90,8 @@ public class TraceTransformer extends BaseClassTransformer {
                 "      java.util.Map.Entry e = (java.util.Map.Entry)it.next();\n" +
                 "      String k = e.getKey().toString();\n" +
                 "      int[] v = (int[])e.getValue();\n" +
-                "      str += \">>\" + k + \" hit:\" + v[1] + \"times, total cost:\" + v[0] + \"ms\\\n\";\n" +
+                "      if (v[0] == 0 && " + ignoreZero + ") \n {} else {" +
+                "       str += \">>\" + k + \" hit:\" + v[1] + \"times, total cost:\" + v[0] + \"ms\\\n\";}\n" +
                 "  }" +
                 "  w.core.model.TraceTransformer.traceContent.remove();\n" +
                 "  w.Global.info(str);\n" +
