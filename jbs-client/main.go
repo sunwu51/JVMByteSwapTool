@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -40,8 +41,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	if m.width < 150 || m.height < 30 {
-		return "Window need to larger than 150x30"
+	if m.width < 100 || m.height < 30 {
+		return fmt.Sprintf("Window need to larger than 100x30, current=%dx%d", m.width, m.height)
 	}
 	initializing := 0
 	if m.state == initializing {

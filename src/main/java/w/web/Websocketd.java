@@ -52,7 +52,10 @@ public class Websocketd extends NanoWSD {
 
             @Override
             protected void onException(IOException e) {
-                System.err.println("ws error " + e);
+                if (!this.isOpen()) {
+                    System.out.println("ws closed");
+                    Global.removeWs(this);
+                }
             }
 
             private void dispatch(String msg) {

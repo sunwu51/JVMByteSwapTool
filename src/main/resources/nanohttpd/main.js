@@ -59,6 +59,8 @@ document.getElementById("clear-btn").onclick = e => {
 document.getElementById("wt-btn").addEventListener("click", e => {
     var signature = document.getElementById("wt-signature-input").value;
     var printFormat = parseInt(document.getElementById('wt-format-radio').value);
+    var minCost = parseInt(document.getElementById("wt-min-cost-input").value);
+
     if (signature.split("#").length === 2) {
         latestId = uuid();
         if (ws) {
@@ -68,6 +70,7 @@ document.getElementById("wt-btn").addEventListener("click", e => {
                 type: "WATCH",
                 printFormat,
                 signature,
+                minCost
             }))
         } else {
             alert("ws closed");
@@ -102,6 +105,7 @@ document.getElementById("owt-btn").addEventListener("click", e => {
 
 document.getElementById("tc-btn").addEventListener("click", e => {
     var signature = document.getElementById("tc-signature-input").value;
+    var minCost = parseInt(document.getElementById("tc-min-cost-input").value);
     if (signature.split("#").length === 2) {
         latestId = uuid();
         if (ws) {
@@ -110,6 +114,7 @@ document.getElementById("tc-btn").addEventListener("click", e => {
                 timestamp: new Date().getTime(),
                 type: "TRACE",
                 signature,
+                minCost
             }))
         } else {
             alert("ws closed")
@@ -145,8 +150,8 @@ document.getElementById("cb-btn").addEventListener("click", e => {
 
 document.getElementById("ocb-btn").addEventListener("click", e => {
     var signature = document.getElementById("ocb-outer-signature-input").value;
-    var paramTypesTxt = document.getElementById("ocb-outer-parmas-input").value;
-    var innerSignature = document.getElementById("ocb-inter-signature-input").value;
+    var paramTypesTxt = document.getElementById("ocb-outer-params-input").value;
+    var innerSignature = document.getElementById("ocb-inner-signature-input").value;
 
     if (signature.split("#").length === 2 && innerSignature.split("#").length === 2) {
         latestId = uuid();

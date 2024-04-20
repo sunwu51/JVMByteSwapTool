@@ -12,4 +12,6 @@ public class TraceMessage extends Message {
      * The method signature with format: com.example.A#func
      */
     String signature;
+
+    int minCost;
 }

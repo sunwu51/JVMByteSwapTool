@@ -64,7 +64,7 @@ public class Swapper {
         }
 
         if (!classExists) {
-            Global.error("Class not exist" + transformer.getClassName());
+            Global.error("Class not exist: " + transformer.getClassName());
             return false;
         }
 

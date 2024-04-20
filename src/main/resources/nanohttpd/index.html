@@ -51,6 +51,7 @@
                     </div>
                     <div>
                         <sl-input label="Input the method signature" id="wt-signature-input" placeholder="package.name.ClassName#methodName"></sl-input>
+                        <sl-input label="Input the min cost(ms) filter" type="number" id="wt-min-cost-input" value="0"></sl-input>
                         <sl-radio-group label="PrintFormat" id="wt-format-radio" value="1">
                             <sl-radio value="1">toString</sl-radio>
                             <sl-radio value="2">Json</sl-radio>
@@ -82,6 +83,7 @@
                     </div>
                     <div>
                         <sl-input label="Input the method signature" id="tc-signature-input" placeholder="package.name.ClassName#methodName"></sl-input>
+                        <sl-input label="Input the min cost(ms) filter" type="number" id="tc-min-cost-input" value="0"></sl-input>
                         <sl-button variant="primary" id="tc-btn">trace</sl-button>
                     </div>
                 </sl-card>
