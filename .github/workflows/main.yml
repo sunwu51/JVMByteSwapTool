@@ -1,0 +1,85 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [windows, darwin, linux]
+        goarch: [arm64, amd64]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v3
+        with:
+          java-version: '8'
+          distribution: 'adopt'
+
+      - name: Build Java with Maven
+        run: |
+          mvn package
+        shell: bash
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '^1.22'
+
+      - name: Build Go Binary
+      
+        run: |
+          cd jbs-client
+          EXT=""
+          if [ "${{ matrix.goos }}" == "windows" ]; then
+            EXT=".exe"
+          fi
+          CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -v -o jbs-client-${{ matrix.goos }}-${{ matrix.goarch }}$EXT
+        shell: bash
+
+      - name: Archive Production Artifacts
+        run: |
+          cd ..
+          zip -r release-${{ matrix.goos }}-${{ matrix.goarch }}.zip target/*.jar jbs-client/jbs-client-${{ matrix.goos }}-${{ matrix.goarch }}*
+        shell: bash
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+          path: release-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v3
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./release-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+          asset_name: release-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+          asset_content_type: application/zip
