@@ -106,6 +106,7 @@ document.getElementById("owt-btn").addEventListener("click", e => {
 document.getElementById("tc-btn").addEventListener("click", e => {
     var signature = document.getElementById("tc-signature-input").value;
     var minCost = parseInt(document.getElementById("tc-min-cost-input").value);
+    var ignoreZero = document.getElementById("tc-ignore-zero").checked;
     if (signature.split("#").length === 2) {
         latestId = uuid();
         if (ws) {
@@ -114,7 +115,8 @@ document.getElementById("tc-btn").addEventListener("click", e => {
                 timestamp: new Date().getTime(),
                 type: "TRACE",
                 signature,
-                minCost
+                minCost,
+                ignoreZero
             }))
         } else {
             alert("ws closed")

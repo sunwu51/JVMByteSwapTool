@@ -14,4 +14,6 @@ public class TraceMessage extends Message {
     String signature;
 
     int minCost;
+
+    boolean ignoreZero;
 }

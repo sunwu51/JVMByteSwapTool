@@ -24,12 +24,15 @@ public class TraceTransformer extends BaseClassTransformer {
 
     int minCost;
 
+    boolean ignoreZero;
+
     public TraceTransformer(TraceMessage traceMessage) {
         this.message = traceMessage;
         this.className = traceMessage.getSignature().split("#")[0];
         this.method = traceMessage.getSignature().split("#")[1];
         this.traceId = traceMessage.getId();
         this.minCost = traceMessage.getMinCost();
+        this.ignoreZero = traceMessage.isIgnoreZero();
     }
 
     @Override
@@ -75,10 +78,10 @@ public class TraceTransformer extends BaseClassTransformer {
         ctMethod.addLocalVariable("s", CtClass.longType);
         ctMethod.addLocalVariable("cost", CtClass.longType);
         ctMethod.insertBefore("s = System.currentTimeMillis();");
-        ctMethod.insertBefore("w.Global.checkCountAndUnload(\"" + uuid + "\");");
         ctMethod.insertAfter("{" +
                 "cost = System.currentTimeMillis() - s;\n" +
                 "if (cost >= " + minCost +") {" +
+                "  w.Global.checkCountAndUnload(\"" + uuid + "\");\n"+
                 "  w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");\n" +
                 "  String str = \"" + className + "#" + method + ", total cost:\"+cost+\"ms\\\n\";\n" +
                 "  LinkedHashMap map = (LinkedHashMap)w.core.model.TraceTransformer.traceContent.get(); \n" +
@@ -87,7 +90,8 @@ public class TraceTransformer extends BaseClassTransformer {
                 "      java.util.Map.Entry e = (java.util.Map.Entry)it.next();\n" +
                 "      String k = e.getKey().toString();\n" +
                 "      int[] v = (int[])e.getValue();\n" +
-                "      str += \">>\" + k + \" hit:\" + v[1] + \"times, total cost:\" + v[0] + \"ms\\\n\";\n" +
+                "      if (v[0] == 0 && " + ignoreZero + ") \n {} else {" +
+                "       str += \">>\" + k + \" hit:\" + v[1] + \"times, total cost:\" + v[0] + \"ms\\\n\";}\n" +
                 "  }" +
                 "  w.core.model.TraceTransformer.traceContent.remove();\n" +
                 "  w.Global.info(str);\n" +
