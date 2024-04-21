@@ -2,6 +2,8 @@ name: Build and Release
 
 on:
   push:
+    branches:
+      - master
     tags:
       - 'v*'
 
@@ -54,9 +56,13 @@ jobs:
           path: release-${{ matrix.goos }}-${{ matrix.goarch }}.zip
 
   release:
+    if: startsWith(github.ref, 'refs/tags/')
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    strategy:
+      matrix:
+        goos: [windows, darwin, linux]
+        goarch: [arm64, amd64]
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v3
