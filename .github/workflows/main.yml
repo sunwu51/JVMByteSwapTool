@@ -80,7 +80,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd JVMByteSwapTool
+          pwd
+          ls
           for zipfile in *; do
             if [[ -f "$zipfile" ]]; then
               echo "Uploading $zipfile"
