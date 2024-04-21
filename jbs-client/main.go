@@ -51,7 +51,7 @@ func (m Model) View() string {
 	iv := lipgloss.NewStyle().Width(m.width / 2).Render(
 		m.inputContainer.View())
 	lv := m.logContainer.View()
-	return lipgloss.JoinHorizontal(lipgloss.Top, iv, lv)
+	return lipgloss.JoinHorizontal(lipgloss.Bottom, iv, lv)
 }
 
 func main() {
