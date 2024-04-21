@@ -1,6 +1,8 @@
 # JVM ByteSwap Tool
 ![logo](sw-ico.png)
 
+![actions](https://github.com/sunwu51/JVMByteSwapTool/actions/workflows/main.yml/badge.svg)
+
 A tool that can hot swap the class byte code while jvm is running. Very suitable for `SpringBoot framework`.
 
 Based on the jvm instrumentation tech, javassist lib, JVMTI.

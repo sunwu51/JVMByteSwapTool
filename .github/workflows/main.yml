@@ -20,13 +20,13 @@ jobs:
           distribution: 'adopt'
       - name: Build Java with Maven
         run: |
-          mvn package
+          mvn package && cp target/swapper-0.0.1-SNAPSHOT.jar swapper.jar
         shell: bash
       - name: Upload Jar
         uses: actions/upload-artifact@v3
         with:
-          name: swapper.jar
-          path: target/swapper-0.0.1-SNAPSHOT.jar
+          name: artifacts
+          path: swapper.jar
   build-go:
     name: Build Go
     runs-on: ubuntu-latest
@@ -35,6 +35,7 @@ jobs:
         goos: [windows, darwin, linux]
         goarch: [arm64, amd64]
     steps:
+      - uses: actions/checkout@v3
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
@@ -55,7 +56,7 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: jbs-client-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+          name: artifacts
           path: jbs-client-${{ matrix.goos }}-${{ matrix.goarch }}.zip
 
   release:
@@ -75,19 +76,9 @@ jobs:
           release_name: Release ${{ github.ref }}
           draft: false
           prerelease: false
-      - name: Upload Release Asset
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd JVMByteSwapTool
-          for zipfile in *; do
-            if [[ -f "$zipfile" ]]; then
-              echo "Uploading $zipfile"
-              curl \
-                -X POST \
-                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                -H "Content-Type: $(file -b --mime-type "$zipfile")" \
-                --data-binary @"$zipfile" \
-                "${{ steps.create_release.outputs.upload_url }}?name=$(basename "$zipfile")"
-            fi
-          done
