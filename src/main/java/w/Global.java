@@ -338,7 +338,7 @@ public class Global {
 
     // 0 debug 1 info 2 error
     private static void log(int level, String content) {
-        Logger log = Logger.getLogger(Thread.currentThread().getStackTrace()[2].getClassName());
+        Logger log = Logger.getLogger(Thread.currentThread().getStackTrace()[3].getClassName());
         switch (level) {
             case 0:
                 log.log(Level.CONFIG, "[debug]" + content);
