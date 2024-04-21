@@ -76,20 +76,9 @@ jobs:
           release_name: Release ${{ github.ref }}
           draft: false
           prerelease: false
-      - name: Upload Release Asset
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          pwd
-          ls
-          for zipfile in *; do
-            if [[ -f "$zipfile" ]]; then
-              echo "Uploading $zipfile"
-              curl \
-                -X POST \
-                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                -H "Content-Type: $(file -b --mime-type "$zipfile")" \
-                --data-binary @"$zipfile" \
-                "${{ steps.create_release.outputs.upload_url }}?name=$(basename "$zipfile")"
-            fi
-          done
