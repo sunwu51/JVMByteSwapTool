@@ -20,13 +20,13 @@ jobs:
           distribution: 'adopt'
       - name: Build Java with Maven
         run: |
-          mvn package
+          mvn package && cp target/swapper-0.0.1-SNAPSHOT.jar swapper.jar
         shell: bash
       - name: Upload Jar
         uses: actions/upload-artifact@v3
         with:
-          name: swapper.jar
-          path: target/swapper-0.0.1-SNAPSHOT.jar
+          name: artifacts
+          path: swapper.jar
   build-go:
     name: Build Go
     runs-on: ubuntu-latest
@@ -56,8 +56,8 @@ jobs:
       - name: Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: jbs-client-${{ matrix.goos }}-${{ matrix.goarch }}.zip
-          path: archive
+          name: artifacts
+          path: jbs-client-${{ matrix.goos }}-${{ matrix.goarch }}.zip
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
@@ -79,6 +79,6 @@ jobs:
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
         with:
-          files: archive/*
+          files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
