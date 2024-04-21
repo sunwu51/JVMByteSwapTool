@@ -33,9 +33,8 @@ jobs:
           go-version: '^1.22'
 
       - name: Build Go Binary
-      
+        working-directory: ./jbs-client
         run: |
-          cd jbs-client
           EXT=""
           if [ "${{ matrix.goos }}" == "windows" ]; then
             EXT=".exe"
@@ -45,7 +44,6 @@ jobs:
 
       - name: Archive Production Artifacts
         run: |
-          cd ..
           zip -r release-${{ matrix.goos }}-${{ matrix.goarch }}.zip target/*.jar jbs-client/jbs-client-${{ matrix.goos }}-${{ matrix.goarch }}*
         shell: bash
 
