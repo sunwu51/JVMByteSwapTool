@@ -33,7 +33,6 @@
         .card-overview{
             width: 100%;
         }
-
     </style>
 </head>
 <body>
@@ -48,11 +47,12 @@
                 <sl-card class="card-overview">
                     <div slot="header">
                         <strong>Watch</strong><br />
-                        watch指定一个方法，进行环绕增强，打印出入参和耗时
+                        watch a specific method, will print the method params and return value
                     </div>
                     <div>
-                        <sl-input label="请输入方法签名" id="wt-input1" placeholder="全限定类名#方法名"></sl-input>
-                        <sl-radio-group label="出入参的打印格式" id="wt-radio1" value="1">
+                        <sl-input label="Input the method signature" id="wt-signature-input" placeholder="package.name.ClassName#methodName"></sl-input>
+                        <sl-input label="Input the min cost(ms) filter" type="number" id="wt-min-cost-input" value="0"></sl-input>
+                        <sl-radio-group label="PrintFormat" id="wt-format-radio" value="1">
                             <sl-radio value="1">toString</sl-radio>
                             <sl-radio value="2">Json</sl-radio>
                             <sl-radio value="3">Pretty</sl-radio>
@@ -63,27 +63,29 @@
                 <sl-card class="card-overview">
                     <div slot="header">
                         <strong>OuterWatch</strong><br />
-                        outer-watch是增强调用方的代码，来监控，即方法1调用方法2，增强方法1中相关代码。
+                        outer-watch is similar with watch, the focus of this is the innerMethod in the outerMethod
                     </div>
                     <div>
-                        <sl-input label="请输入方法签名" id="wt-input2" placeholder="全限定类名#方法名"></sl-input>
-                        <sl-input label="上述方法内调用其他方法签名" id="wt-input3" placeholder="全限定类名#方法名"></sl-input>
-                        <sl-radio-group label="出入参的打印格式" id="wt-radio2" value="1">
+                        <sl-input label="Input the outer method signature" id="owt-outer-signature-input" placeholder="package.name.ClassName#methodName"></sl-input>
+                        <sl-input label="Input the inner method signature" id="owt-inner-signature-input" placeholder="package.name.ClassName#methodName"></sl-input>
+                        <sl-radio-group label="PrintFormat" id="owt-format-radio" value="1">
                             <sl-radio value="1">toString</sl-radio>
                             <sl-radio value="2">Json</sl-radio>
                             <sl-radio value="3">Pretty</sl-radio>
                         </sl-radio-group>
-                        <sl-button variant="primary" id="wt-btn2">watch</sl-button>
+                        <sl-button variant="primary" id="owt-btn">watch</sl-button>
                     </div>
                 </sl-card>
                 <sl-card class="card-overview">
                     <div slot="header">
                         <strong>Trace</strong><br />
-                        trace监听方法内 调用其他方法的耗时。
+                        trace is to record the time consumption of each inner-method
                     </div>
                     <div>
-                        <sl-input label="请输入方法签名" id="wt-input4" placeholder="全限定类名#方法名"></sl-input>
-                        <sl-button variant="primary" id="wt-btn3">trace</sl-button>
+                        <sl-input label="Input the method signature" id="tc-signature-input" placeholder="package.name.ClassName#methodName"></sl-input>
+                        <sl-input label="Input the min cost(ms) filter" type="number" id="tc-min-cost-input" value="0"></sl-input>
+                        <sl-checkbox id="tc-ignore-zero" checked="true">ignore sub method cost <= 0 mills</sl-checkbox> </br>
+                        <sl-button variant="primary" id="tc-btn">trace</sl-button>
                     </div>
                 </sl-card>
             </sl-tab-panel>
@@ -91,13 +93,13 @@
                 <sl-card class="card-overview">
                     <div slot="header">
                         <strong>ChangeBody</strong><br />
-                        热替换整个方法的代码，原理是用javaassist直接修改当前类当前方法的字节码，并重新加载类
+                        Replace the whole method body using the code inputed
                     </div>
                     <div>
-                        <sl-input id="cb-input1" label="请输入方法签名"  placeholder="全限定类名#方法名"></sl-input>
-                        <sl-input id="cb-input2" label="请输入方法参数类型列表，英文逗号隔开"
-                                  placeholder="类名1, 类名2..."
-                                  help-text="类名使用全限定类名例如com.example.Person">
+                        <sl-input id="cb-signature-input" label="Input the method signature"  placeholder="package.name.ClassName#methodName"></sl-input>
+                        <sl-input id="cb-params-input" label="Param types split by comma"
+                                  placeholder="e.g java.lang.String,java.util.List..."
+                                  help-text="Full class name including the package name">
                         </sl-input>
                         <textarea id="cb-text"></textarea>
                         <sl-button variant="primary" id="cb-btn">ChangeBody</sl-button>
@@ -106,23 +108,23 @@
                 <sl-card class="card-overview">
                     <div slot="header">
                         <strong>OuterChange</strong><br />
-                        与out-watch类似，修改调用方的相关代码进行增强。
+                        Similar with ChangeBody, but focus at the inner method
                     </div>
                     <div>
-                        <sl-input id="cb-input3" label="请输入方法签名"  placeholder="全限定类名#方法名"></sl-input>
-                        <sl-input id="cb-input4" label="请输入方法参数类型列表，英文逗号隔开"
-                                  placeholder="类名1, 类名2..."
-                                  help-text="类名使用全限定类名例如com.example.Person">
+                        <sl-input id="ocb-outer-signature-input" label="Input the outer method signature"  placeholder="package.name.ClassName#methodName"></sl-input>
+                        <sl-input id="ocb-outer-params-input" label="Param types split by comma"
+                                  placeholder="e.g java.lang.String,java.util.List..."
+                                  help-text="Full class name including the package name">
                         </sl-input>
-                        <sl-input id="cb-input5" label="调用的方法签名"
-                                  placeholder="全限定类名#方法名"
-                                  help-text="↑这里可以用*匹配所有类，*#get就是所有的get方法">
+                        <sl-input id="ocb-inner-signature-input" label="Input the inner method signature"
+                                  placeholder="package.name.ClassName#methodName"
+                                  help-text="Here you can use * as a class, for example *#get match all get methods">
                         </sl-input>
-                        这里除了修改返回值$_，你也可以做一些环绕的增强，或者执行一些额外的代码。<br>
-                        用法：$_是返回值的指针，$args是该内部方法入参数组，$_=$proceed($$)是执行原方法<br>
-                        $1 $2 ..是第1、2..个入参，$r是返回值类型，用于强转。
-                        <textarea id="cb-text2"></textarea>
-                        <sl-button variant="primary" id="cb-btn2">ChangeResult</sl-button>
+                        $_ represents the return object<br>
+                        $args represents the method params array, $_=$proceed($$) is just execute the origin method<br>
+                        $1 $2 .. are the method arguments
+                        <textarea id="ocb-text"></textarea>
+                        <sl-button variant="primary" id="ocb-btn">ChangeResult</sl-button>
                     </div>
                 </sl-card>
             </sl-tab-panel>
@@ -130,8 +132,7 @@
                 <sl-card class="card-overview">
                     <div slot="header">
                         <strong>Execute</strong><br />
-                        用一个新线程去运行一段代码，对于类型需要使用全限定类名<br>
-                        可以查看下方的examples来使用
+                        Use a new Thread to run some code.
                     </div>
                     <div>
                         <textarea id="ex-text"></textarea>
@@ -143,8 +144,8 @@
                         <strong>Final</strong><br />
                     </div>
                     <div>
-                        最终上传的代码:
-                        <textarea id="ex-text2"></textarea>
+                        Final Code:
+                        <textarea id="ex-final-text"></textarea>
                     </div>
                 </sl-card>
             </sl-tab-panel>
@@ -152,11 +153,11 @@
                     <sl-card class="card-overview">
                         <div slot="header">
                             <strong>ReplaceClass</strong><br />
-                            上传class文件在线替换整个类，默认会将所有的ClassLoader加载过的同名类都替换<br>
+                            Upload a .class file to hot swap the origin class in jvm<br>
                         </div>
                         <div>
-                            <input id="rc-input1" type="file"></input>
-                            <sl-input id="rc-input2" label="请输入全限定类名" >
+                            <input id="rc-file-input" type="file"></input>
+                            <sl-input id="rc-class-input" label="Input the class signature (package.ClassName)" >
                             </sl-input>
                             <sl-button variant="primary" id="rc-btn">Upload</sl-button>
                         </div>
@@ -166,25 +167,25 @@
         </div>
         <div id="right-container">
             <div style="display: flex;">
-                <sl-button id="log-btn1">clear</sl-button>
+                <sl-button id="clear-btn">clear</sl-button>
                 <sl-dialog label="Dialog" class="dialog-width" style="--width: 50vw;">
-                    <textarea id="log-text2"></textarea>
-                    <sl-input id="log-input1" placeholder="输入结尾的uuid可以删除transformer"></sl-input>
-                    <sl-button variant="warning" id="log-btn2">delete</sl-button>
-                    <sl-button variant="danger" id="log-btn3">reset</sl-button>
+                    <textarea id="json-area"></textarea>
+                    <sl-input id="uuid-input" placeholder="uuid in the tail of transformer"></sl-input>
+                    <sl-button variant="warning" id="del-btn">delete</sl-button>
+                    <sl-button variant="danger" id="reset-btn">reset</sl-button>
                 </sl-dialog>
                 <sl-button>effected class</sl-button>
-                <sl-button id="log-btn4">full screen</sl-button>
-                <sl-select id="log-select1" style="width: 30%" value="0">
+                <sl-button id="full-screen-btn">full screen</sl-button>
+                <sl-select id="log-level" style="width: 30%" value="0">
                     <sl-option value="0">DEBUG</sl-option>
                     <sl-option value="1">INFO</sl-option>
                 </sl-select>
             </div>
             <script>
-                var logBtn4 = document.getElementById("log-btn4");
+                var logBtn4 = document.getElementById("full-screen-btn");
                 var leftContainer = document.getElementById("left-container")
                 var rightContainer = document.getElementById("right-container")
-                var logLevelSelect = document.getElementById("log-select1")
+                var logLevelSelect = document.getElementById("log-level")
                 logBtn4.addEventListener("click", () => {
                     logBtn4.innerText = logBtn4.innerText == 'full screen' ? 'half screen' : 'full screen';
                     leftContainer.style.display = leftContainer.style.display == 'none' ? 'block' : 'none';
@@ -194,13 +195,13 @@
                     logLevel = parseInt(e.target.value);
                 })
             </script>
-            <textarea id="log-text1"></textarea>
+            <textarea id="log-text"></textarea>
         </div>
     </div>
 </body>
 <script>
     var cbCode = initCodeMirror("cb-text", false, "{\n\t// write some java code\n}");
-    var cbCode2 = initCodeMirror("cb-text2", false, "// $_ = \"修改后的返回值\";");
+    var cbCode2 = initCodeMirror("ocb-text", false, "// $_ = \"ChangedValue\";");
     var exCodeStr = "import w.Global;\n" +
         "\n" +
         "{\n" +
@@ -216,7 +217,7 @@
         console.log('Content changed!', exCode2.setValue(replaceImports(cm.getValue())));
     });
 
-    var exCode2 = initCodeMirror("ex-text2", true, replaceImports(exCodeStr));
+    var exCode2 = initCodeMirror("ex-final-text", true, replaceImports(exCodeStr));
     function initCodeMirror(id, readOnly, value) {
         var codeArea = CodeMirror.fromTextArea(document.getElementById(id), {
             mode: 'text/x-java',
@@ -255,20 +256,20 @@
         return newArr.join("\n");
 
     }
-    var logMirror = CodeMirror.fromTextArea(document.getElementById('log-text1'), {
+    var logMirror = CodeMirror.fromTextArea(document.getElementById('log-text'), {
         mode: 'text/x-java',
         theme: 'darcula',
         lineNumbers: true,
         readOnly: true,
         lineWrapping: true,
     });
-    var logMirror2 = CodeMirror.fromTextArea(document.getElementById('log-text2'), {
+    var jsonArea = CodeMirror.fromTextArea(document.getElementById('json-area'), {
         mode: { name: "javascript", json: true },
         lineNumbers: true,
         readOnly: true,
     });
     logMirror.setSize("100%", "98vh")
-    logMirror2.setSize(null, "400px")
+    jsonArea.setSize(null, "400px")
 </script>
 <script src="main.js"></script>
 </html>

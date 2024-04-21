@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.UUID;
+import java.util.logging.Logger;
 
 /**
  * @author Frank
@@ -20,6 +21,8 @@ import java.util.UUID;
  */
 
 public class Websocketd extends NanoWSD {
+    Logger log = Logger.getLogger(Websocketd.class.getName());
+
     ObjectMapper objectMapper = new ObjectMapper();
 
     Swapper swapper = Swapper.getInstance();
@@ -52,14 +55,17 @@ public class Websocketd extends NanoWSD {
 
             @Override
             protected void onException(IOException e) {
-                System.err.println("ws error " + e);
+                if (!this.isOpen()) {
+                    System.out.println("ws closed");
+                    Global.removeWs(this);
+                }
             }
 
             private void dispatch(String msg) {
                 try {
                     Message message = objectMapper.readValue(msg, Message.class);
                     if (message.getType() != MessageType.PING) {
-                        System.out.println(objectMapper.writeValueAsString(message));
+                        log.info(objectMapper.writeValueAsString(message));
                         RequestUtils.initRequestCtx(this, message.getId());
                     }
                     switch (message.getType()) {

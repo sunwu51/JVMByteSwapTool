@@ -18,5 +18,7 @@ public class WatchMessage extends Message implements RequestMessage {
      */
     String signature;
 
-    int printFormat;
+    int printFormat = 1;
+
+    int minCost;
 }

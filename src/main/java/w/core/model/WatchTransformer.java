@@ -27,12 +27,15 @@ public class WatchTransformer extends BaseClassTransformer {
 
     int printFormat;
 
+    int minCost;
+
     public WatchTransformer(WatchMessage watchMessage) {
         this.className = watchMessage.getSignature().split("#")[0];
         this.method = watchMessage.getSignature().split("#")[1];
         this.message = watchMessage;
         this.traceId = watchMessage.getId();
         this.printFormat = watchMessage.getPrintFormat();
+        this.minCost = watchMessage.getMinCost();
     }
 
     @Override
@@ -66,6 +69,8 @@ public class WatchTransformer extends BaseClassTransformer {
         StringBuilder afterCode = new StringBuilder("{\n")
                 .append("endTime = System.currentTimeMillis();\n")
                 .append("duration = endTime - startTime;\n");
+
+        afterCode.append("if (duration>=").append(minCost).append(") {\n");
         StringBuilder catchCode = new StringBuilder("{\n");
         if (printFormat == 1) {
             afterCode.append("req = Arrays.toString($args);");
@@ -84,7 +89,7 @@ public class WatchTransformer extends BaseClassTransformer {
                 .append("w.Global.info(\"cost:\"+duration+\"ms,req:\"+req+\",res:\"+res);")
                 .append("w.util.RequestUtils.clearRequestCtx();")
                 .append("}");
-
+        afterCode.append("}");
         catchCode.append("w.util.RequestUtils.fillCurThread(\"").append(message.getId()).append("\");")
                 .append("w.Global.info(\"req:\"+req+\",exception:\"+$e); throw $e;")
                 .append("w.util.RequestUtils.clearRequestCtx();")

@@ -3,6 +3,7 @@ package ui
 import (
 	"encoding/json"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,13 +47,15 @@ func WatchToJSON(params []string) string {
 	m := CommonMap()
 	m["type"] = "WATCH"
 	m["signature"] = params[0]
+	minCost, _ := strconv.Atoi(params[1])
+	m["minCost"] = minCost
 	str, _ := json.Marshal(m)
 	return string(str)
 }
 
 func OuterWatchToJSON(params []string) string {
 	m := CommonMap()
-	m["type"] = "WATCH"
+	m["type"] = "OUTER_WATCH"
 	m["signature"] = params[0]
 	m["innerSignature"] = params[1]
 	str, _ := json.Marshal(m)
@@ -63,6 +66,10 @@ func TraceToJSON(params []string) string {
 	m := CommonMap()
 	m["type"] = "TRACE"
 	m["signature"] = params[0]
+	minCost, _ := strconv.Atoi(params[1])
+	m["minCost"] = minCost
+	ignoreZero, _ := strconv.ParseBool(params[2])
+	m["ignoreZero"] = ignoreZero
 	str, _ := json.Marshal(m)
 	return string(str)
 }
@@ -112,6 +119,7 @@ func init() {
 		Value     string
 	}{
 		{"ClassName#MethodName", 0, ClassAndMethodChecker, ""},
+		{"MinCost", 0, func(s string) bool { return true }, "0"},
 	}, WatchToJSON}
 
 	outerWatch := Function{"OuterWatch", []struct {
@@ -131,6 +139,8 @@ func init() {
 		Value     string
 	}{
 		{"ClassName#MethodName", 0, ClassAndMethodChecker, ""},
+		{"MinCost", 0, func(s string) bool { return true }, "0"},
+		{"IgnoreSubMethodZeroCost", 0, func(s string) bool { return true }, "true"},
 	}, TraceToJSON}
 
 	changeBody := Function{"ChangeBody", []struct {
