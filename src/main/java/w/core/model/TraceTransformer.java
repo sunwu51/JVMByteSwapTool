@@ -78,10 +78,10 @@ public class TraceTransformer extends BaseClassTransformer {
         ctMethod.addLocalVariable("s", CtClass.longType);
         ctMethod.addLocalVariable("cost", CtClass.longType);
         ctMethod.insertBefore("s = System.currentTimeMillis();");
-        ctMethod.insertBefore("w.Global.checkCountAndUnload(\"" + uuid + "\");");
         ctMethod.insertAfter("{" +
                 "cost = System.currentTimeMillis() - s;\n" +
                 "if (cost >= " + minCost +") {" +
+                "  w.Global.checkCountAndUnload(\"" + uuid + "\");\n"+
                 "  w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");\n" +
                 "  String str = \"" + className + "#" + method + ", total cost:\"+cost+\"ms\\\n\";\n" +
                 "  LinkedHashMap map = (LinkedHashMap)w.core.model.TraceTransformer.traceContent.get(); \n" +

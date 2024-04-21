@@ -55,7 +55,7 @@ func WatchToJSON(params []string) string {
 
 func OuterWatchToJSON(params []string) string {
 	m := CommonMap()
-	m["type"] = "WATCH"
+	m["type"] = "OUTER_WATCH"
 	m["signature"] = params[0]
 	m["innerSignature"] = params[1]
 	str, _ := json.Marshal(m)

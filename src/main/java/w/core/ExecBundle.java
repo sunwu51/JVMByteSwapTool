@@ -29,6 +29,7 @@ public class ExecBundle {
             Class c = ctClass.toClass(Global.getClassLoader());
             ctClass.detach();
             inst = c.newInstance();
+            Global.fillLoadedClasses();
         } catch (Throwable e) {
             e.printStackTrace();
         }
