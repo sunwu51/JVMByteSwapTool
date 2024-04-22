@@ -111,4 +111,13 @@ class SwapperTest {
         Assertions.assertTrue(swapper.swap(message));
         Assertions.assertEquals("hi frank", t.hello("frank"));
     }
+
+    @Test
+    public void traceRecursiveTest() {
+        TraceMessage message = new TraceMessage();
+        message.setSignature("w.core.TestClass#recursive");
+        message.setIgnoreZero(false);
+        Assertions.assertTrue(swapper.swap(message));
+        t.recursive(3);
+    }
 }

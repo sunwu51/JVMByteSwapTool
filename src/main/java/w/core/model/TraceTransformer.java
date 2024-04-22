@@ -17,6 +17,7 @@ import w.web.message.TraceMessage;
 @Data
 public class TraceTransformer extends BaseClassTransformer {
     public static ThreadLocal<Map<String, int[]>> traceContent = ThreadLocal.withInitial(LinkedHashMap::new);
+    public static ThreadLocal<Integer> stackDeep = ThreadLocal.withInitial(()->1);
 
     transient TraceMessage message;
 
@@ -61,6 +62,10 @@ public class TraceTransformer extends BaseClassTransformer {
                     return;
                 }
                 String code = "{" +
+                        "   if (\"" + m.getMethodName() + "\".equals(\"" + method + "\")) {" +
+                        "       int deep = ((Integer)w.core.model.TraceTransformer.stackDeep.get()).intValue();" +
+                        "       w.core.model.TraceTransformer.stackDeep.set(new Integer(++deep));" +
+                        "   }" +
                         "   long start = System.currentTimeMillis();\n" +
                         "   $_ = $proceed($$);\n" +
                         "   long duration = System.currentTimeMillis() - start;\n" +
@@ -69,33 +74,37 @@ public class TraceTransformer extends BaseClassTransformer {
                         "   if (!map.containsKey(sig)) {map.put(sig, new int[]{0,0});}" +
                         "   int[] arr = (int[])map.get(sig); \n" +
                         "   arr[0] += duration; arr[1] += 1;" +
+
                         "}";
                 m.replace(code);
             }
         });
-        String str ="";
-
         ctMethod.addLocalVariable("s", CtClass.longType);
         ctMethod.addLocalVariable("cost", CtClass.longType);
         ctMethod.insertBefore("s = System.currentTimeMillis();");
         ctMethod.insertAfter("{" +
-                "cost = System.currentTimeMillis() - s;\n" +
-                "if (cost >= " + minCost +") {" +
-                "  w.Global.checkCountAndUnload(\"" + uuid + "\");\n"+
-                "  w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");\n" +
-                "  String str = \"" + className + "#" + method + ", total cost:\"+cost+\"ms\\\n\";\n" +
-                "  LinkedHashMap map = (LinkedHashMap)w.core.model.TraceTransformer.traceContent.get(); \n" +
-                "  Iterator it = map.entrySet().iterator(); \n" +
-                "  while (it.hasNext()) {\n" +
-                "      java.util.Map.Entry e = (java.util.Map.Entry)it.next();\n" +
-                "      String k = e.getKey().toString();\n" +
-                "      int[] v = (int[])e.getValue();\n" +
-                "      if (v[0] == 0 && " + ignoreZero + ") \n {} else {" +
-                "       str += \">>\" + k + \" hit:\" + v[1] + \"times, total cost:\" + v[0] + \"ms\\\n\";}\n" +
-                "  }" +
-                "  w.core.model.TraceTransformer.traceContent.remove();\n" +
-                "  w.Global.info(str);\n" +
-                "  w.util.RequestUtils.clearRequestCtx();\n" +
+                "int deep = ((Integer)w.core.model.TraceTransformer.stackDeep.get()).intValue();\n" +
+                "w.core.model.TraceTransformer.stackDeep.set(new Integer(--deep));" +
+                "if (deep <= 0) {" +
+                "   w.core.model.TraceTransformer.stackDeep.remove();\n" +
+                "   cost = System.currentTimeMillis() - s;\n" +
+                "   if (cost >= " + minCost +") {" +
+                "     w.Global.checkCountAndUnload(\"" + uuid + "\");\n"+
+                "     w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");\n" +
+                "     String str = \"" + className + "#" + method + ", total cost:\"+cost+\"ms\\\n\";\n" +
+                "     LinkedHashMap map = (LinkedHashMap)w.core.model.TraceTransformer.traceContent.get(); \n" +
+                "     Iterator it = map.entrySet().iterator(); \n" +
+                "     while (it.hasNext()) {\n" +
+                "         java.util.Map.Entry e = (java.util.Map.Entry)it.next();\n" +
+                "         String k = e.getKey().toString();\n" +
+                "         int[] v = (int[])e.getValue();\n" +
+                "         if (v[0] == 0 && " + ignoreZero + ") \n {} else {" +
+                "          str += \">>\" + k + \" hit:\" + v[1] + \"times, total cost:\" + v[0] + \"ms\\\n\";}\n" +
+                "     }" +
+                "     w.core.model.TraceTransformer.traceContent.remove();\n" +
+                "     w.Global.info(str);\n" +
+                "     w.util.RequestUtils.clearRequestCtx();\n" +
+                "   }" +
                 "}" +
                 "}");
     }
