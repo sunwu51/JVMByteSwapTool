@@ -101,10 +101,10 @@ public class TraceTransformer extends BaseClassTransformer {
                 "         if (v[0] == 0 && " + ignoreZero + ") \n {} else {" +
                 "          str += \">>\" + k + \" hit:\" + v[1] + \"times, total cost:\" + v[0] + \"ms\\\n\";}\n" +
                 "     }" +
-                "     w.core.model.TraceTransformer.traceContent.remove();\n" +
                 "     w.Global.info(str);\n" +
                 "     w.util.RequestUtils.clearRequestCtx();\n" +
-                "   }" +
+                "   }\n" +
+                "   w.core.model.TraceTransformer.traceContent.remove();\n" +
                 "}" +
                 "}");
     }

@@ -118,6 +118,8 @@ class SwapperTest {
         message.setSignature("w.core.TestClass#recursive");
         message.setIgnoreZero(false);
         Assertions.assertTrue(swapper.swap(message));
-        t.recursive(3);
+        for (int i = 0; i < 10; i++) {
+            t.recursive(3);
+        }
     }
 }
