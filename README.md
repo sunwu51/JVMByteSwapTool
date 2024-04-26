@@ -10,7 +10,7 @@ Based on the jvm instrumentation tech, javassist lib, JVMTI.
 # Usage
 Download the zip file from the [release](https://github.com/sunwu51/JVMByteSwapTool/releases) page.
 
-Make sure you have a JDK >= 1.8.
+Make sure you have a JDK >= 1.8 and should better JDK <= 11, because javassist may not support new language feature util now.
 ```bash
 $ unzip swapper-<latest-version>.zip
 
