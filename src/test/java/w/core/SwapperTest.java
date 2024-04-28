@@ -89,7 +89,7 @@ class SwapperTest {
     public void execTest() throws Exception {
         ExecMessage message = new ExecMessage();
         message.setBody("{w.Global.info(\"hello\");}");
-        ExecBundle.changeBodyAndInvoke(message.getBody());
+        ExecBundle.changeBodyAndInvoke(0, message.getBody());
     }
 
     @Test

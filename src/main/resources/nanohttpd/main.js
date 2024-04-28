@@ -180,11 +180,13 @@ document.getElementById("ocb-btn").addEventListener("click", e => {
 
 document.getElementById("ex-btn").addEventListener("click", e => {
     latestId = uuid();
+    var mode = parseInt(execModeSelect.value)
     if (ws) {
         ws.send(JSON.stringify({
             id: latestId,
             timestamp: new Date().getTime(),
             type: "EXEC",
+            mode,
             body: exCode2.getValue(),
         }))
     } else {
