@@ -37,6 +37,7 @@ public class Attach {
                         return;
                     } catch (Exception e) {
                         e.printStackTrace();
+                        System.exit(-1);
                     }
                 } else {
                     Global.error(jdkVersion + " is not supported");

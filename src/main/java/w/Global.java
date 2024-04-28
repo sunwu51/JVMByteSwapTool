@@ -20,6 +20,8 @@ import java.lang.instrument.UnmodifiableClassException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.CodeSource;
+import java.security.ProtectionDomain;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -405,5 +407,21 @@ public class Global {
             }
         }
 //        debug("fill loaded classes cost: " + (System.currentTimeMillis() - start) + "ms, class num:" + count);
+    }
+
+    public static Set<String> getClassPathes() {
+        Set<String> result = new HashSet<>();
+        result.addAll(SpringUtils.getClassPathes());
+        CodeSource codeSource  = Global.class.getProtectionDomain().getCodeSource();
+        if (codeSource != null) {
+            String jarPath = codeSource.getLocation().getPath();
+            result.add(jarPath);
+        }
+        codeSource = getClassLoader().getClass().getProtectionDomain().getCodeSource();
+        if (codeSource != null) {
+            String jarPath = codeSource.getLocation().getFile();
+            result.add(jarPath);
+        }
+        return result;
     }
 }
