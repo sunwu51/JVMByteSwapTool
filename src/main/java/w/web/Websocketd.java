@@ -77,7 +77,7 @@ public class Websocketd extends NanoWSD {
                             break;
                         case EXEC:
                             ExecMessage execMessage = (ExecMessage) message;
-                            ExecBundle.changeBodyAndInvoke(execMessage.getBody());
+                            ExecBundle.changeBodyAndInvoke(execMessage.getMode(), execMessage.getBody());
                             break;
                         case DELETE:
                             DeleteMessage deleteMessage = (DeleteMessage) message;

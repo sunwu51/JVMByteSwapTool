@@ -2,7 +2,6 @@ package w;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import javassist.ClassPool;
-import lombok.Getter;
 import ognl.*;
 import w.core.model.BaseClassTransformer;
 import w.util.NativeUtils;
@@ -12,19 +11,19 @@ import w.util.SpringUtils;
 import w.web.message.LogMessage;
 import fi.iki.elonen.NanoWSD;
 
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import java.io.*;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
-import java.net.URI;
+import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.CodeSource;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -42,7 +41,20 @@ public class Global {
      */
     public static int wsPort = 0;
 
+    /**
+     * Whether set the java flag -Xverify:none
+     */
     public static boolean nonVerifying;
+
+    /**
+     * classes and innerJar will unpack to a temp dir
+     */
+    public static String tempCompileClassPath;
+
+    /**
+     * class path list
+     */
+    public static Set<String> classPaths = new HashSet<>();
 
     /**
      * The Javassist ClassPool used in this project.
@@ -102,14 +114,11 @@ public class Global {
             throw new RuntimeException(e);
         }
         ognlContext = new OgnlContext(
-                new ClassResolver() {
-                    @Override
-                    public Class classForName(String s, Map map) throws ClassNotFoundException {
-                        try {
-                            return Global.getClassLoader().loadClass(s);
-                        } catch (Exception e) {
-                            throw new ClassNotFoundException(s);
-                        }
+                (s, map) -> {
+                    try {
+                        return Global.getClassLoader().loadClass(s);
+                    } catch (Exception e) {
+                        throw new ClassNotFoundException(s);
                     }
                 },
                 new DefaultTypeConverter(),
@@ -405,5 +414,128 @@ public class Global {
             }
         }
 //        debug("fill loaded classes cost: " + (System.currentTimeMillis() - start) + "ms, class num:" + count);
+    }
+
+    public static Set<String> getClassPaths() {
+        Set<String> result = new HashSet<>();
+        result.addAll(classPaths);
+        CodeSource codeSource  = Global.class.getProtectionDomain().getCodeSource();
+        if (codeSource != null) {
+            String jarPath = codeSource.getLocation().getPath();
+            result.add(jarPath);
+        }
+        codeSource = getClassLoader().getClass().getProtectionDomain().getCodeSource();
+        if (codeSource != null) {
+            String jarPath = codeSource.getLocation().getFile();
+            result.add(jarPath);
+        }
+        return result;
+    }
+
+
+    public static void unpackUberJar(ClassLoader classLoader) {
+        try {
+            Map<String, Set<String>> innerInfo = new HashMap<>();
+            Enumeration<URL> urls = classLoader.getResources("");
+            while (urls.hasMoreElements()) {
+                URL url = urls.nextElement();
+                // spring uber jar BOOT-INF/classes and BOOT-INF/lib/dependency.jar!/ ends with !/
+                String[] parts = url.toString().split("!/");
+                if (parts.length == 2 && url.toString().endsWith("!/")) {
+                    String parentJar = parts[0].substring(parts[0].lastIndexOf(":") + 1);
+                    String innerPath = parts[1];
+                    innerInfo.computeIfAbsent(parentJar, k->new HashSet<>()).add(innerPath);
+                }
+            }
+            String tempDir = System.getProperty("java.io.tmpdir");
+            String targetDir = tempDir + "/" + System.nanoTime() + "_classpath";
+            innerInfo.forEach((jar, inners) -> {
+                try {
+                    classPaths.addAll(extractBootInfClasses(jar, targetDir, inners));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            classPaths.add(new File(targetDir).getAbsolutePath());
+            Global.tempCompileClassPath = targetDir;
+
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                try {
+                    deleteRecursively(new File(targetDir));
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            Global.error("unpack uber jar failed, execute can only use javassist mode!");
+        }
+
+    }
+
+    private static Set<String> extractBootInfClasses(String jarFilePath, String destDirPath, Set<String> inners) throws IOException {
+        Set<String> result = new HashSet<>();
+        try (JarFile jarFile = new JarFile(jarFilePath)) {
+            Enumeration<JarEntry> entries = jarFile.entries();
+            while (entries.hasMoreElements()) {
+                JarEntry entry = entries.nextElement();
+                String entryName = entry.getName();
+                String innerName = null;
+                for (String inner : inners) {
+                    if (entryName.startsWith(inner)) {
+                        innerName = inner;
+                        break;
+                    }
+                }
+                if (innerName != null) {
+                    String prefix = "";
+                    if (innerName.endsWith(".jar")) {
+                        prefix = innerName.substring(0, innerName.lastIndexOf("/"));
+                    } else {
+                        prefix = innerName.endsWith("/") ? innerName : innerName + "/";
+                    }
+                    // directory for class files
+                    if (entry.isDirectory()) {
+                        continue;
+                    }
+
+                    Path targetPath = Paths.get(destDirPath + "/" + entryName.substring(prefix.length()));
+
+                    if (Files.notExists(targetPath.getParent())) {
+                        Files.createDirectories(targetPath.getParent());
+                    }
+
+                    try (InputStream is = jarFile.getInputStream(entry);
+                         OutputStream os = Files.newOutputStream(targetPath)) {
+                        copyStream(is, os);
+                        result.add(targetPath.toFile().getAbsolutePath());
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    private static void copyStream(InputStream input, OutputStream output) throws IOException {
+        byte[] buffer = new byte[4096];
+        int bytesRead;
+        while ((bytesRead = input.read(buffer)) != -1) {
+            output.write(buffer, 0, bytesRead);
+        }
+    }
+
+    private static void deleteRecursively(File file) throws IOException {
+        if (file.isDirectory()) {
+            File[] entries = file.listFiles();
+            if (entries != null) {
+                for (File entry : entries) {
+                    deleteRecursively(entry);
+                }
+            }
+        }
+        if (!file.delete()) {
+            throw new IOException("Failed to delete " + file);
+        }
     }
 }

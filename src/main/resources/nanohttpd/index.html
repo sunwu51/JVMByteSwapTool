@@ -133,6 +133,13 @@
                     <div slot="header">
                         <strong>Execute</strong><br />
                         Use a new Thread to run some code.
+                        <div style="display: flex; justify-content: space-between">
+                            <sl-select id="exec-mode" style="width: 50%" value="0">
+                                <sl-option value="0">javassist(java 4) fast and safe</sl-option>
+                                <sl-option value="1">currentJDK slow but more grammar features</sl-option>
+                            </sl-select>
+                            <sl-checkbox id="exec-spring" checked="true">spring ctx inject</sl-checkbox>
+                        </div>
                     </div>
                     <div>
                         <textarea id="ex-text"></textarea>
@@ -144,7 +151,8 @@
                         <strong>Final</strong><br />
                     </div>
                     <div>
-                        Final Code:
+                        For javassist compiler, final-code is a method block without any other things. <br />
+                        For jdk compiler, final-code is the whole java source code.
                         <textarea id="ex-final-text"></textarea>
                     </div>
                 </sl-card>
@@ -207,17 +215,25 @@
         "{\n" +
         "    try {\n" +
         "       // write some java code\n" +
-        "       Global.info(Global.ognl(\"#root\", ctx));\n" +
+        "       Global.info(Global.ognl(\"#root\", UUID.randomUUID()));\n" +
         "    } catch(Exception e) {\n" +
         "       Global.error(e.toString(),e);\n" +
         "    }\n" +
         "}";
     var exCode = initCodeMirror("ex-text", false, exCodeStr);
-    exCode.on('change', function(cm, change) {
-        console.log('Content changed!', exCode2.setValue(replaceImports(cm.getValue())));
-    });
-
     var exCode2 = initCodeMirror("ex-final-text", true, replaceImports(exCodeStr));
+    var execModeSelect = document.getElementById("exec-mode");
+    var execSpringCheck = document.getElementById("exec-spring");
+    execModeSelect.addEventListener("sl-change", e=>{
+        exCode2.setValue(genCode(exCode.getValue()));
+    })
+    exCode.on('change', function(cm, change) {
+        console.log('Content changed!', exCode2.setValue(genCode(cm.getValue())));
+    });
+    execSpringCheck.addEventListener('sl-change', function() {
+        exCode2.setValue(genCode(exCode.getValue()))
+    })
+
     function initCodeMirror(id, readOnly, value) {
         var codeArea = CodeMirror.fromTextArea(document.getElementById(id), {
             mode: 'text/x-java',
@@ -229,6 +245,28 @@
         codeArea.setSize("100%", "100%")
         codeArea.setValue(value);
         return codeArea;
+    }
+
+    function genCode(str) {
+        if (document.getElementById("exec-mode").value === "0") {
+            return replaceImports(str);
+        } else if (document.getElementById("exec-mode").value === "1") {
+            var start = str.indexOf("{"), end = str.lastIndexOf("}");
+            var result = `package w;
+import java.util.*;
+${str.substring(0, start).trim()}
+${execSpringCheck.checked ? `import org.springframework.context.ApplicationContext;
+import w.util.SpringUtils;` : ""}
+
+public class Exec {
+    public void exec() {
+        ${execSpringCheck.checked ? "ApplicationContext ctx = (ApplicationContext) SpringUtils.getSpringBootApplicationContext();" :""}
+${str.substring(start + 1, end).split("\n").filter(it=>it.trim().length>0).map(it=>`    ${it}`).join("\n")}
+    }
+}
+` ;
+            return result
+        }
     }
 
     function replaceImports(str) {

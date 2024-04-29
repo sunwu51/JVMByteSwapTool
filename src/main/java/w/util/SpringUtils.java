@@ -7,10 +7,17 @@ import lombok.Setter;
 import ognl.*;
 import w.Global;
 
+import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.InvocationTargetException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 
 /**
  * @author Frank
@@ -60,6 +67,7 @@ public class SpringUtils {
             }
         }
 
+
         RuntimeMXBean runtimeMXBean = ManagementFactory.getRuntimeMXBean();
         List<String> inputArguments = runtimeMXBean.getInputArguments();
         String xverifyValue = null;
@@ -81,6 +89,5 @@ public class SpringUtils {
         return String.format("%s ctx = (%s) (%s).getSpringBootApplicationContext();\n",
                 APP_CTX_CLASS_NAME, APP_CTX_CLASS_NAME, SpringUtils.class.getName());
     }
-
 
 }
