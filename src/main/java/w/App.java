@@ -67,7 +67,7 @@ public class App {
             }
             classpath += cp;
         }
-        classpath += File.pathSeparator + javaHome + "/../lib/tools.jar" + File.separator + System.getProperty("java.class.path");
+        classpath += File.pathSeparator + javaHome + "/../lib/tools.jar" + File.pathSeparator + System.getProperty("java.class.path");
         String className = "w.Compiler";
         List<String> command = new ArrayList<>();
         command.add(javaBin);
@@ -76,6 +76,7 @@ public class App {
         command.add("-Duser.language=en");
         command.add("-Dfile.encoding=UTF-8");
         command.add(className);
+        Global.info(String.format("%s -cp %s -Duser.language=en -Dfile.encoding=UTF-8 %s", javaBin, classpath, className));
         try {
             //new jvm process
             ProcessBuilder builder = new ProcessBuilder(command);

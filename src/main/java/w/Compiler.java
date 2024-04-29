@@ -31,12 +31,9 @@ public class Compiler {
                     switch (uri) {
                         case "/compile":
                             String className = parameters.get("className");
-                            System.out.println("className: " + className);
 
                             String content = parameters.get("content");
-                            System.out.println("Content: " + content);
                             content = new String(Base64.getDecoder().decode(parameters.get("content")), StandardCharsets.UTF_8);
-                            System.out.println("Content: " + content);
                             try {
                                 StringBuilder errorMessage = new StringBuilder();
                                 byte[] bytecode = InMemoryJavaCompiler.compile(className, content, new InMemoryJavaCompiler.InMemoryDiagnosticListener(errorMessage));
