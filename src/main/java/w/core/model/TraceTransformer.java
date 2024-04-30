@@ -4,10 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 import java.util.*;
 
-import javassist.CannotCompileException;
-import javassist.CtClass;
-import javassist.CtMethod;
-import javassist.NotFoundException;
+import javassist.*;
 import javassist.expr.ExprEditor;
 import javassist.expr.MethodCall;
 import lombok.Data;
@@ -42,12 +39,18 @@ public class TraceTransformer extends BaseClassTransformer {
         boolean effect = false;
         for (CtMethod declaredMethod : ctClass.getDeclaredMethods()) {
             if (Objects.equals(declaredMethod.getName(), method)) {
+                if ((declaredMethod.getModifiers() & Modifier.ABSTRACT) != 0) {
+                    throw new IllegalArgumentException("Cannot change abstract method.");
+                }
+                if ((declaredMethod.getModifiers() & Modifier.NATIVE) != 0) {
+                    throw new IllegalArgumentException("Cannot change native method.");
+                }
                 addTraceCodeToMethod(declaredMethod);
                 effect = true;
             }
         }
         if (!effect) {
-            throw new IllegalArgumentException("Class or Method not exist.");
+            throw new IllegalArgumentException("Method not declared here.");
         }
         byte[] result = ctClass.toBytecode();
         ctClass.detach();

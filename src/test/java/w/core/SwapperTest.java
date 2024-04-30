@@ -20,7 +20,10 @@ class SwapperTest {
 
     Swapper swapper = Swapper.getInstance();;
 
-    TestClass t = new TestClass();;
+    TestClass t = new TestClass();
+
+    R r = new R();
+    R2 r2 = new R2();
 
     @BeforeAll
     public static void setUp() throws Exception {
@@ -37,10 +40,23 @@ class SwapperTest {
     @Test
     public void watchTest() {
         WatchMessage watchMessage = new WatchMessage();
-        watchMessage.setSignature("w.core.TestClass#hello");
-        watchMessage.setMinCost(0);
+        watchMessage.setSignature("w.core.R#abstractParentMethod");
         Assertions.assertTrue(swapper.swap(watchMessage));
-        t.hello("world");
+        WatchMessage watchMessage2 = new WatchMessage();
+        watchMessage2.setSignature("w.core.R#interfaceMethod");
+        Assertions.assertTrue(swapper.swap(watchMessage2));
+        WatchMessage watchMessage3 = new WatchMessage();
+        watchMessage3.setSignature("w.core.AbstractService#normalParentMethod");
+        Assertions.assertTrue(swapper.swap(watchMessage3));
+        WatchMessage watchMessage4 = new WatchMessage();
+        watchMessage4.setSignature("w.core.MyInterface#interfaceDefaultMethod");
+        Assertions.assertTrue(swapper.swap(watchMessage4));
+        r.abstractParentMethod();
+        r.interfaceMethod();
+        r.normalParentMethod();
+        r.interfaceDefaultMethod();
+        r2.normalParentMethod();
+        r2.interfaceDefaultMethod();
     }
 
     @Test
@@ -115,11 +131,11 @@ class SwapperTest {
     @Test
     public void traceRecursiveTest() {
         TraceMessage message = new TraceMessage();
-        message.setSignature("w.core.TestClass#recursive");
+        message.setSignature("w.core.R#recursive");
         message.setIgnoreZero(false);
         Assertions.assertTrue(swapper.swap(message));
         for (int i = 0; i < 10; i++) {
-            t.recursive(3);
+            r.recursive(3);
         }
     }
 }

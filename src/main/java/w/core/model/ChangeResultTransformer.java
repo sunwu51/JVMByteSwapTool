@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import javassist.CannotCompileException;
 import javassist.CtClass;
 import javassist.CtMethod;
+import javassist.Modifier;
 import javassist.expr.ExprEditor;
 import javassist.expr.MethodCall;
 import lombok.Data;
@@ -54,6 +55,12 @@ public class ChangeResultTransformer extends BaseClassTransformer {
                     Arrays.equals(paramTypes.toArray(new String[0]),
                             Arrays.stream(declaredMethod.getParameterTypes()).map(CtClass::getName).toArray())
             ) {
+                if ((declaredMethod.getModifiers() & Modifier.ABSTRACT) != 0) {
+                    throw new IllegalArgumentException("Cannot change abstract method.");
+                }
+                if ((declaredMethod.getModifiers() & Modifier.NATIVE) != 0) {
+                    throw new IllegalArgumentException("Cannot change native method.");
+                }
                 declaredMethod.instrument(new ExprEditor() {
                     public void edit(MethodCall m) throws CannotCompileException {
                         if (m.getMethodName().equals(innerMethod)) {
@@ -67,7 +74,7 @@ public class ChangeResultTransformer extends BaseClassTransformer {
             }
         }
         if (!effect) {
-            throw new IllegalArgumentException("Class or Method not exist.");
+            throw new IllegalArgumentException("Method not declared here.");
         }
         byte[] result = ctClass.toBytecode();
         ctClass.detach();

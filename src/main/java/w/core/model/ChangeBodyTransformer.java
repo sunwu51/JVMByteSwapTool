@@ -3,6 +3,7 @@ package w.core.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import javassist.CtClass;
 import javassist.CtMethod;
+import javassist.Modifier;
 import lombok.Data;
 import w.Global;
 import w.web.message.ChangeBodyMessage;
@@ -44,12 +45,18 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
                     Arrays.equals(paramTypes.toArray(new String[0]),
                             Arrays.stream(declaredMethod.getParameterTypes()).map(CtClass::getName).toArray())
             ) {
+                if ((declaredMethod.getModifiers() & Modifier.ABSTRACT) != 0) {
+                    throw new IllegalArgumentException("Cannot change abstract method.");
+                }
+                if ((declaredMethod.getModifiers() & Modifier.NATIVE) != 0) {
+                    throw new IllegalArgumentException("Cannot change native method.");
+                }
                 declaredMethod.setBody(message.getBody());
                 effect = true;
             }
         }
         if (!effect) {
-            throw new IllegalArgumentException("Class or Method not exist.");
+            throw new IllegalArgumentException("Method not declared here.");
         }
         byte[] result = ctClass.toBytecode();
         ctClass.detach();

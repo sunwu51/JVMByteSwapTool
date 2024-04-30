@@ -8,9 +8,7 @@ import w.web.message.WatchMessage;
 
 import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
@@ -44,12 +42,18 @@ public class WatchTransformer extends BaseClassTransformer {
         boolean effect = false;
         for (CtMethod declaredMethod : ctClass.getDeclaredMethods()) {
             if (Objects.equals(declaredMethod.getName(), method)) {
+                if ((declaredMethod.getModifiers() & Modifier.ABSTRACT) != 0) {
+                    throw new IllegalArgumentException("Cannot change abstract method.");
+                }
+                if ((declaredMethod.getModifiers() & Modifier.NATIVE) != 0) {
+                    throw new IllegalArgumentException("Cannot change native method.");
+                }
                 addWatchCodeToMethod(declaredMethod);
                 effect = true;
             }
         }
         if (!effect) {
-            throw new IllegalArgumentException("Class or Method not exist.");
+            throw new IllegalArgumentException("Method not declared here.");
         }
         byte[] result = ctClass.toBytecode();
         ctClass.detach();

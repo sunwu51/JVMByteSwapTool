@@ -16,10 +16,4 @@ public class TestClass {
         return hello(name);
     }
 
-
-    public int recursive(int n) {
-        if (n <= 1) return 1;
-        UUID.randomUUID();
-        return recursive(n - 1) + recursive(n - 2);
-    }
 }
