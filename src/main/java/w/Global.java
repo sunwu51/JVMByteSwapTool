@@ -424,11 +424,6 @@ public class Global {
             String jarPath = codeSource.getLocation().getPath();
             result.add(jarPath);
         }
-        codeSource = getClassLoader().getClass().getProtectionDomain().getCodeSource();
-        if (codeSource != null) {
-            String jarPath = codeSource.getLocation().getFile();
-            result.add(jarPath);
-        }
         return result;
     }
 

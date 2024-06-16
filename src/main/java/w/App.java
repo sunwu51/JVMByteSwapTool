@@ -4,7 +4,9 @@ import java.io.*;
 import java.lang.instrument.Instrumentation;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -56,12 +58,29 @@ public class App {
 //    }
 
     public static void startCompiler() {
-
+        String os = System.getProperty("os.name").toLowerCase();
         Global.unpackUberJar(Global.getClassLoader());
         String javaHome = System.getProperty("java.home");
         String javaBin = javaHome + "/bin/java";
         String classpath = "";
+        Set<String> cps = new HashSet<>();
         for (String cp : Global.getClassPaths()) {
+
+            // Windows os need to delete the first /
+            if (os.contains("win") && cp.startsWith("/")) {
+                cp = cp.substring(1);
+            }
+
+            if (cp.endsWith(".jar")) {
+                int pos = cp.lastIndexOf("/") < 0 ? cp.lastIndexOf("\\") : cp.lastIndexOf("/");
+                cp = cp.substring(0, pos + 1) + "*";
+            }
+            if (cp.endsWith(".class")) {
+                continue;
+            }
+            cps.add(cp);
+        }
+        for (String cp : cps) {
             if (!classpath.isEmpty()) {
                 classpath += File.pathSeparator;
             }
