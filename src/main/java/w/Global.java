@@ -82,6 +82,12 @@ public class Global {
      */
     public static Map<String, AtomicInteger> hitCounter = new ConcurrentHashMap<>();
 
+    public static Set<String> ignoreTraceMethods = new HashSet<String>() {{
+        add("<init>");
+        add("toString");
+        add("append");
+    }};
+
     /**
      * OgnlContext inited at static code block
      */

@@ -30,6 +30,8 @@ class SwapperTest {
         Instrumentation instrumentation = ByteBuddyAgent.install();
         Global.instrumentation = instrumentation;
         Global.fillLoadedClasses();
+        System.setProperty("maxHit", "3");
+
     }
 
     @BeforeEach
@@ -39,24 +41,38 @@ class SwapperTest {
 
     @Test
     public void watchTest() {
+//        WatchMessage watchMessage = new WatchMessage();
+//        watchMessage.setSignature("w.core.MyInterface#interfaceMethod");
+//        Assertions.assertTrue(swapper.swap(watchMessage));
+//        WatchMessage watchMessage2 = new WatchMessage();
+//        watchMessage2.setSignature("w.core.R#interfaceMethod");
+//        Assertions.assertTrue(swapper.swap(watchMessage2));
+//        WatchMessage watchMessage3 = new WatchMessage();
+//        watchMessage3.setSignature("w.core.AbstractService#normalParentMethod");
+//        Assertions.assertTrue(swapper.swap(watchMessage3));
+//        WatchMessage watchMessage4 = new WatchMessage();
+//        watchMessage4.setSignature("w.core.MyInterface#interfaceDefaultMethod");
+//        Assertions.assertTrue(swapper.swap(watchMessage4));
+//        r.abstractParentMethod();
+//        r.interfaceMethod();
+//        r.normalParentMethod();
+//        r.interfaceDefaultMethod();
+//        r2.normalParentMethod();
+//        r2.interfaceDefaultMethod();
+
         WatchMessage watchMessage = new WatchMessage();
-        watchMessage.setSignature("w.core.R#abstractParentMethod");
+        watchMessage.setSignature("w.core.TestClass#hello");
         Assertions.assertTrue(swapper.swap(watchMessage));
-        WatchMessage watchMessage2 = new WatchMessage();
-        watchMessage2.setSignature("w.core.R#interfaceMethod");
-        Assertions.assertTrue(swapper.swap(watchMessage2));
-        WatchMessage watchMessage3 = new WatchMessage();
-        watchMessage3.setSignature("w.core.AbstractService#normalParentMethod");
-        Assertions.assertTrue(swapper.swap(watchMessage3));
-        WatchMessage watchMessage4 = new WatchMessage();
-        watchMessage4.setSignature("w.core.MyInterface#interfaceDefaultMethod");
-        Assertions.assertTrue(swapper.swap(watchMessage4));
-        r.abstractParentMethod();
-        r.interfaceMethod();
-        r.normalParentMethod();
-        r.interfaceDefaultMethod();
-        r2.normalParentMethod();
-        r2.interfaceDefaultMethod();
+        new TestClass().hello("frank", "david", "Smith");
+        new TestClass().hello("frank", "david", "Smith");
+        new TestClass().hello("frank", "david", "Smith");
+        new TestClass().hello("frank", "david", "Smith");
+        new TestClass().hello("frank", "david", "Smith");
+
+//        WatchMessage watchMessage2 = new WatchMessage();
+//        watchMessage2.setSignature("w.core.TestClass#hello");
+//        Assertions.assertTrue(swapper.swap(watchMessage2));
+//        new TestClass().hello("frank", "david", "Smith");
     }
 
     @Test
@@ -65,6 +81,9 @@ class SwapperTest {
         message.setSignature("w.core.TestClass#wrapperHello");
         message.setInnerSignature("*#hello");
         Assertions.assertTrue(swapper.swap(message));
+        t.wrapperHello("world");
+        t.wrapperHello("world");
+        t.wrapperHello("world");
         t.wrapperHello("world");
     }
 
@@ -82,6 +101,7 @@ class SwapperTest {
         ChangeBodyMessage message = new ChangeBodyMessage();
         message.setClassName("w.core.TestClass");
         message.setMethod("wrapperHello");
+        message.setMode(1);
         message.setParamTypes(Arrays.asList("java.lang.String"));
         message.setBody("{return java.util.UUID.randomUUID().toString();}");
         Assertions.assertTrue(swapper.swap(message));
@@ -130,6 +150,8 @@ class SwapperTest {
 
     @Test
     public void traceRecursiveTest() {
+        System.setProperty("maxHit", "322");
+
         TraceMessage message = new TraceMessage();
         message.setSignature("w.core.R#recursive");
         message.setIgnoreZero(false);

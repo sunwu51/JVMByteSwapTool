@@ -1,11 +1,10 @@
 package w.core.model;
 
-import javassist.CtClass;
-import javassist.CtMethod;
-import javassist.LoaderClassPath;
-import javassist.NotFoundException;
 import lombok.Getter;
 import lombok.Setter;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import w.Global;
 
 import java.io.PrintWriter;
@@ -16,6 +15,8 @@ import java.security.ProtectionDomain;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
+import static org.objectweb.asm.Opcodes.*;
+
 /**
  * @author Frank
  * @date 2023/12/21 23:45
@@ -23,7 +24,6 @@ import java.util.concurrent.CompletableFuture;
 @Getter
 @Setter
 public abstract class BaseClassTransformer implements ClassFileTransformer {
-
     protected UUID uuid = UUID.randomUUID();
 
     protected String className;
@@ -34,7 +34,7 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
 
 
 
-    public abstract byte[] transform(String className, byte[] origin) throws Exception;
+    public abstract byte[] transform(Class<?> className, byte[] origin) throws Exception;
 
     public abstract String desc();
 
@@ -43,7 +43,7 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
         className = className.replace("/", ".");
         if (Objects.equals(this.className, className)) {
             try{
-                byte[] r = transform(className, origin);
+                byte[] r = transform(classBeingRedefined, origin);
                 Global.info(className + " transformer " + uuid +  " added success <(^－^)>");
                 return r;
             } catch (Exception e) {

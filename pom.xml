@@ -29,6 +29,32 @@
 			<artifactId>nanohttpd-websocket</artifactId>
 			<version>2.2.0</version>
 		</dependency>
+		<!-- https://mvnrepository.com/artifact/net.bytebuddy/byte-buddy -->
+		<dependency>
+			<groupId>net.bytebuddy</groupId>
+			<artifactId>byte-buddy</artifactId>
+			<version>1.14.17</version>
+		</dependency>
+		<!-- https://mvnrepository.com/artifact/org.ow2.asm/asm-commons -->
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm-commons</artifactId>
+			<version>9.7</version>
+		</dependency>
+
+		<!-- https://mvnrepository.com/artifact/org.ow2.asm/asm -->
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm</artifactId>
+			<version>9.7</version>
+		</dependency>
+
+		<!-- https://mvnrepository.com/artifact/org.codehaus.janino/janino -->
+		<dependency>
+			<groupId>org.codehaus.janino</groupId>
+			<artifactId>janino</artifactId>
+			<version>3.1.12</version>
+		</dependency>
 		<dependency>
 			<groupId>org.javassist</groupId>
 			<artifactId>javassist</artifactId>
@@ -50,17 +76,6 @@
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-databind</artifactId>
 			<version>2.13.5</version>
-		</dependency>
-		<!-- https://mvnrepository.com/artifact/net.openhft/compiler -->
-		<dependency>
-			<groupId>net.openhft</groupId>
-			<artifactId>compiler</artifactId>
-			<version>2.25ea2</version>
-		</dependency>
-		<dependency>
-			<groupId>org.jooq</groupId>
-			<artifactId>joor-java-8</artifactId>
-			<version>0.9.14</version>
 		</dependency>
 		<dependency>
             <groupId>org.junit.jupiter</groupId>

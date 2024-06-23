@@ -29,7 +29,7 @@ public class ReplaceClassTransformer extends BaseClassTransformer {
     }
 
     @Override
-    public byte[] transform(String className, byte[] origin) throws Exception {
+    public byte[] transform(Class<?> className, byte[] origin) throws Exception {
         status = 1;
         return content;
     }

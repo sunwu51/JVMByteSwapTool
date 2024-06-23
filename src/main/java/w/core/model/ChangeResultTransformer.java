@@ -47,7 +47,7 @@ public class ChangeResultTransformer extends BaseClassTransformer {
     }
 
     @Override
-    public byte[] transform(String className, byte[] origin) throws Exception {
+    public byte[] transform(Class<?> claz, byte[] origin) throws Exception {
         CtClass ctClass = Global.classPool.makeClass(new ByteArrayInputStream(origin));
         boolean effect = false;
         for (CtMethod declaredMethod : ctClass.getDeclaredMethods()) {
