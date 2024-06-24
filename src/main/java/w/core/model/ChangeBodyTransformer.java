@@ -6,20 +6,16 @@ import javassist.CtMethod;
 import javassist.Modifier;
 import lombok.Data;
 import net.bytebuddy.jar.asm.*;
-import org.codehaus.commons.compiler.CompileException;
-import org.codehaus.janino.SimpleCompiler;
 import w.Global;
+import w.core.Constants.Codes;
 import w.web.message.ChangeBodyMessage;
 
 import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author Frank
@@ -49,9 +45,11 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
     @Override
     public byte[] transform(Class<?> claz, byte[] origin) throws Exception {
         byte[] result = null;
-        if (mode == 0) {
+        if (mode == Codes.changeBodyModeUseJavassist) {
+            // use javassist, message.body is the method body, a code block starts with { ends with }
             result = changeBodyByJavassist(origin);
-        } else if (mode == 1) {
+        } else if (mode == Codes.changeBodyModeUseASM) {
+            // use asm, message.body is the whole method including signature, like `public void hi {}`
             result = changeBodyByASM(origin);
         }
         new FileOutputStream("T.class").write(result);
@@ -87,12 +85,28 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
 
 
     private byte[] changeBodyByASM(byte[] origin) throws Exception {
+        ClassReader newMethodReader = new ClassReader(compileMethod(message.getBody()));
+        String parameterDes = paramTypesToDescriptor(paramTypes);
+        AtomicBoolean effect = new AtomicBoolean();
         ClassReader classReader = new ClassReader(origin);
         ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_FRAMES);
         classReader.accept(new ClassVisitor(Opcodes.ASM9, classWriter) {
+            private int access = -10000;
+
+            private String descriptor;
+
+            private String signature;
+
+            private String[] exceptions;
+
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                if (name.equals(method)) {
+                // remove the original method
+                if (name.equals(method) && descriptor.startsWith(parameterDes)) {
+                    this.access = access;
+                    this.descriptor = descriptor;
+                    this.signature = signature;
+                    this.exceptions = exceptions;
                     return null;
                 }
                 return super.visitMethod(access, name, descriptor, signature, exceptions);
@@ -100,16 +114,15 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
 
             @Override
             public void visitEnd() {
-                ClassReader newMethodReader = null;
-                try {
-                    newMethodReader = new ClassReader(compile(message.getBody()));
-                } catch (CompileException e) {
-                    throw new RuntimeException(e);
-                }
                 newMethodReader.accept(new ClassVisitor(Opcodes.ASM9, classWriter) {
                     @Override
                     public MethodVisitor visitMethod(int _access, String _name, String _descriptor, String _signature, String[] _exceptions) {
-                        if (method.equals(_name)) {
+                        if (_name.equals(method) && _descriptor.startsWith(parameterDes)) {
+                            if (_access != access || !_descriptor.equals(descriptor) || !Objects.equals(_signature, signature) || !stringArrEquals(_exceptions, exceptions)) {
+                                throw new IllegalStateException("Method signature not same with original method");
+                            }
+                            effect.set(true);
+                            // append new method
                             return classWriter.visitMethod(_access, _name, _descriptor, _signature, _exceptions);
                         }
                         return null;
@@ -119,16 +132,14 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
             }
         }, ClassReader.EXPAND_FRAMES);
 
-        return classWriter.toByteArray();
+        byte[] result = classWriter.toByteArray();
+        if (!effect.get()) {
+            throw new IllegalArgumentException("Method not declared here");
+        }
+        return result;
     }
 
-    private byte[] compile(String methodBody) throws CompileException {
-        SimpleCompiler compiler = new SimpleCompiler();
-        String packageName = className.substring(0, className.lastIndexOf("."));
-        String simpleClassName = className.substring(className.lastIndexOf(".") +1);
-        compiler.cook("package " + packageName +";\n import java.util.*;\n public class " + simpleClassName + " { public String " + method + "(String a) {" + methodBody + "} }");
-        return compiler.getBytecodes().get(className);
-    }
+
 
 
     public boolean equals(Object other) {
@@ -143,51 +154,5 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
         return "ChangeBody_" + getClassName() + "#" + method + " " + paramTypes;
     }
 
-    private static boolean stringArrEquals(String[] a1, String[] a2) {
-        if (a1 == null && a2 == null) { return  true;}
-        if (a1 == null || a2 == null) { return false; }
-        return Arrays.toString(a1).equals(Arrays.toString(a2));
-    }
 
-    private String paramTypesToDescriptor(List<String> paramTypes) {
-        try {
-            StringBuilder s = new StringBuilder();
-            for (String paramType : paramTypes) {
-                s.append(paramTypeToDescriptor(paramType));
-            }
-            return "(" + s + ")";
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    private String paramTypeToDescriptor(String paramType) {
-        if (paramType == null || paramType.length() == 0 || paramType.contains("<")) {
-            throw new IllegalArgumentException("error type");
-        }
-        switch (paramType) {
-            case "int":
-                return "I";
-            case "long":
-                return "J";
-            case "float":
-                return "F";
-            case "boolean":
-                return "Z";
-            case "double":
-                return "D";
-            case "byte":
-                return "B";
-            case "short":
-                return "S";
-            case "char":
-                return "C";
-            default:
-                if (paramType.endsWith("[]")) {
-                    return "[" + paramTypeToDescriptor(paramType.substring(0, paramType.length() - 2));
-                }
-                return "L" + paramType.replace(".", "/") + ";"
-        }
-    }
 }

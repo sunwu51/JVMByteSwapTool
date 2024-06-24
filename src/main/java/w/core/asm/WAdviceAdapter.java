@@ -55,30 +55,29 @@ public class WAdviceAdapter extends AdviceAdapter {
     protected int asmStoreRetString(MethodVisitor mv, String descriptor, int printFormat) {
         int returnValueVarIndex = -1;
         Type returnType = Type.getReturnType(descriptor);
-        if (returnType.getSort() != Type.VOID) {
-            mv.visitInsn(DUP);
-        }
         switch (returnType.getSort()) {
             case Type.ARRAY:
+                mv.visitInsn(DUP);
                 mv.visitMethodInsn(INVOKESTATIC, "java/util/Arrays", "toString", "([Ljava/lang/Object;)Ljava/lang/String;", false);
+                break;
+            case Type.DOUBLE:
+            case Type.LONG:
+                mv.visitInsn(DUP2);
+                box(returnType);
+                formatResult(printFormat);
                 break;
             case Type.BOOLEAN:
             case Type.CHAR:
             case Type.INT:
             case Type.FLOAT:
-            case Type.DOUBLE:
-            case Type.LONG:
             case Type.SHORT:
             case Type.BYTE:
+                mv.visitInsn(DUP);
                 box(returnType);
+                formatResult(printFormat);
+                break;
             case Type.OBJECT:
-                if (printFormat == 1) {
-                    mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "toString", "()Ljava/lang/String;", false);
-                } else if (printFormat == 2) {
-                    mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toJson",   "(Ljava/lang/Object;)Ljava/lang/String;", false);
-                } else {
-                    mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toString", "(Ljava/lang/Object;)Ljava/lang/String;", false);
-                }
+                formatResult(printFormat);
                 break;
             case Type.VOID:
             default:
@@ -87,6 +86,16 @@ public class WAdviceAdapter extends AdviceAdapter {
         returnValueVarIndex = newLocal(Type.getType(String.class));
         mv.visitVarInsn(ASTORE, returnValueVarIndex);
         return returnValueVarIndex;
+    }
+
+    private void formatResult(int printFormat) {
+        if (printFormat == 1) {
+            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "toString", "()Ljava/lang/String;", false);
+        } else if (printFormat == 2) {
+            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toJson",   "(Ljava/lang/Object;)Ljava/lang/String;", false);
+        } else {
+            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toString", "(Ljava/lang/Object;)Ljava/lang/String;", false);
+        }
     }
 
 

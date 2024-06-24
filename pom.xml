@@ -41,6 +41,13 @@
 			<artifactId>asm-commons</artifactId>
 			<version>9.7</version>
 		</dependency>
+		<!-- https://mvnrepository.com/artifact/org.ow2.asm/asm-util -->
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm-util</artifactId>
+			<version>9.7</version>
+		</dependency>
+
 
 		<!-- https://mvnrepository.com/artifact/org.ow2.asm/asm -->
 		<dependency>

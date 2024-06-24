@@ -1,7 +1,6 @@
 package w.core.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import javassist.CannotCompileException;
 import javassist.CtClass;
 import javassist.CtMethod;
@@ -9,14 +8,24 @@ import javassist.Modifier;
 import javassist.expr.ExprEditor;
 import javassist.expr.MethodCall;
 import lombok.Data;
+import org.codehaus.commons.compiler.CompileException;
+import org.objectweb.asm.*;
+import org.objectweb.asm.tree.*;
+import org.objectweb.asm.util.ASMifier;
+import org.objectweb.asm.util.TraceClassVisitor;
 import w.Global;
+import w.core.Constants.Codes;
+import w.core.asm.WAdviceAdapter;
 import w.web.message.ChangeBodyMessage;
 import w.web.message.ChangeResultMessage;
 
-import java.io.ByteArrayInputStream;
+import java.io.*;
 import java.util.Arrays;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Objects;
+
+import static org.objectweb.asm.Opcodes.*;
 
 /**
  * @author Frank
@@ -36,6 +45,8 @@ public class ChangeResultTransformer extends BaseClassTransformer {
 
     String innerMethod;
 
+    int mode;
+
     public ChangeResultTransformer(ChangeResultMessage message) {
         this.className = message.getClassName();
         this.method = message.getMethod();
@@ -44,10 +55,28 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         this.innerClassName = message.getInnerClassName();
         this.message = message;
         this.traceId = message.getId();
+        this.mode = message.getMode();
     }
 
     @Override
     public byte[] transform(Class<?> claz, byte[] origin) throws Exception {
+        byte[] result = null;
+        if (mode == Codes.changeResultModeUseJavassist) {
+            // use javassist $_=xxx to change result
+            result = changeResultByJavassist(origin);
+        } else if (mode == Codes.changeResultModeUseASM) {
+            // use asm, will create a new dynamic class with a method contains the code
+            // then the origin code will be replaced by the dynamic method
+            result = changeResultByASM(origin);
+        }
+        status = 1;
+
+        new FileOutputStream("T.class").write(result);
+        return result;
+    }
+
+
+    private byte[] changeResultByJavassist(byte[] origin) throws Exception {
         CtClass ctClass = Global.classPool.makeClass(new ByteArrayInputStream(origin));
         boolean effect = false;
         for (CtMethod declaredMethod : ctClass.getDeclaredMethods()) {
@@ -78,7 +107,111 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         }
         byte[] result = ctClass.toBytecode();
         ctClass.detach();
-        status = 1;
+
+        return result;
+    }
+
+
+    public static String toASMCode(byte[] bytecode, boolean debug) throws IOException {
+        int flags = ClassReader.SKIP_DEBUG;
+
+        if (debug) {
+            flags = 0;
+        }
+
+        ClassReader cr = new ClassReader(new ByteArrayInputStream(bytecode));
+        StringWriter sw = new StringWriter();
+        cr.accept(new TraceClassVisitor(null, new ASMifier(), new PrintWriter(sw)), flags);
+        return sw.toString();
+    }
+
+    private byte[] changeResultByASM(byte[] origin) throws CompileException, IOException {
+
+        ClassReader classReader = new ClassReader(origin);
+
+        // Create a class writer to modify the class
+        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+
+        String paramDes = paramTypesToDescriptor(paramTypes);
+
+        // A container to collect the whole injection method info
+        MethodNode methodNode = new MethodNode(ASM9);
+
+        ClassReader newCr = new ClassReader(compileDynamicCodeBlock(message.getBody()));
+        newCr.accept(new ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                if (name.equals("test")) {
+                    return methodNode;
+                }
+                return null;
+            }
+        }, ClassReader.EXPAND_FRAMES);
+
+
+        MethodNode newInstructionsNode = new MethodNode(Opcodes.ASM9);
+        newInstructionsNode.visitMethodInsn(INVOKEVIRTUAL, "w/core/TestClass", "helloWrapper", "(Ljava/lang/String;)Ljava/lang/String;", false);
+
+
+
+        InsnList instructions = methodNode.instructions;
+        ListIterator<AbstractInsnNode> iterator = instructions.iterator();
+        while (iterator.hasNext()) {
+            AbstractInsnNode insnNode = iterator.next();
+            if (insnNode instanceof MethodInsnNode) {
+                MethodInsnNode methodInsnNode = (MethodInsnNode) insnNode;
+                if (methodInsnNode.owner.equals("w/core/TestClass") && methodInsnNode.name.equals("hello") && methodInsnNode.desc.equals("(Ljava/lang/String;)Ljava/lang/String;")) {
+                    // Replace the target method call with new instructions
+                    instructions.insert(methodInsnNode, newInstructionsNode.instructions);
+                    instructions.remove(methodInsnNode);
+                }
+            }
+        }
+
+
+
+        // Accept the visitor to modify the class
+        classReader.accept(new ClassVisitor(ASM9, classWriter) {
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
+                if (name.equals(method) && descriptor.startsWith(paramDes)) {
+//                    return new MethodVisitor(ASM9, mv) {
+//                        @Override
+//                        public void visitCode() {
+////                            AbstractInsnNode[] arr = methodNode.instructions.toArray();
+//                            methodNode.instructions.remove(methodNode.instructions.getLast());
+//                            methodNode.accept(mv);
+//                            super.visitCode();
+//                        }
+//                    };
+////
+                    return new WAdviceAdapter(api, mv, access, name, descriptor){
+                        @Override
+                        public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
+                            if (opcode == INVOKEVIRTUAL &&
+                                    (Objects.equals(owner.replace("/", "."), innerClassName) ||"*".equals(innerClassName))
+                                    && name.equals(innerMethod)) {
+                                // Insert the compiled code before invoke
+                                methodNode.instructions.remove(methodNode.instructions.getLast());
+                                methodNode.accept(mv);
+                                super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+                            } else {
+                                super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
+                            }
+                        }
+                    };
+                }
+                return mv;
+            }
+        }, ClassReader.EXPAND_FRAMES);
+
+
+
+
+
+        byte[] result = classWriter.toByteArray();
+        new FileOutputStream("T.class").write(result);
         return result;
     }
 

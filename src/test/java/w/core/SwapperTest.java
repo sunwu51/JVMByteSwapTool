@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import w.Global;
+import w.core.Constants.Codes;
 import w.web.message.*;
 
 import java.lang.instrument.Instrumentation;
@@ -60,19 +61,19 @@ class SwapperTest {
 //        r2.normalParentMethod();
 //        r2.interfaceDefaultMethod();
 
-        WatchMessage watchMessage = new WatchMessage();
-        watchMessage.setSignature("w.core.TestClass#hello");
-        Assertions.assertTrue(swapper.swap(watchMessage));
-        new TestClass().hello("frank", "david", "Smith");
-        new TestClass().hello("frank", "david", "Smith");
-        new TestClass().hello("frank", "david", "Smith");
-        new TestClass().hello("frank", "david", "Smith");
-        new TestClass().hello("frank", "david", "Smith");
-
-//        WatchMessage watchMessage2 = new WatchMessage();
-//        watchMessage2.setSignature("w.core.TestClass#hello");
-//        Assertions.assertTrue(swapper.swap(watchMessage2));
+//        WatchMessage watchMessage = new WatchMessage();
+//        watchMessage.setSignature("w.core.TestClass#hello");
+//        Assertions.assertTrue(swapper.swap(watchMessage));
 //        new TestClass().hello("frank", "david", "Smith");
+//        new TestClass().hello("frank", "david", "Smith");
+//        new TestClass().hello("frank", "david", "Smith");
+//        new TestClass().hello("frank", "david", "Smith");
+//        new TestClass().hello("frank", "david", "Smith");
+
+        WatchMessage watchMessage2 = new WatchMessage();
+        watchMessage2.setSignature("w.core.TestClass#generateRandom");
+        Assertions.assertTrue(swapper.swap(watchMessage2));
+        new TestClass().generateRandom();
     }
 
     @Test
@@ -98,18 +99,35 @@ class SwapperTest {
 
     @Test
     public void changeBodyTest() {
+        // javassist test
         ChangeBodyMessage message = new ChangeBodyMessage();
         message.setClassName("w.core.TestClass");
         message.setMethod("wrapperHello");
-        message.setMode(1);
+        message.setMode(Codes.changeBodyModeUseJavassist);
         message.setParamTypes(Arrays.asList("java.lang.String"));
         message.setBody("{return java.util.UUID.randomUUID().toString();}");
         Assertions.assertTrue(swapper.swap(message));
         Assertions.assertTrue(t.wrapperHello("world").length() > 30);
+        System.out.println(t.wrapperHello("world"));
+
     }
 
     @Test
-    public void changeResultTest() {
+    public void changeBodyAsmTest() {
+        // asm test
+        ChangeBodyMessage message = new ChangeBodyMessage();
+        message.setClassName("w.core.TestClass");
+        message.setMethod("wrapperHello");
+        message.setMode(Codes.changeBodyModeUseASM);
+        message.setParamTypes(Arrays.asList("java.lang.String"));
+        message.setBody("public String wrapperHello(String arg) {return \"arg=\" + arg + \", uuid=\" + java.util.UUID.randomUUID().toString();}");
+        Assertions.assertTrue(swapper.swap(message));
+        Assertions.assertTrue(t.wrapperHello("world").length() > 30);
+        System.out.println(t.wrapperHello("world"));
+    }
+
+    @Test
+    public void changeResultJavassistTest() {
         ChangeResultMessage message = new ChangeResultMessage();
         message.setClassName("w.core.TestClass");
         message.setMethod("wrapperHello");
@@ -118,6 +136,21 @@ class SwapperTest {
         message.setInnerMethod("hello");
         message.setBody("{$_ = java.util.UUID.randomUUID().toString();}");
         Assertions.assertTrue(swapper.swap(message));
+        Assertions.assertTrue(t.wrapperHello("world").length() > 30);
+    }
+
+    @Test
+    public void changeResultASMTest() {
+        ChangeResultMessage message = new ChangeResultMessage();
+        message.setClassName("w.core.TestClass");
+        message.setMethod("wrapperHello");
+        message.setParamTypes(Arrays.asList("java.lang.String"));
+        message.setInnerClassName("*");
+        message.setMode(Codes.changeResultModeUseASM);
+        message.setInnerMethod("hello");
+        message.setBody("{System.out.println(java.util.UUID.randomUUID().toString());}");
+        Assertions.assertTrue(swapper.swap(message));
+        System.out.println(t.wrapperHello("world"));
         Assertions.assertTrue(t.wrapperHello("world").length() > 30);
     }
 

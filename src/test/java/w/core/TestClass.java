@@ -20,7 +20,7 @@ public class TestClass {
 
     public String wrapperHello(String name) {
         try {
-            return new TestClass().hello(name + "!");
+            return hello(name + "!");
         }catch (Exception e) {
             return "null";
         }
@@ -33,6 +33,12 @@ public class TestClass {
             throw new RuntimeException(e);
         }
         return "hello " + name + " " + arg2 + " " + arg3;
+    }
+
+    public double generateRandom() {
+        double ran = Math.random();
+        System.out.println("ran="+ ran);
+        return ran;
     }
 
 }

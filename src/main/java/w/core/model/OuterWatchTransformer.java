@@ -51,25 +51,6 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
     @Override
     public byte[] transform(Class<?> className, byte[] origin) throws Exception {
-//        CtClass ctClass = Global.classPool.makeClass(new ByteArrayInputStream(origin));
-//        boolean effect = false;
-//        for (CtMethod declaredMethod : ctClass.getDeclaredMethods()) {
-//            if (Objects.equals(declaredMethod.getName(), method)) {
-//                if ((declaredMethod.getModifiers() & Modifier.ABSTRACT) != 0) {
-//                    throw new IllegalArgumentException("Cannot change abstract method.");
-//                }
-//                if ((declaredMethod.getModifiers() & Modifier.NATIVE) != 0) {
-//                    throw new IllegalArgumentException("Cannot change native method.");
-//                }
-//                addOuterWatchCodeToMethod(declaredMethod);
-//                effect = true;
-//            }
-//        }
-//        if (!effect) {
-//            throw new IllegalArgumentException("Method not declared here.");
-//        }
-//        byte[] result = ctClass.toBytecode();
-//        ctClass.detach();
         ClassReader classReader = new ClassReader(origin);
         ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
 
@@ -92,9 +73,7 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                                 && name.equals(innerMethod);
                         if (hit) {
                             // long start = System.currentTimeMillis();
-                            mv.visitMethodInsn(INVOKESTATIC, "java/lang/System", "currentTimeMillis", "()J", false);
-                            int startTimeVarIndex = newLocal(Type.LONG_TYPE);
-                            mv.visitVarInsn(LSTORE, startTimeVarIndex);
+                            int startTimeVarIndex = asmStoreStartTime(mv);
 
                             // String params = Arrays.toString(paramArray);
                             int paramsVarIndex = asmStoreParamsString(mv, printFormat);
