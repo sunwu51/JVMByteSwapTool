@@ -62,7 +62,7 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
 
     protected byte[] compileDynamicCodeBlock(String content)  throws CompileException {
         SimpleCompiler compiler = new SimpleCompiler();
-        compiler.cook("package w;\n import java.util.*;\n public class Dynamic { public static void test()" + content +"}");
+        compiler.cook("package w;\n import java.util.*;\n public class Dynamic { " + content +" }");
         return compiler.getBytecodes().get("w.Dynamic");
     }
 

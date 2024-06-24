@@ -13,6 +13,7 @@ import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
 import org.objectweb.asm.util.ASMifier;
 import org.objectweb.asm.util.TraceClassVisitor;
+import org.omg.CosNaming.NamingContextPackage.InvalidNameHolder;
 import w.Global;
 import w.core.Constants.Codes;
 import w.core.asm.WAdviceAdapter;
@@ -127,89 +128,106 @@ public class ChangeResultTransformer extends BaseClassTransformer {
 
     private byte[] changeResultByASM(byte[] origin) throws CompileException, IOException {
 
-        ClassReader classReader = new ClassReader(origin);
 
-        // Create a class writer to modify the class
-        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+
+
 
         String paramDes = paramTypesToDescriptor(paramTypes);
 
-        // A container to collect the whole injection method info
-        MethodNode methodNode = new MethodNode(ASM9);
 
-        ClassReader newCr = new ClassReader(compileDynamicCodeBlock(message.getBody()));
-        newCr.accept(new ClassVisitor(Opcodes.ASM9) {
+        // A container to collect the outer method insn
+        MethodNode outerNode = new MethodNode(ASM9);
+
+        // A container to collect the injection method insn
+        MethodNode replacementNode = new MethodNode(ASM9);
+
+        ClassReader cr = new ClassReader(origin);
+        ClassReader rcr = new ClassReader(compileDynamicCodeBlock(message.getBody()));
+        cr.accept(new ClassVisitor(Opcodes.ASM9) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                if (name.equals("test")) {
-                    return methodNode;
+                if (name.equals(method) && descriptor.startsWith(paramDes)) {
+                    return outerNode;
                 }
                 return null;
             }
         }, ClassReader.EXPAND_FRAMES);
 
-
-        MethodNode newInstructionsNode = new MethodNode(Opcodes.ASM9);
-        newInstructionsNode.visitMethodInsn(INVOKEVIRTUAL, "w/core/TestClass", "helloWrapper", "(Ljava/lang/String;)Ljava/lang/String;", false);
-
-
-
-        InsnList instructions = methodNode.instructions;
-        ListIterator<AbstractInsnNode> iterator = instructions.iterator();
-        while (iterator.hasNext()) {
-            AbstractInsnNode insnNode = iterator.next();
-            if (insnNode instanceof MethodInsnNode) {
-                MethodInsnNode methodInsnNode = (MethodInsnNode) insnNode;
-                if (methodInsnNode.owner.equals("w/core/TestClass") && methodInsnNode.name.equals("hello") && methodInsnNode.desc.equals("(Ljava/lang/String;)Ljava/lang/String;")) {
-                    // Replace the target method call with new instructions
-                    instructions.insert(methodInsnNode, newInstructionsNode.instructions);
-                    instructions.remove(methodInsnNode);
+        final Type[] returnType = {null};
+        rcr.accept(new ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                // fixed signature: public static XX replace(){}
+                if (name.equals("replace") && descriptor.startsWith("()") && (access & ACC_STATIC) > 0) {
+                    returnType[0] = Type.getReturnType(descriptor);
+                    return replacementNode;
                 }
+                return null;
             }
+        }, ClassReader.EXPAND_FRAMES);
+
+        if (replacementNode.instructions.size() == 0 || outerNode.instructions.size() == 0) {
+            throw new IllegalArgumentException("Param error, method not exist or different name");
         }
 
+        // replace the innerMethod with the replacement
+        InsnList list = new InsnList();
+        for (AbstractInsnNode instruction : outerNode.instructions) {
+            if (instruction instanceof MethodInsnNode) {
+                MethodInsnNode mnode = (MethodInsnNode) instruction;
+                if (mnode.name.equals(innerMethod) && (
+                        mnode.owner.replace("/", ".").equals(innerClassName) || "*".equals(innerClassName))
+                        && returnType[0].equals(Type.getReturnType(mnode.desc))
+                ) {
+                    Type[] types = Type.getArgumentTypes(mnode.desc);
+                    for (int i = types.length - 1; i >= 0; i--) {
+                        if (types[i] == Type.DOUBLE_TYPE || types[i] == Type.LONG_TYPE) {
+                            list.add(new InsnNode(POP2));
+                        } else {
+                            list.add(new InsnNode(POP));
+                        }
+                    }
+                    switch (mnode.getOpcode()) {
+                        case INVOKEVIRTUAL:
+                        case INVOKEINTERFACE:
+                        case INVOKESPECIAL:
+                            list.add(new InsnNode(POP));
+                            break;
+                        case INVOKESTATIC:
+                            break;
+                        default:
+                            throw new IllegalStateException("Not supported method invocation type: " + mnode.getOpcode());
+                    }
+                    for (AbstractInsnNode repInsn : replacementNode.instructions) {
+                        if (repInsn instanceof LineNumberNode) continue;
+                        if (repInsn.getOpcode() >= IRETURN && repInsn.getOpcode() <= RETURN) continue;
 
+                        list.add(repInsn);
+                    }
+                    continue;
+                }
+            }
+            list.add(instruction);
+        }
 
-        // Accept the visitor to modify the class
-        classReader.accept(new ClassVisitor(ASM9, classWriter) {
+        // Create a class writer to modify the class
+        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+        cr.accept(new ClassVisitor(Opcodes.ASM9, classWriter) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
                 MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
                 if (name.equals(method) && descriptor.startsWith(paramDes)) {
-//                    return new MethodVisitor(ASM9, mv) {
-//                        @Override
-//                        public void visitCode() {
-////                            AbstractInsnNode[] arr = methodNode.instructions.toArray();
-//                            methodNode.instructions.remove(methodNode.instructions.getLast());
-//                            methodNode.accept(mv);
-//                            super.visitCode();
-//                        }
-//                    };
-////
-                    return new WAdviceAdapter(api, mv, access, name, descriptor){
+                    return new MethodVisitor(ASM9, mv) {
                         @Override
-                        public void visitMethodInsn(int opcode, String owner, String name, String descriptor, boolean isInterface) {
-                            if (opcode == INVOKEVIRTUAL &&
-                                    (Objects.equals(owner.replace("/", "."), innerClassName) ||"*".equals(innerClassName))
-                                    && name.equals(innerMethod)) {
-                                // Insert the compiled code before invoke
-                                methodNode.instructions.remove(methodNode.instructions.getLast());
-                                methodNode.accept(mv);
-                                super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
-                            } else {
-                                super.visitMethodInsn(opcode, owner, name, descriptor, isInterface);
-                            }
+                        public void visitCode() {
+                            super.visitCode();
+                            list.accept(mv);
                         }
                     };
                 }
                 return mv;
             }
         }, ClassReader.EXPAND_FRAMES);
-
-
-
-
-
         byte[] result = classWriter.toByteArray();
         new FileOutputStream("T.class").write(result);
         return result;

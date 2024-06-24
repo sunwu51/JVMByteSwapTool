@@ -148,7 +148,7 @@ class SwapperTest {
         message.setInnerClassName("*");
         message.setMode(Codes.changeResultModeUseASM);
         message.setInnerMethod("hello");
-        message.setBody("{System.out.println(java.util.UUID.randomUUID().toString());}");
+        message.setBody("public static String replace(){return java.util.UUID.randomUUID().toString();}");
         Assertions.assertTrue(swapper.swap(message));
         System.out.println(t.wrapperHello("world"));
         Assertions.assertTrue(t.wrapperHello("world").length() > 30);
