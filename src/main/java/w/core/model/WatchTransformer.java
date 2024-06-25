@@ -12,6 +12,8 @@ import w.web.message.WatchMessage;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -45,6 +47,7 @@ public class WatchTransformer extends BaseClassTransformer {
         ClassReader classReader = new ClassReader(origin);
         ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
 
+        AtomicBoolean effect = new AtomicBoolean();
         classReader.accept(new ClassVisitor(ASM9, classWriter) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
@@ -54,12 +57,27 @@ public class WatchTransformer extends BaseClassTransformer {
                     private int startTimeVarIndex;
                     private int paramsVarIndex;
 
+                    private int returnValueVarIndex;
+
+                    Label startTry = new Label();
+                    Label endTry = new Label();
+                    Label startCatch = new Label();
+                    Label endCatch = new Label();
+                    Label startFinally = new Label();
+                    Label endFinally = new Label();
+
                     @Override
                     protected void onMethodEnter() {
                         /*---------------------startTime:long start = System.currentTimeMillis();-----------------*/
                         startTimeVarIndex = asmStoreStartTime(mv);
                         /*---------------------param: String params = Arrays.toString(paramsArray);-----------------*/
                         paramsVarIndex = asmStoreParamsString(mv, printFormat);
+                        returnValueVarIndex = newLocal(Type.getType(String.class));
+                        mv.visitLdcInsn("__none__");
+                        mv.visitVarInsn(ASTORE, returnValueVarIndex);
+
+                        // try { original }
+                        mv.visitLabel(startTry);
                     }
 
                     @Override
@@ -83,13 +101,14 @@ public class WatchTransformer extends BaseClassTransformer {
 
                         /*---------------------print: concat the final string, and w.Global.info-----------------*/
                         List<SbNode> list = new ArrayList<>();
-                        list.add(new SbNode("request: "));
-                        list.add(new SbNode(ALOAD, paramsVarIndex));
-                        list.add(new SbNode(", response: "));
-                        list.add(returnValueVarIndex < 0 ? new SbNode("null"): new SbNode(ALOAD, returnValueVarIndex));
-                        list.add(new SbNode(", cost: "));
+                        String simpleMethodName = message.getSignature().substring(message.getSignature().lastIndexOf(".") + 1);
+                        list.add(new SbNode(simpleMethodName));
+                        list.add(new SbNode(",cost:"));
                         list.add(new SbNode(LLOAD, durationVarIndex));
-                        list.add(new SbNode("ms"));
+                        list.add(new SbNode("ms,req:"));
+                        list.add(new SbNode(ALOAD, paramsVarIndex));
+                        list.add(new SbNode(",res:"));
+                        list.add(new SbNode(ALOAD, returnValueVarIndex));
                         asmGenerateStringBuilder(mv, list);
                         mv.visitMethodInsn(INVOKESTATIC, "w/Global", "info", "(Ljava/lang/Object;)V", false);
                         mv.visitJumpInsn(Opcodes.GOTO, endLabel);
@@ -97,11 +116,69 @@ public class WatchTransformer extends BaseClassTransformer {
                         /*-----------------------cost < minCost skip---------------------------------------------*/
                         mv.visitLabel(elseLabel);
                         mv.visitLabel(endLabel);
+                        mv.visitLabel(endTry);
+
                     }
+
+                    @Override
+                    public void visitMaxs(int maxStack, int maxLocals) {
+                        mv.visitLabel(startCatch);
+                        int exceptionIndex = newLocal(Type.getType(Throwable.class));
+                        mv.visitVarInsn(Opcodes.ASTORE, exceptionIndex);
+                        mv.visitVarInsn(Opcodes.ALOAD, exceptionIndex);
+                        int exceptionStringIndex = newLocal(Type.getType(String.class));
+                        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "toString", "()Ljava/lang/String;", false);
+                        mv.visitVarInsn(Opcodes.ASTORE, exceptionStringIndex);
+
+                        /*---------------------cost:     long end = System.currentTimeMillis(); long duration = end - start;-----------------*/
+                        int durationVarIndex = asmCalculateCost(mv, startTimeVarIndex);
+                        Label elseLabel = new Label();
+                        Label endLabel = new Label();
+                        mv.visitVarInsn(Opcodes.LLOAD, durationVarIndex);
+                        mv.visitLdcInsn((long) minCost);
+                        mv.visitInsn(LCMP);
+                        // if duration < minCost goto elselabel
+                        mv.visitJumpInsn(Opcodes.IFLT, elseLabel);
+
+                        /*---------------------counter: if reach the limitation will remove the transformer----------------*/
+                        mv.visitLdcInsn(uuid.toString());
+                        mv.visitMethodInsn(INVOKESTATIC, "w/Global", "checkCountAndUnload", "(Ljava/lang/String;)V", false);
+
+                        /*---------------------print: concat the final string, and w.Global.info-----------------*/
+                        List<SbNode> list = new ArrayList<>();
+                        list.add(new SbNode(message.getSignature()));
+                        list.add(new SbNode(",cost:"));
+                        list.add(new SbNode(LLOAD, durationVarIndex));
+                        list.add(new SbNode("ms,req:"));
+                        list.add(new SbNode(ALOAD, paramsVarIndex));
+                        list.add(new SbNode(",throw:"));
+                        list.add(new SbNode(ALOAD, exceptionStringIndex));
+                        asmGenerateStringBuilder(mv, list);
+                        mv.visitLdcInsn(traceId);
+                        mv.visitMethodInsn(INVOKESTATIC, "w/util/RequestUtils", "fillCurThread", "(Ljava/lang/String;)V", false);
+                        mv.visitMethodInsn(INVOKESTATIC, "w/Global", "info", "(Ljava/lang/Object;)V", false);
+                        mv.visitJumpInsn(Opcodes.GOTO, endLabel);
+
+                        /*-----------------------cost < minCost skip---------------------------------------------*/
+                        mv.visitLabel(elseLabel);
+                        mv.visitLabel(endLabel);
+
+                        mv.visitVarInsn(Opcodes.ALOAD, exceptionIndex);
+                        mv.visitInsn(Opcodes.ATHROW);
+                        mv.visitLabel(endCatch);
+                        mv.visitTryCatchBlock(startTry, endTry, startCatch, "java/lang/Throwable");
+
+                        effect.set(true);
+                        super.visitMaxs(maxStack, maxLocals);
+                    }
+
                 };
             }
-        }, ClassReader.EXPAND_FRAMES);
+        }, ClassReader.EXPAND_FRAMES );
         byte[] result = classWriter.toByteArray();
+        if (!effect.get()) {
+            throw new IllegalArgumentException("Method not declared here.");
+        }
         new FileOutputStream("T.class").write(result);
         status = 1;
         return result;
@@ -161,76 +238,5 @@ public class WatchTransformer extends BaseClassTransformer {
     public String desc() {
         return "Watch_" + getClassName() + "#" + method;
     }
-//
-//    public static class TimingMethodAdapter extends LocalVariablesSorter {
-//        private int startTimeIndex;
-//
-//        private int paramsIndex;
-//
-//        private String methodDescriptor;
-//
-//        protected TimingMethodAdapter(int api, int access, String name, String descriptor, MethodVisitor mv) {
-//            super(api, access, descriptor, mv);
-//            this.methodDescriptor = descriptor;
-//
-//
-//        }
-//
-//        @Override
-//        public void visitCode() {
-//            super.visitCode();
-//            startTimeIndex = newLocal(Type.LONG_TYPE);
-//            mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/System", "currentTimeMillis", "()J", false);
-//            mv.visitVarInsn(Opcodes.LSTORE, startTimeIndex); //LSTORE: save a long value to the index
-//            mv.visitTypeInsn(Opcodes.NEW, "java/lang/StringBuilder");
-//            mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "()V", false);
-//            mv.visitVarInsn(Opcodes.ASTORE, 7);
-//
-//
-//
-////            // 准备拼接入参信息
-//
-////            mv.visitVarInsn(Opcodes.ASTORE, 8);
-////            mv.visitLdcInsn("Method: " + methodDescriptor + ", Params: ");
-////            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
-//////
-//
-//        }
-//
-//        @Override
-//        public void visitInsn(int opcode) {
-//            if ((opcode >= Opcodes.IRETURN && opcode <= Opcodes.RETURN) || opcode == Opcodes.ATHROW) {
-//                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/System", "currentTimeMillis", "()J", false);
-//                mv.visitVarInsn(Opcodes.LLOAD, startTimeIndex); // LLOAD: load a long value from the index, this is just the startTime
-//                mv.visitInsn(Opcodes.LSUB);
-//                // end - start
-//                int durationIndex = newLocal(Type.LONG_TYPE);
-//                mv.visitVarInsn(Opcodes.LSTORE, durationIndex); // save the duration
-//
-////                if (opcode != Opcodes.RETURN) {
-////                    mv.visitInsn(Opcodes.DUP);
-////                    Type returnType = Type.getReturnType(methodDescriptor);
-////                    box(returnType);
-////                    mv.visitTypeInsn(Opcodes.NEW, "java/lang/StringBuilder");
-////                }
-//
-//
-//                mv.visitTypeInsn(Opcodes.NEW, "java/lang/StringBuilder");
-//                mv.visitInsn(Opcodes.DUP);
-//                mv.visitLdcInsn("Method executed in ");
-//                mv.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/StringBuilder", "<init>", "(Ljava/lang/String;)V", false);
-//                mv.visitVarInsn(Opcodes.LLOAD, durationIndex);
-//                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(J)Ljava/lang/StringBuilder;", false);
-//                mv.visitLdcInsn(" ns");
-//                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "append", "(Ljava/lang/String;)Ljava/lang/StringBuilder;", false);
-//                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/StringBuilder", "toString", "()Ljava/lang/String;", false);
-//
-//                // 调用 w.Global.info 方法，将 String 作为 Object 传递
-//                mv.visitMethodInsn(Opcodes.INVOKESTATIC, "w/Global", "info", "(Ljava/lang/Object;)V", false);
-//            }
-//            super.visitInsn(opcode);
-//        }
-//    }
-
 
 }

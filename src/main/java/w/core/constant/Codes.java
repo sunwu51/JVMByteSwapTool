@@ -1,4 +1,4 @@
-package w.core.Constants;
+package w.core.constant;
 
 /**
  * @author Frank

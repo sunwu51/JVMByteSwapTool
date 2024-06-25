@@ -7,7 +7,7 @@ import javassist.Modifier;
 import lombok.Data;
 import net.bytebuddy.jar.asm.*;
 import w.Global;
-import w.core.Constants.Codes;
+import w.core.constant.Codes;
 import w.web.message.ChangeBodyMessage;
 
 import java.io.ByteArrayInputStream;

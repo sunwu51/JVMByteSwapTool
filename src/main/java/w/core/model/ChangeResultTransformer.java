@@ -13,17 +13,13 @@ import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
 import org.objectweb.asm.util.ASMifier;
 import org.objectweb.asm.util.TraceClassVisitor;
-import org.omg.CosNaming.NamingContextPackage.InvalidNameHolder;
 import w.Global;
-import w.core.Constants.Codes;
-import w.core.asm.WAdviceAdapter;
-import w.web.message.ChangeBodyMessage;
+import w.core.constant.Codes;
 import w.web.message.ChangeResultMessage;
 
 import java.io.*;
 import java.util.Arrays;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Objects;
 
 import static org.objectweb.asm.Opcodes.*;
@@ -113,24 +109,7 @@ public class ChangeResultTransformer extends BaseClassTransformer {
     }
 
 
-    public static String toASMCode(byte[] bytecode, boolean debug) throws IOException {
-        int flags = ClassReader.SKIP_DEBUG;
-
-        if (debug) {
-            flags = 0;
-        }
-
-        ClassReader cr = new ClassReader(new ByteArrayInputStream(bytecode));
-        StringWriter sw = new StringWriter();
-        cr.accept(new TraceClassVisitor(null, new ASMifier(), new PrintWriter(sw)), flags);
-        return sw.toString();
-    }
-
     private byte[] changeResultByASM(byte[] origin) throws CompileException, IOException {
-
-
-
-
 
         String paramDes = paramTypesToDescriptor(paramTypes);
 

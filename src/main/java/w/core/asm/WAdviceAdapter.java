@@ -53,7 +53,11 @@ public class WAdviceAdapter extends AdviceAdapter {
      * @return
      */
     protected int asmStoreRetString(MethodVisitor mv, String descriptor, int printFormat) {
-        int returnValueVarIndex = -1;
+        int returnValueVarIndex = newLocal(Type.getType(String.class));
+        return asmStoreRetString(mv, descriptor, printFormat, returnValueVarIndex);
+    }
+
+    protected int asmStoreRetString(MethodVisitor mv, String descriptor, int printFormat, int returnValueVarIndex) {
         Type returnType = Type.getReturnType(descriptor);
         switch (returnType.getSort()) {
             case Type.ARRAY:
@@ -77,16 +81,17 @@ public class WAdviceAdapter extends AdviceAdapter {
                 formatResult(printFormat);
                 break;
             case Type.OBJECT:
+                mv.visitInsn(DUP);
                 formatResult(printFormat);
                 break;
             case Type.VOID:
             default:
-                mv.visitLdcInsn("null");
+                mv.visitLdcInsn("void");
         }
-        returnValueVarIndex = newLocal(Type.getType(String.class));
         mv.visitVarInsn(ASTORE, returnValueVarIndex);
         return returnValueVarIndex;
     }
+
 
     private void formatResult(int printFormat) {
         if (printFormat == 1) {
