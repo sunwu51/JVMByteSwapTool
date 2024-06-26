@@ -114,11 +114,9 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         // A container to collect the outer method insn
         MethodNode outerNode = new MethodNode(ASM9);
 
-        // A container to collect the injection method insn
-        MethodNode replacementNode = new MethodNode(ASM9);
+
 
         ClassReader cr = new ClassReader(origin);
-        ClassReader rcr = new ClassReader(WCompiler.compileDynamicCodeBlock(message.getBody()));
         cr.accept(new ClassVisitor(Opcodes.ASM9) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
@@ -129,25 +127,9 @@ public class ChangeResultTransformer extends BaseClassTransformer {
             }
         }, ClassReader.EXPAND_FRAMES);
 
-        final Type[] returnType = {null};
 
-        ClassNode replaceClassNode = new ClassNode();
-        rcr.accept(new ClassVisitor(Opcodes.ASM9) {
-            @Override
-            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                // fixed signature: public static XX replace(){}
-                if (name.equals("replace") && descriptor.startsWith("()") && (access & ACC_STATIC) > 0) {
-                    returnType[0] = Type.getReturnType(descriptor);
-                    return replacementNode;
-                }
-                return null;
-            }
-        }, ClassReader.EXPAND_FRAMES);
-
-        if (replacementNode.instructions.size() == 0 || outerNode.instructions.size() == 0) {
-            throw new IllegalArgumentException("Param error, method not exist or different name");
-        }
-
+        MethodNode replacementNode = null;
+        String desc = null;
         // replace the innerMethod with the replacement
         InsnList list = new InsnList();
         for (AbstractInsnNode instruction : outerNode.instructions) {
@@ -155,8 +137,12 @@ public class ChangeResultTransformer extends BaseClassTransformer {
                 MethodInsnNode mnode = (MethodInsnNode) instruction;
                 if (mnode.name.equals(innerMethod) && (
                         mnode.owner.replace("/", ".").equals(innerClassName) || "*".equals(innerClassName))
-                        && returnType[0].equals(Type.getReturnType(mnode.desc))
                 ) {
+                    if (desc == null || desc.equals(mnode.desc)) {
+                        desc = mnode.desc;
+                    } else {
+                        throw new IllegalStateException("Matched method descriptor more than once");
+                    }
                     Type[] types = Type.getArgumentTypes(mnode.desc);
                     for (int i = types.length - 1; i >= 0; i--) {
                         if (types[i] == Type.DOUBLE_TYPE || types[i] == Type.LONG_TYPE) {
@@ -176,10 +162,10 @@ public class ChangeResultTransformer extends BaseClassTransformer {
                         default:
                             throw new IllegalStateException("Not supported method invocation type: " + mnode.getOpcode());
                     }
+                    replacementNode = replacementNode == null ? getReplacementMethodNode(mnode.desc) : replacementNode;
                     for (AbstractInsnNode repInsn : replacementNode.instructions) {
                         if (repInsn instanceof LineNumberNode) continue;
                         if (repInsn.getOpcode() >= IRETURN && repInsn.getOpcode() <= RETURN) continue;
-
                         list.add(repInsn);
                     }
                     continue;
@@ -187,7 +173,7 @@ public class ChangeResultTransformer extends BaseClassTransformer {
             }
             list.add(instruction);
         }
-
+        final MethodNode rnode = replacementNode;
         // Create a class writer to modify the class
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
         cr.accept(new ClassVisitor(Opcodes.ASM9, classWriter) {
@@ -199,9 +185,11 @@ public class ChangeResultTransformer extends BaseClassTransformer {
                         @Override
                         public void visitCode() {
                             list.accept(mv);
-                            replacementNode.tryCatchBlocks.forEach(a->{
-                                a.accept(mv);
-                            });
+                            if (rnode.tryCatchBlocks != null) {
+                                rnode.tryCatchBlocks.forEach(a->{
+                                    a.accept(mv);
+                                });
+                            }
                         }
                     };
                 }
@@ -211,6 +199,25 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         byte[] result = classWriter.toByteArray();
         new FileOutputStream("T.class").write(result);
         return result;
+    }
+
+    private MethodNode getReplacementMethodNode(String descriptor) throws CompileException {
+        MethodNode replacementNode = new MethodNode(ASM9);
+        ClassReader rcr = new ClassReader(WCompiler.compileDynamicCodeBlock(Type.getReturnType(descriptor).getClassName(),
+                message.getBody()));
+        // A container to collect the injection method insn
+        rcr.accept(new ClassVisitor(Opcodes.ASM9) {
+            @Override
+            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                // fixed signature: public static XX replace(){}
+                if (name.equals("replace") && descriptor.startsWith("()")) {
+                    return replacementNode;
+                }
+                return null;
+            }
+        }, ClassReader.EXPAND_FRAMES);
+
+        return replacementNode;
     }
 
     public boolean equals(Object other) {

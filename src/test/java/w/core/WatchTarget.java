@@ -78,4 +78,38 @@ public class WatchTarget implements Runnable {
     public void subMethodCallExp() throws IOException {
         readFile("123");
     }
+
+    public static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public String callManyMethod() {
+        for (int i = 0; i <10; i++) {
+            sleep(1);
+            System.out.println("name=" + getName());
+        }
+        for (int i = 0; i < 5; i++) {
+            sleep(3);
+            System.out.println(add(1,1, 3));
+        }
+        return "Hello World";
+    }
+
+    public int fib(int n) {
+        if (n <= 2) return 1;
+        return fib(n - 1) + fib(n - 2);
+    }
+
+
+    public int ow1(int a, int b) {
+        return ow1(a + b);
+    }
+
+    public int ow1(int c) {
+        return (int) add(c, 0, 1);
+    }
 }

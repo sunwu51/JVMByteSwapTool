@@ -52,28 +52,9 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
         return null;
     }
 
+    public void clear() {
 
-//    protected byte[] compileMethod(String methodContent) throws CompileException {
-//        SimpleCompiler compiler = new SimpleCompiler();
-//        compiler.setParentClassLoader(w.Global.getClassLoader());
-//        String packageName = className.substring(0, className.lastIndexOf("."));
-//        String simpleClassName = className.substring(className.lastIndexOf(".") +1);
-//        compiler.cook("package " + packageName +";\n import java.util.*;\n public class " + simpleClassName + " {" + methodContent + "}");
-//        return compiler.getBytecodes().get(className);
-//    }
-//
-//    protected byte[] compileDynamicCodeBlock(String content)  throws CompileException {
-//        SimpleCompiler compiler = new SimpleCompiler();
-//        compiler.cook("package w;\n import java.util.*;\n public class Dynamic { " + content +" }");
-//        return compiler.getBytecodes().get("w.Dynamic");
-//    }
-
-    protected static boolean stringArrEquals(String[] a1, String[] a2) {
-        if (a1 == null && a2 == null) { return  true;}
-        if (a1 == null || a2 == null) { return false; }
-        return Arrays.toString(a1).equals(Arrays.toString(a2));
     }
-
     protected String paramTypesToDescriptor(List<String> paramTypes) {
         StringBuilder s = new StringBuilder();
         for (String paramType : paramTypes) {
@@ -83,7 +64,7 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
     }
 
     protected String paramTypeToDescriptor(String paramType) {
-        if (paramType == null || paramType.length() == 0 || paramType.contains("<")) {
+        if (paramType == null || paramType.isEmpty() || paramType.contains("<")) {
             throw new IllegalArgumentException("error type");
         }
         switch (paramType) {

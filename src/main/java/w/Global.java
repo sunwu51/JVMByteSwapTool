@@ -267,6 +267,7 @@ public class Global {
         transformers.removeIf(it -> {
             if (it.getUuid().equals(uuid)) {
                 it.setStatus(-1);
+                it.clear();
                 instrumentation.removeTransformer(it);
                 for (Class<?> aClass : allLoadedClasses.getOrDefault(it.getClassName(), new HashSet<>())) {
                     try {

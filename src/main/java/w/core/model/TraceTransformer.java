@@ -20,8 +20,10 @@ import static net.bytebuddy.jar.asm.Opcodes.ASM9;
 
 @Data
 public class TraceTransformer extends BaseClassTransformer {
-    public static ThreadLocal<Map<String, int[]>> traceContent = ThreadLocal.withInitial(LinkedHashMap::new);
-    public static ThreadLocal<Integer> stackDeep = ThreadLocal.withInitial(()->1);
+//    public static ThreadLocal<Map<String, int[]>> traceContent = ThreadLocal.withInitial(LinkedHashMap::new);
+//    public static ThreadLocal<Integer> stackDeep = ThreadLocal.withInitial(()->1);
+
+    public static ThreadLocal<Map<String, TraceCtx>> traceCtx = ThreadLocal.withInitial(HashMap::new);
 
     transient TraceMessage message;
 
@@ -63,9 +65,6 @@ public class TraceTransformer extends BaseClassTransformer {
 
                     @Override
                     public void onMethodEnter(){
-                        /*---------------------counter: if reach the limitation will remove the transformer----------------*/
-                        mv.visitLdcInsn(uuid.toString());
-                        mv.visitMethodInsn(INVOKESTATIC, "w/Global", "checkCountAndUnload", "(Ljava/lang/String;)V", false);
                         startTimeVarIndex = asmStoreStartTime(mv);
                     }
                     @Override
@@ -89,7 +88,8 @@ public class TraceTransformer extends BaseClassTransformer {
                         }
 
                         if (owner.replace("/",".").equals(className) && method.equals(name)) {
-                            mv.visitMethodInsn(INVOKESTATIC, "w/core/model/TraceTransformer", "recursiveRecord", "()V", false);
+                            mv.visitLdcInsn(uuid.toString());
+                            mv.visitMethodInsn(INVOKESTATIC, "w/core/model/TraceTransformer", "recursiveRecord", "(Ljava/lang/String;)V", false);
                         }
 
                         // long start = System.currentTimeMillis();
@@ -101,9 +101,13 @@ public class TraceTransformer extends BaseClassTransformer {
                         super.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
                         // long duration = System.currentTimeMillis() - start;
                         int localDurationIndex = asmCalculateCost(mv, localStart);
+                        mv.visitLdcInsn(uuid.toString());
                         mv.visitLdcInsn("line" + line + "," + owner.replace("/", ".") + "#" + name);
                         mv.visitVarInsn(LLOAD, localDurationIndex);
-                        mv.visitMethodInsn(INVOKESTATIC, "w/core/model/TraceTransformer", "subTrace", "(Ljava/lang/String;J)V", false);
+                        mv.visitMethodInsn(INVOKESTATIC, "w/core/model/TraceTransformer", "subTrace", "(Ljava/lang/String;Ljava/lang/String;J)V", false);
+                        /*---------------------counter: if reach the limitation will remove the transformer----------------*/
+                        mv.visitLdcInsn(uuid.toString());
+                        mv.visitMethodInsn(INVOKESTATIC, "w/Global", "checkCountAndUnload", "(Ljava/lang/String;)V", false);
                     }
                 };
             }
@@ -117,63 +121,8 @@ public class TraceTransformer extends BaseClassTransformer {
         return result;
     }
 
-    private void addTraceCodeToMethod(CtMethod ctMethod) throws CannotCompileException, NotFoundException {
-        ctMethod.instrument(new ExprEditor() {
-            public void edit(MethodCall m) throws CannotCompileException {
-                if (m.getClassName().startsWith("java.lang") && !m.getClassName().equals("java.lang.Thread")) {
-                    return;
-                }
-                String code = "{" +
-                        "   if (\"" + m.getMethodName() + "\".equals(\"" + method + "\")) {" +
-                        "       int deep = ((Integer)w.core.model.TraceTransformer.stackDeep.get()).intValue();" +
-                        "       w.core.model.TraceTransformer.stackDeep.set(new Integer(++deep));" +
-                        "   }" +
-                        "   long start = System.currentTimeMillis();\n" +
-                        "   $_ = $proceed($$);\n" +
-                        "   long duration = System.currentTimeMillis() - start;\n" +
-                        "   String sig = \"line" + m.getLineNumber() + "," + m.getClassName() + "#" + m.getMethodName() + "\";\n" +
-                        "   LinkedHashMap map = ((LinkedHashMap)w.core.model.TraceTransformer.traceContent.get()); \n" +
-                        "   if (!map.containsKey(sig)) {map.put(sig, new int[]{0,0});}" +
-                        "   int[] arr = (int[])map.get(sig); \n" +
-                        "   arr[0] += duration; arr[1] += 1;" +
-
-                        "}";
-                m.replace(code);
-            }
-        });
-        ctMethod.addLocalVariable("s", CtClass.longType);
-        ctMethod.addLocalVariable("cost", CtClass.longType);
-        ctMethod.insertBefore("s = System.currentTimeMillis();");
-        ctMethod.insertAfter("{" +
-                "int deep = ((Integer)w.core.model.TraceTransformer.stackDeep.get()).intValue();\n" +
-                "w.core.model.TraceTransformer.stackDeep.set(new Integer(--deep));" +
-                "if (deep <= 0) {" +
-                "   w.core.model.TraceTransformer.stackDeep.remove();\n" +
-                "   cost = System.currentTimeMillis() - s;\n" +
-                "   if (cost >= " + minCost +") {" +
-                "     w.Global.checkCountAndUnload(\"" + uuid + "\");\n"+
-                "     w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");\n" +
-                "     String str = \"" + className + "#" + method + ", total cost:\"+cost+\"ms\\\n\";\n" +
-                "     LinkedHashMap map = (LinkedHashMap)w.core.model.TraceTransformer.traceContent.get(); \n" +
-                "     Iterator it = map.entrySet().iterator(); \n" +
-                "     while (it.hasNext()) {\n" +
-                "         java.util.Map.Entry e = (java.util.Map.Entry)it.next();\n" +
-                "         String k = e.getKey().toString();\n" +
-                "         int[] v = (int[])e.getValue();\n" +
-                "         if (v[0] == 0 && " + ignoreZero + ") \n {} else {" +
-                "          str += \">>\" + k + \" hit:\" + v[1] + \"times, total cost:\" + v[0] + \"ms\\\n\";}\n" +
-                "     }" +
-                "     w.Global.info(str);\n" +
-                "     w.util.RequestUtils.clearRequestCtx();\n" +
-                "   }\n" +
-                "   w.core.model.TraceTransformer.traceContent.remove();\n" +
-                "}" +
-                "}");
-    }
-
-
-    public static void subTrace(String key, long duration) {
-        Map<String, int[]> map = w.core.model.TraceTransformer.traceContent.get();
+    public static void subTrace(String uuid, String key, long duration) {
+        Map<String, int[]> map = traceCtx.get().computeIfAbsent(uuid, k->new TraceCtx()).traceContent;
         int[] arr = map.computeIfAbsent(key, k->new int[2]);
         arr[0] += (int) duration;
         arr[1] += 1;
@@ -181,31 +130,29 @@ public class TraceTransformer extends BaseClassTransformer {
 
 
     public static void traceSummary(long start, long minCost, String uuid, String traceId, String outerSig, boolean ignoreZero) {
-        int deep = w.core.model.TraceTransformer.stackDeep.get();
-        w.core.model.TraceTransformer.stackDeep.set(--deep);
+        TraceCtx ctx = traceCtx.get().getOrDefault(uuid, new TraceCtx());
+        int deep = --ctx.stackDeep;
         StringBuilder sb = new StringBuilder();
         if (deep <= 0) {
-            w.core.model.TraceTransformer.stackDeep.remove();
             long cost = System.currentTimeMillis() - start;
             if (cost >= minCost) {
-                w.Global.checkCountAndUnload(uuid.toString());
+                w.Global.checkCountAndUnload(uuid);
                 w.util.RequestUtils.fillCurThread(traceId);
                 sb.append(outerSig).append(", total cost:").append(cost).append("ms\n");
-                Map<String, int[]> map = w.core.model.TraceTransformer.traceContent.get();
+                Map<String, int[]> map = ctx.traceContent;
                 map.forEach((k, v) -> {
                     if (v[0] != 0 || !ignoreZero) {
                         sb.append(">>").append(k).append(" hit:").append(v[1]).append("times, total cost:").append(v[0]).append("ms\n");
                     }
                 });
+                w.Global.info(sb);
             }
-            w.core.model.TraceTransformer.traceContent.remove();
-            w.Global.info(sb);
+            traceCtx.remove();
         }
     }
 
-    public static void recursiveRecord() {
-        int deep = w.core.model.TraceTransformer.stackDeep.get();
-        w.core.model.TraceTransformer.stackDeep.set(++deep);
+    public static void recursiveRecord(String uuid) {
+        traceCtx.get().computeIfAbsent(uuid, k -> new TraceCtx()).stackDeep++;
     }
 
     public boolean equals(Object other) {
@@ -218,5 +165,15 @@ public class TraceTransformer extends BaseClassTransformer {
     @Override
     public String desc() {
         return "Trace_" + getClassName() + "#" + method;
+    }
+
+    @Override
+    public void clear() {
+        traceCtx.get().remove(this.uuid.toString());
+    }
+
+    public static class TraceCtx {
+        int stackDeep = 1;
+        Map<String, int[]> traceContent = new HashMap<>();
     }
 }

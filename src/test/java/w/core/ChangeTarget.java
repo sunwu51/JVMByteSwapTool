@@ -18,9 +18,12 @@ public class ChangeTarget implements Runnable {
         return a + b;
     }
 
-
     @Override
     public void run() {
         System.out.println("run");
+    }
+
+    public double addWrapper(int a, int b) throws IOException, InterruptedException {
+        return add(a, b);
     }
 }

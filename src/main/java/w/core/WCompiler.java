@@ -50,7 +50,7 @@ public class WCompiler {
      * @return
      * @throws CompileException
      */
-    public static byte[] compileDynamicCodeBlock(String content)  throws CompileException {
-        return compileMethod("w.Dynamic", content);
+    public static byte[] compileDynamicCodeBlock(String reType, String content)  throws CompileException {
+        return compileMethod("w.Dynamic", "public "+ reType +" replace()" + content);
     }
 }

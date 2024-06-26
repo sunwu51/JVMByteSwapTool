@@ -68,4 +68,17 @@ public class ChangeBodyTest {
         System.out.println(target.add(1,1));
         Assertions.assertEquals(102.0, target.add(1, 1));
     }
+
+    @Test
+    public void asmTest4() throws IOException, InterruptedException {
+        ChangeBodyMessage msg = new ChangeBodyMessage();
+        msg.setClassName("w.core.ChangeTarget");
+        msg.setMethod("hashCode");
+        msg.setMode(1);
+        msg.setParamTypes(Arrays.asList());
+        msg.setBody("{return 1; }");
+        Assertions.assertTrue(swapper.swap(msg));
+        System.out.println(target.hashCode());
+        Assertions.assertEquals(1, target.hashCode());
+    }
 }
