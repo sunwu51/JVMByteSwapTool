@@ -3,7 +3,9 @@ package w.core.asm;
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.AdviceAdapter;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 
 /**
  * @author Frank
@@ -32,6 +34,22 @@ public class WAdviceAdapter extends AdviceAdapter {
 
     protected int asmStoreParamsString(MethodVisitor mv, int printFormat) {
         loadArgArray();
+        if (printFormat == 1) {
+            mv.visitMethodInsn(INVOKESTATIC, "java/util/Arrays", "toString", "([Ljava/lang/Object;)Ljava/lang/String;", false);
+        } else if (printFormat == 2) {
+            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toJson", "(Ljava/lang/Object;)Ljava/lang/String;", false);
+        } else {
+            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toString", "(Ljava/lang/Object;)Ljava/lang/String;", false);
+        }
+        int paramsVarIndex = newLocal(Type.getType(String.class));
+        mv.visitVarInsn(ASTORE, paramsVarIndex);
+        return paramsVarIndex;
+    }
+
+
+    protected int asmSubCallStoreParamsString(MethodVisitor mv, int printFormat, String descriptor) {
+        int _i = subCallParamsToArray(descriptor);
+        mv.visitVarInsn(ALOAD, _i);
         if (printFormat == 1) {
             mv.visitMethodInsn(INVOKESTATIC, "java/util/Arrays", "toString", "([Ljava/lang/Object;)Ljava/lang/String;", false);
         } else if (printFormat == 2) {
@@ -103,6 +121,75 @@ public class WAdviceAdapter extends AdviceAdapter {
         }
     }
 
+    private int subCallParamsToArray(String descriptor) {
+        Type[] argumentTypes = Type.getArgumentTypes(descriptor);
+        int[] loads = new int[argumentTypes.length];
+        int[] index = new int[argumentTypes.length];
+        for (int i = argumentTypes.length - 1; i >= 0; i--) {
+            switch (argumentTypes[i].getSort()) {
+                case Type.LONG:
+                    int li = newLocal(Type.LONG_TYPE);
+                    mv.visitVarInsn(LSTORE, li);
+                    index[i] = li; loads[i] = LLOAD;
+                    break;
+                case Type.DOUBLE:
+                    int di = newLocal(Type.DOUBLE_TYPE);
+                    mv.visitVarInsn(DSTORE, di);
+                    index[i] = di;loads[i] = DLOAD;
+                    break;
+                case Type.BOOLEAN:
+                    int zi = newLocal(Type.BOOLEAN_TYPE);
+                    mv.visitVarInsn(ISTORE, zi);
+                    index[i] = zi;loads[i] = ILOAD;
+                    break;
+                case Type.BYTE:
+                    int bi = newLocal(Type.BYTE_TYPE);
+                    mv.visitVarInsn(ISTORE, bi);
+                    index[i] = bi;loads[i] = ILOAD;
+                    break;
+                case Type.CHAR:
+                    int ci = newLocal(Type.CHAR_TYPE);
+                    mv.visitVarInsn(ISTORE, ci);
+                    index[i] = ci;loads[i] = ILOAD;
+                    break;
+                case Type.SHORT:
+                    int si = newLocal(Type.SHORT_TYPE);
+                    mv.visitVarInsn(ISTORE, si);
+                    index[i] = si;loads[i] = ILOAD;
+                    break;
+                case Type.FLOAT:
+                    int fi = newLocal(Type.FLOAT_TYPE);
+                    mv.visitVarInsn(FSTORE, fi);
+                    index[i] = fi;loads[i] = FLOAD;
+                    break;
+                case Type.INT:
+                    int ii = newLocal(Type.INT_TYPE);
+                    mv.visitVarInsn(ISTORE, ii);
+                    index[i] = ii;loads[i] = ILOAD;
+                    break;
+                default:
+                    int ai = newLocal(Type.getType(Object.class));
+                    mv.visitVarInsn(ASTORE, ai);
+                    index[i] = ai;loads[i] = ALOAD;
+                    break;
+            }
+        }
+        push(argumentTypes.length);
+        newArray(Type.getObjectType("java/lang/Object"));
+        for (int i = 0; i < index.length; i++) {
+            dup();
+            push(i);
+            mv.visitVarInsn(loads[i], index[i]);
+            box(argumentTypes[i]);
+            arrayStore(Type.getObjectType("java/lang/Object"));
+        }
+        int result = newLocal(Type.getType(Object.class));
+        mv.visitVarInsn(ASTORE, result);
+        for (int i = 0; i < index.length; i++) {
+            mv.visitVarInsn(loads[i], index[i]);
+        }
+        return result;
+    }
 
     protected void asmGenerateStringBuilder(MethodVisitor mv, List<SbNode> list) {
         if (list == null || list.isEmpty()) {

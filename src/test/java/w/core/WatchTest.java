@@ -17,7 +17,7 @@ import java.lang.instrument.Instrumentation;
  */
 public class WatchTest {
 
-    Target target = new Target();
+    WatchTarget target = new WatchTarget();
 
     Swapper swapper = Swapper.getInstance();;
 
@@ -35,24 +35,24 @@ public class WatchTest {
     }
 
     @Test
-    public void voidTest() {
+    public void test() {
         WatchMessage msg = new WatchMessage();
-        msg.setSignature("w.core.Target#voidMethodWithNoParams");
+        msg.setSignature("w.core.WatchTarget#voidMethodWithNoParams");
         Assertions.assertTrue(swapper.swap(msg));
         WatchMessage msg2 = new WatchMessage();
         msg2.setPrintFormat(2);
-        msg2.setSignature("w.core.Target#doubleMethodWithParams");
+        msg2.setSignature("w.core.WatchTarget#doubleMethodWithParams");
         Assertions.assertTrue(swapper.swap(msg2));
         WatchMessage msg3 = new WatchMessage();
-        msg3.setSignature("w.core.Target#empty");
+        msg3.setSignature("w.core.WatchTarget#empty");
         Assertions.assertTrue(swapper.swap(msg3));
 
         WatchMessage msg4 = new WatchMessage();
-        msg4.setSignature("w.core.Target#tryCatchTest");
+        msg4.setSignature("w.core.WatchTarget#tryCatchTest");
         Assertions.assertTrue(swapper.swap(msg4));
 
         WatchMessage msg5 = new WatchMessage();
-        msg5.setSignature("w.core.Target#readFile");
+        msg5.setSignature("w.core.WatchTarget#readFile");
         Assertions.assertTrue(swapper.swap(msg5));
         target.voidMethodWithNoParams();
         target.doubleMethodWithParams(0.1324, 0.243543, 0.325432);
@@ -77,33 +77,17 @@ public class WatchTest {
     }
 
     @Test
-    public void doubleReturnAndArrayParam() {
-        WatchMessage msg = new WatchMessage();
-        msg.setSignature("w.core.Target#doubleMethodWithParams");
-        Assertions.assertTrue(swapper.swap(msg));
-        target.doubleMethodWithParams();
-    }
-
-    @Test
-    public void doubleReturnAndArrayParam2() {
-        WatchMessage msg = new WatchMessage();
-        msg.setSignature("w.core.Target#doubleMethodWithParams");
-        msg.setPrintFormat(2);
-        Assertions.assertTrue(swapper.swap(msg));
-        target.doubleMethodWithParams();
-    }
-    @Test
     public void toStringTest() {
         WatchMessage msg = new WatchMessage();
-        msg.setSignature("w.core.Target#toString");
+        msg.setSignature("w.core.WatchTarget#toString");
         Assertions.assertTrue(swapper.swap(msg));
-        System.out.println(new Target().toString());
+        System.out.println(new WatchTarget().toString());
     }
 
     @Test
     public void runTest() {
         WatchMessage msg = new WatchMessage();
-        msg.setSignature("w.core.Target#run");
+        msg.setSignature("w.core.WatchTarget#run");
         Assertions.assertTrue(swapper.swap(msg));
         target.run();
     }

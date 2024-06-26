@@ -6,6 +6,7 @@ import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.janino.SimpleCompiler;
 import w.Global;
 
+import java.io.IOException;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.security.ProtectionDomain;
@@ -52,19 +53,20 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
     }
 
 
-    protected byte[] compileMethod(String methodBody) throws CompileException {
-        SimpleCompiler compiler = new SimpleCompiler();
-        String packageName = className.substring(0, className.lastIndexOf("."));
-        String simpleClassName = className.substring(className.lastIndexOf(".") +1);
-        compiler.cook("package " + packageName +";\n import java.util.*;\n public class " + simpleClassName + " {" + methodBody + "}");
-        return compiler.getBytecodes().get(className);
-    }
-
-    protected byte[] compileDynamicCodeBlock(String content)  throws CompileException {
-        SimpleCompiler compiler = new SimpleCompiler();
-        compiler.cook("package w;\n import java.util.*;\n public class Dynamic { " + content +" }");
-        return compiler.getBytecodes().get("w.Dynamic");
-    }
+//    protected byte[] compileMethod(String methodContent) throws CompileException {
+//        SimpleCompiler compiler = new SimpleCompiler();
+//        compiler.setParentClassLoader(w.Global.getClassLoader());
+//        String packageName = className.substring(0, className.lastIndexOf("."));
+//        String simpleClassName = className.substring(className.lastIndexOf(".") +1);
+//        compiler.cook("package " + packageName +";\n import java.util.*;\n public class " + simpleClassName + " {" + methodContent + "}");
+//        return compiler.getBytecodes().get(className);
+//    }
+//
+//    protected byte[] compileDynamicCodeBlock(String content)  throws CompileException {
+//        SimpleCompiler compiler = new SimpleCompiler();
+//        compiler.cook("package w;\n import java.util.*;\n public class Dynamic { " + content +" }");
+//        return compiler.getBytecodes().get("w.Dynamic");
+//    }
 
     protected static boolean stringArrEquals(String[] a1, String[] a2) {
         if (a1 == null && a2 == null) { return  true;}

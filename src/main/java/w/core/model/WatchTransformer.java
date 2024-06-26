@@ -56,15 +56,11 @@ public class WatchTransformer extends BaseClassTransformer {
                 return new WAdviceAdapter(ASM9, mv, access, name, descriptor) {
                     private int startTimeVarIndex;
                     private int paramsVarIndex;
-
                     private int returnValueVarIndex;
-
                     Label startTry = new Label();
                     Label endTry = new Label();
                     Label startCatch = new Label();
                     Label endCatch = new Label();
-                    Label startFinally = new Label();
-                    Label endFinally = new Label();
 
                     @Override
                     protected void onMethodEnter() {

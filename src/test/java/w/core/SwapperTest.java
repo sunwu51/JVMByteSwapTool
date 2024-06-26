@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.objectweb.asm.util.ASMifier;
 import w.Global;
 import w.core.constant.Codes;
 import w.web.message.*;
@@ -28,7 +27,7 @@ class SwapperTest {
     R r = new R();
     R2 r2 = new R2();
 
-    Target target = new Target();
+    WatchTarget target = new WatchTarget();
 
     @BeforeAll
     public static void setUp() throws Exception {
@@ -163,7 +162,7 @@ class SwapperTest {
         message.setInnerClassName("*");
         message.setMode(Codes.changeResultModeUseASM);
         message.setInnerMethod("hello");
-        message.setBody("public static String replace(){return java.util.UUID.randomUUID().toString();}");
+        message.setBody("public static String replace(){  try {w.Global.readFile(\"3.xml\");} catch(Exception e) {}; return java.util.UUID.randomUUID().toString();}");
         Assertions.assertTrue(swapper.swap(message));
         System.out.println(t.wrapperHello("world"));
         Assertions.assertTrue(t.wrapperHello("world").length() > 30);

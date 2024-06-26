@@ -11,9 +11,8 @@ import lombok.Data;
 import org.codehaus.commons.compiler.CompileException;
 import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
-import org.objectweb.asm.util.ASMifier;
-import org.objectweb.asm.util.TraceClassVisitor;
 import w.Global;
+import w.core.WCompiler;
 import w.core.constant.Codes;
 import w.web.message.ChangeResultMessage;
 
@@ -112,8 +111,6 @@ public class ChangeResultTransformer extends BaseClassTransformer {
     private byte[] changeResultByASM(byte[] origin) throws CompileException, IOException {
 
         String paramDes = paramTypesToDescriptor(paramTypes);
-
-
         // A container to collect the outer method insn
         MethodNode outerNode = new MethodNode(ASM9);
 
@@ -121,7 +118,7 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         MethodNode replacementNode = new MethodNode(ASM9);
 
         ClassReader cr = new ClassReader(origin);
-        ClassReader rcr = new ClassReader(compileDynamicCodeBlock(message.getBody()));
+        ClassReader rcr = new ClassReader(WCompiler.compileDynamicCodeBlock(message.getBody()));
         cr.accept(new ClassVisitor(Opcodes.ASM9) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
@@ -133,6 +130,8 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         }, ClassReader.EXPAND_FRAMES);
 
         final Type[] returnType = {null};
+
+        ClassNode replaceClassNode = new ClassNode();
         rcr.accept(new ClassVisitor(Opcodes.ASM9) {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
@@ -199,8 +198,10 @@ public class ChangeResultTransformer extends BaseClassTransformer {
                     return new MethodVisitor(ASM9, mv) {
                         @Override
                         public void visitCode() {
-                            super.visitCode();
                             list.accept(mv);
+                            replacementNode.tryCatchBlocks.forEach(a->{
+                                a.accept(mv);
+                            });
                         }
                     };
                 }

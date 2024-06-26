@@ -20,6 +20,16 @@
           </execution>
         </executions>
         <configuration>
+          <filters>
+            <filter>
+              <artifact>*:*</artifact>
+              <excludes>
+                <exclude>META-INF/*.DSA</exclude>
+                <exclude>META-INF/*.RSA</exclude>
+                <exclude>META-INF/*.SF</exclude>
+              </excludes>
+            </filter>
+          </filters>
           <transformers>
             <transformer>
               <manifestEntries>

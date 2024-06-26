@@ -74,12 +74,17 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                         if (hit) {
                             // long start = System.currentTimeMillis();
                             int startTimeVarIndex = asmStoreStartTime(mv);
-
                             // String params = Arrays.toString(paramArray);
-                            int paramsVarIndex = asmStoreParamsString(mv, printFormat);
+                            int paramsVarIndex = asmSubCallStoreParamsString(mv, printFormat, descriptor);
 
+
+                            Label tryStart = new Label();
+                            Label tryEnd = new Label();
+                            Label catchStart = new Label();
+                            mv.visitTryCatchBlock(tryStart, tryEnd, catchStart, "java/lang/Throwable");
+                            mv.visitLabel(tryStart);
                             // execute original method
-                            super.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
+                            mv.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
 
                             // long duration = System.currentTimeMillis() - start;
                             int durationVarIndex = asmCalculateCost(mv, startTimeVarIndex);
@@ -88,13 +93,13 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             int returnValueVarIndex = asmStoreRetString(mv, descriptor, printFormat);
                             // new StringBuilder().append("line:" + line + ", request: ").append(params).append(", response: ").append(returnValue).append(", cost: ").append(duration).append("ms");
                             List<SbNode> list = new ArrayList<SbNode>();
-                            list.add(new SbNode("line:" + line + ", request: "));
+                            list.add(new SbNode("\033[32mline:" + line + ", req: "));
                             list.add(new SbNode(ALOAD, paramsVarIndex));
                             list.add(new SbNode(", response: "));
                             list.add(new SbNode(ALOAD, returnValueVarIndex));
                             list.add(new SbNode(", cost: "));
                             list.add(new SbNode(LLOAD, durationVarIndex));
-                            list.add(new SbNode("ms"));
+                            list.add(new SbNode("ms\033[0m"));
                             asmGenerateStringBuilder(mv, list);
 
                             /*---------------------counter: if reach the limitation will remove the transformer----------------*/
@@ -103,8 +108,43 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
                             // info the string builder
                             mv.visitMethodInsn(INVOKESTATIC, "w/Global", "info", "(Ljava/lang/Object;)V", false);
+                            mv.visitLabel(tryEnd);
+                            Label end = new Label();
+                            mv.visitJumpInsn(Opcodes.GOTO, end);
+
+                            mv.visitLabel(catchStart);
+                            int exceptionIndex = newLocal(Type.getType(Throwable.class));
+                            mv.visitVarInsn(Opcodes.ASTORE, exceptionIndex);
+                            mv.visitVarInsn(Opcodes.ALOAD, exceptionIndex);
+                            int exceptionStringIndex = newLocal(Type.getType(String.class));
+                            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "toString", "()Ljava/lang/String;", false);
+                            mv.visitVarInsn(Opcodes.ASTORE, exceptionStringIndex);
+                            int durationVarIndexInCatch = asmCalculateCost(mv, startTimeVarIndex);
+                            List<SbNode> listInCatch = new ArrayList<SbNode>();
+                            listInCatch.add(new SbNode("line:" + line + ", req: "));
+                            listInCatch.add(new SbNode(ALOAD, paramsVarIndex));
+                            listInCatch.add(new SbNode(", throw: "));
+                            listInCatch.add(new SbNode(ALOAD, exceptionStringIndex));
+                            listInCatch.add(new SbNode(", cost: "));
+                            listInCatch.add(new SbNode(LLOAD, durationVarIndexInCatch));
+                            listInCatch.add(new SbNode("ms"));
+                            asmGenerateStringBuilder(mv, listInCatch);
+                            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "info", "(Ljava/lang/Object;)V", false);
+                            /*---------------------counter: if reach the limitation will remove the transformer----------------*/
+                            mv.visitLdcInsn(uuid.toString());
+                            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "checkCountAndUnload", "(Ljava/lang/String;)V", false);
+                            mv.visitVarInsn(Opcodes.ALOAD, exceptionIndex);
+                            mv.visitInsn(Opcodes.ATHROW);
+                            Label catchEnd = new Label();
+                            mv.visitLabel(catchEnd);
+                            mv.visitLabel(end);
+
+
+                            // info the string builder
+//                            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "info", "(Ljava/lang/Object;)V", false);
+
                         } else {
-                            super.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
+                            mv.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
                         }
                     }
                 };
