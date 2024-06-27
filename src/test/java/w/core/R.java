@@ -1,6 +1,5 @@
 package w.core;
 
-import w.Global;
 
 import java.util.UUID;
 

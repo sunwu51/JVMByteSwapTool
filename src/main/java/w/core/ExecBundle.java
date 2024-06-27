@@ -13,6 +13,7 @@ import w.web.message.ReplaceClassMessage;
 
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
+import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.InvocationTargetException;
 import java.net.HttpURLConnection;
@@ -34,12 +35,7 @@ public class ExecBundle {
 
     static {
         try {
-            CtClass ctClass = Global.classPool.makeClass("w.Exec");
-            CtMethod ctMethod = CtMethod.make("public void exec() {}", ctClass);
-            ctClass.addMethod(ctMethod);
-            // use the spring boot class loader
-            Class c = ctClass.toClass(Global.getClassLoader());
-            ctClass.detach();
+            Class<?> c = new ExecClassLoader(w.Global.getClassLoader()).loadClass("w.Exec");
             inst = c.newInstance();
             Global.fillLoadedClasses();
         } catch (Throwable e) {
@@ -69,58 +65,14 @@ public class ExecBundle {
                 invoke();
             }
         } else {
-            String url = "http://localhost:" + Compiler.port  + "/compile";
-            String urlParameters = "className=w.Exec&content=" + URLEncoder.encode(Base64.getEncoder().encodeToString(body.getBytes(StandardCharsets.UTF_8)));
-
-            HttpURLConnection connection = null;
-
-            try {
-                URL obj = new URL(url);
-                connection = (HttpURLConnection) obj.openConnection();
-                connection.setRequestMethod("POST");
-                connection.setRequestProperty("User-Agent", "Java client");
-                connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-                connection.setDoOutput(true);
-                try (DataOutputStream wr = new DataOutputStream(connection.getOutputStream())) {
-                    wr.writeBytes(urlParameters);
-                    wr.flush();
-                }
-                int responseCode = connection.getResponseCode();
-                try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
-                    String inputLine;
-                    StringBuilder response = new StringBuilder();
-
-                    while ((inputLine = in.readLine()) != null) {
-                        response.append(inputLine);
-                    }
-
-                    if (responseCode == HttpURLConnection.HTTP_OK) {
-
-                        Map<String, Object> res = new ObjectMapper().readValue(response.toString(), new TypeReference<Map<String, Object>>() {
-                        });
-
-                        if ("0".equals(res.get("code").toString())) {
-                            ReplaceClassMessage replaceClassMessage = new ReplaceClassMessage();
-                            replaceClassMessage.setClassName("w.Exec");
-                            replaceClassMessage.setContent(res.get("data").toString());
-                            // remove the old transformer
-                            clear();
-                            if (Swapper.getInstance().swap(replaceClassMessage)) {
-                                invoke();
-                            }
-                        } else {
-                            Global.error(res.get("data"));
-                        }
-                    } else {
-                        Global.error("compiler server return error : " + response);
-                    }
-                }
-            } catch (Exception e) {
-                Global.error("request compiler server error", e);
-            } finally {
-                if (connection != null) {
-                    connection.disconnect();
-                }
+            byte[] byteCode = WCompiler.compileWholeClass(body);
+            ReplaceClassMessage replaceClassMessage = new ReplaceClassMessage();
+            replaceClassMessage.setClassName("w.Exec");
+            replaceClassMessage.setContent(Base64.getEncoder().encodeToString(byteCode));
+            // remove the old transformer
+            clear();
+            if (Swapper.getInstance().swap(replaceClassMessage)) {
+                invoke();
             }
         }
     }
@@ -136,6 +88,27 @@ public class ExecBundle {
                 });
         Global.activeTransformers
                 .getOrDefault("w.Exec", new HashMap<>()).clear();
+    }
+
+    public static class ExecClassLoader extends ClassLoader {
+        public ExecClassLoader(ClassLoader parent) {
+            super(parent);
+        }
+
+        @Override
+        public Class<?> loadClass(String name) throws ClassNotFoundException {
+            if (!name.equals("w.Exec")) {
+                return super.loadClass(name);
+            }
+            FileInputStream f;
+            try {
+                byte[] bytes = WCompiler.compileWholeClass("package w; public class Exec { public void exec() {} }");
+                return defineClass("w.Exec", bytes, 0, bytes.length);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
     }
 }
 
