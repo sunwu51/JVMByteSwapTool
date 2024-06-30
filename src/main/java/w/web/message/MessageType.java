@@ -30,4 +30,8 @@ public enum MessageType {
     DELETE,
 
     TRACE,
+
+    DECOMPILE,
+
+    RESET,
 }

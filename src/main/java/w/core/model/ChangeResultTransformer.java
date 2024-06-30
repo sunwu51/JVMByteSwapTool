@@ -12,7 +12,7 @@ import org.codehaus.commons.compiler.CompileException;
 import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
 import w.Global;
-import w.core.WCompiler;
+import w.core.compiler.WCompiler;
 import w.core.constant.Codes;
 import w.web.message.ChangeResultMessage;
 
@@ -55,7 +55,7 @@ public class ChangeResultTransformer extends BaseClassTransformer {
     }
 
     @Override
-    public byte[] transform(Class<?> claz, byte[] origin) throws Exception {
+    public byte[] transform(byte[] origin) throws Exception {
         byte[] result = null;
         if (mode == Codes.changeResultModeUseJavassist) {
             // use javassist $_=xxx to change result
@@ -66,8 +66,6 @@ public class ChangeResultTransformer extends BaseClassTransformer {
             result = changeResultByASM(origin);
         }
         status = 1;
-
-        new FileOutputStream("T.class").write(result);
         return result;
     }
 
@@ -174,6 +172,10 @@ public class ChangeResultTransformer extends BaseClassTransformer {
             list.add(instruction);
         }
         final MethodNode rnode = replacementNode;
+
+        if (rnode == null) {
+            throw new IllegalArgumentException("Inner method not found");
+        }
         // Create a class writer to modify the class
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
         cr.accept(new ClassVisitor(Opcodes.ASM9, classWriter) {
@@ -197,7 +199,7 @@ public class ChangeResultTransformer extends BaseClassTransformer {
             }
         }, ClassReader.EXPAND_FRAMES);
         byte[] result = classWriter.toByteArray();
-        new FileOutputStream("T.class").write(result);
+//        new FileOutputStream("T.class").write(result);
         return result;
     }
 

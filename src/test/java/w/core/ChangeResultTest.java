@@ -59,5 +59,21 @@ public class ChangeResultTest {
         msg.setBody("{return 10086;}");
         Assertions.assertTrue(swapper.swap(msg));
         System.out.println(target.addWrapper(1,1));
+
+    }
+
+    @Test
+    public void asmTest2() throws IOException, InterruptedException {
+        ChangeResultMessage msg = new ChangeResultMessage();
+        msg.setClassName("w.core.ChangeTarget");
+        msg.setMethod("hello");
+        msg.setMode(Codes.changeResultModeUseASM);
+        msg.setParamTypes(Arrays.asList());
+        msg.setInnerMethod("getName");
+        msg.setInnerClassName("*");
+        msg.setBody("{return \"10086\";}");
+        Assertions.assertTrue(swapper.swap(msg));
+        System.out.println(target.hello());
+
     }
 }

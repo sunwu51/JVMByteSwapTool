@@ -3,6 +3,7 @@ package w.web;
 import fi.iki.elonen.NanoHTTPD;
 import lombok.extern.slf4j.Slf4j;
 import w.Global;
+import w.core.compiler.WCompiler;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;

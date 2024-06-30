@@ -104,7 +104,7 @@ public class WAdviceAdapter extends AdviceAdapter {
                 break;
             case Type.VOID:
             default:
-                mv.visitLdcInsn("void");
+                mv.visitInsn(Opcodes.ACONST_NULL);
         }
         mv.visitVarInsn(ASTORE, returnValueVarIndex);
         return returnValueVarIndex;

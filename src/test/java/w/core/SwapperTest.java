@@ -171,8 +171,8 @@ class SwapperTest {
     @Test
     public void execTest() throws Exception {
         ExecMessage message = new ExecMessage();
-        message.setBody("{w.Global.info(\"hello\");}");
-        ExecBundle.changeBodyAndInvoke(0, message.getBody());
+        message.setBody("package w; public class Exec{ public void exec() { w.Global.info(\"hello\");}  }");
+        ExecBundle.changeBodyAndInvoke(message.getBody());
     }
 
     @Test

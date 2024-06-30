@@ -24,6 +24,10 @@ public class ChangeTarget implements Runnable {
     }
 
     public double addWrapper(int a, int b) throws IOException, InterruptedException {
-        return add(a, b);
+        return add(a, b) + 10000.0;
+    }
+
+    public String hello() {
+        return "user will save: name=" + getName() + ", age=" + getAge();
     }
 }

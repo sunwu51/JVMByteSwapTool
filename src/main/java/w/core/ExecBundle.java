@@ -1,29 +1,14 @@
 package w.core;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import javassist.CtClass;
-import javassist.CtMethod;
 import lombok.Data;
-import w.Compiler;
 import w.Global;
-import w.util.SpringUtils;
-import w.web.message.ChangeBodyMessage;
+import w.core.compiler.WCompiler;
 import w.web.message.ReplaceClassMessage;
 
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
 import java.io.FileInputStream;
-import java.io.InputStreamReader;
 import java.lang.reflect.InvocationTargetException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
-import java.util.Map;
 
 /**
  * @author Frank
@@ -42,6 +27,9 @@ public class ExecBundle {
             e.printStackTrace();
         }
     }
+
+    private static final String EXEC_CLASS = "w.Exec";
+
     public static void invoke() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         Global.info("start to invoke");
         inst.getClass().getDeclaredMethod("exec")
@@ -49,31 +37,15 @@ public class ExecBundle {
         Global.info("finish invoking");
     }
 
-    public static void changeBodyAndInvoke(int mode, String body) throws Exception {
-        if (mode > 1 || mode < 0) return;
-
-        if (mode == 0) {
-            ChangeBodyMessage message = new ChangeBodyMessage();
-            message.setClassName("w.Exec");
-            message.setMethod("exec");
-            message.setParamTypes(new ArrayList<>());
-            body = "{" + SpringUtils.generateSpringCtxCode() + body + "}";
-            message.setBody(body);
-            // remove the old transformer
-            clear();
-            if (Swapper.getInstance().swap(message)) {
-                invoke();
-            }
-        } else {
-            byte[] byteCode = WCompiler.compileWholeClass(body);
-            ReplaceClassMessage replaceClassMessage = new ReplaceClassMessage();
-            replaceClassMessage.setClassName("w.Exec");
-            replaceClassMessage.setContent(Base64.getEncoder().encodeToString(byteCode));
-            // remove the old transformer
-            clear();
-            if (Swapper.getInstance().swap(replaceClassMessage)) {
-                invoke();
-            }
+    public static void changeBodyAndInvoke(String body) throws Exception {
+        byte[] byteCode = WCompiler.compileWholeClass(body);
+        ReplaceClassMessage replaceClassMessage = new ReplaceClassMessage();
+        replaceClassMessage.setClassName(EXEC_CLASS);
+        replaceClassMessage.setContent(Base64.getEncoder().encodeToString(byteCode));
+        // remove the old transformer
+        clear();
+        if (Swapper.getInstance().swap(replaceClassMessage)) {
+            invoke();
         }
     }
 

@@ -1,22 +1,16 @@
 package w.core.model;
 
-import java.io.ByteArrayInputStream;
 import java.io.FileOutputStream;
-import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import javassist.*;
-import javassist.expr.ExprEditor;
-import javassist.expr.MethodCall;
 import lombok.Data;
 import org.objectweb.asm.*;
 import w.Global;
-import w.core.asm.SbNode;
 import w.core.asm.WAdviceAdapter;
 import w.web.message.TraceMessage;
 
-import static net.bytebuddy.jar.asm.Opcodes.ASM9;
+import static org.objectweb.asm.Opcodes.ASM9;
 
 @Data
 public class TraceTransformer extends BaseClassTransformer {
@@ -43,7 +37,7 @@ public class TraceTransformer extends BaseClassTransformer {
     }
 
     @Override
-    public byte[] transform(Class<?> claz, byte[] origin) throws Exception {
+    public byte[] transform(byte[] origin) throws Exception {
         ClassReader classReader = new ClassReader(origin);
         ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         AtomicBoolean effect = new AtomicBoolean();
@@ -116,7 +110,6 @@ public class TraceTransformer extends BaseClassTransformer {
             throw new IllegalArgumentException("Method not declared here.");
         }
         byte[] result = classWriter.toByteArray();
-        new FileOutputStream("T.class").write(result);
         status = 1;
         return result;
     }

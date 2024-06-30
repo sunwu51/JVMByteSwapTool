@@ -6,6 +6,7 @@ import org.objectweb.asm.*;
 import w.Global;
 import w.core.asm.SbNode;
 import w.core.asm.WAdviceAdapter;
+import w.util.RequestUtils;
 import w.web.message.WatchMessage;
 
 
@@ -43,7 +44,7 @@ public class WatchTransformer extends BaseClassTransformer {
     }
 
     @Override
-    public byte[] transform(Class<?> claz, byte[] origin) throws Exception {
+    public byte[] transform(byte[] origin) throws Exception {
         ClassReader classReader = new ClassReader(origin);
         ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
 
@@ -56,11 +57,17 @@ public class WatchTransformer extends BaseClassTransformer {
                 return new WAdviceAdapter(ASM9, mv, access, name, descriptor) {
                     private int startTimeVarIndex;
                     private int paramsVarIndex;
-                    private int returnValueVarIndex;
-                    Label startTry = new Label();
-                    Label endTry = new Label();
-                    Label startCatch = new Label();
-                    Label endCatch = new Label();
+
+                    private int returnValueVarIndex = -1;
+
+                    private int exceptionStringIndex = -1;
+
+
+                    private int methodSignatureVarIndex;
+                    private final Label startTry = new Label();
+                    private final Label endTry = new Label();
+                    private final Label startCatch = new Label();
+                    private final Label endCatch = new Label();
 
                     @Override
                     protected void onMethodEnter() {
@@ -68,104 +75,61 @@ public class WatchTransformer extends BaseClassTransformer {
                         startTimeVarIndex = asmStoreStartTime(mv);
                         /*---------------------param: String params = Arrays.toString(paramsArray);-----------------*/
                         paramsVarIndex = asmStoreParamsString(mv, printFormat);
-                        returnValueVarIndex = newLocal(Type.getType(String.class));
-                        mv.visitLdcInsn("__none__");
-                        mv.visitVarInsn(ASTORE, returnValueVarIndex);
-
+                        methodSignatureVarIndex = newLocal(Type.getType(String.class));
+                        String methodSignature = className.substring(1 + className.lastIndexOf('.')) +"#" + method;
+                        mv.visitLdcInsn(methodSignature);
+                        mv.visitVarInsn(ASTORE, methodSignatureVarIndex);
+                        mv.visitLdcInsn(traceId);
+                        mv.visitMethodInsn(INVOKESTATIC, "w/util/RequestUtils", "fillCurThread", "(Ljava/lang/String;)V", false);
                         // try { original }
                         mv.visitLabel(startTry);
                     }
 
                     @Override
                     protected void onMethodExit(int opcode) {
-                        /*---------------------cost:     long end = System.currentTimeMillis(); long duration = end - start;-----------------*/
-                        int durationVarIndex = asmCalculateCost(mv, startTimeVarIndex);
-                        Label elseLabel = new Label();
-                        Label endLabel = new Label();
-                        mv.visitVarInsn(Opcodes.LLOAD, durationVarIndex);
-                        mv.visitLdcInsn((long) minCost);
-                        mv.visitInsn(Opcodes.LCMP);
-                        // if duration < minCost goto elselabel
-                        mv.visitJumpInsn(Opcodes.IFLT, elseLabel);
-
                         /*---------------------returnValue: return object tostring, return the variable index------------*/
-                        int returnValueVarIndex = asmStoreRetString(mv, descriptor, printFormat);
-
-                        /*---------------------counter: if reach the limitation will remove the transformer----------------*/
-                        mv.visitLdcInsn(uuid.toString());
-                        mv.visitMethodInsn(INVOKESTATIC, "w/Global", "checkCountAndUnload", "(Ljava/lang/String;)V", false);
-
-                        /*---------------------print: concat the final string, and w.Global.info-----------------*/
-                        List<SbNode> list = new ArrayList<>();
-                        String simpleMethodName = message.getSignature().substring(message.getSignature().lastIndexOf(".") + 1);
-                        list.add(new SbNode(simpleMethodName));
-                        list.add(new SbNode(",cost:"));
-                        list.add(new SbNode(LLOAD, durationVarIndex));
-                        list.add(new SbNode("ms,req:"));
-                        list.add(new SbNode(ALOAD, paramsVarIndex));
-                        list.add(new SbNode(",res:"));
-                        list.add(new SbNode(ALOAD, returnValueVarIndex));
-                        asmGenerateStringBuilder(mv, list);
-                        mv.visitMethodInsn(INVOKESTATIC, "w/Global", "info", "(Ljava/lang/Object;)V", false);
-                        mv.visitJumpInsn(Opcodes.GOTO, endLabel);
-
-                        /*-----------------------cost < minCost skip---------------------------------------------*/
-                        mv.visitLabel(elseLabel);
-                        mv.visitLabel(endLabel);
-                        mv.visitLabel(endTry);
-
+                        if (opcode != ATHROW) {
+                            returnValueVarIndex = asmStoreRetString(mv, descriptor, printFormat);
+                            postProcess(false);
+                        }
                     }
 
                     @Override
                     public void visitMaxs(int maxStack, int maxLocals) {
+                        mv.visitLabel(endTry);
                         mv.visitLabel(startCatch);
                         int exceptionIndex = newLocal(Type.getType(Throwable.class));
                         mv.visitVarInsn(Opcodes.ASTORE, exceptionIndex);
                         mv.visitVarInsn(Opcodes.ALOAD, exceptionIndex);
-                        int exceptionStringIndex = newLocal(Type.getType(String.class));
+                        exceptionStringIndex = newLocal(Type.getType(String.class));
                         mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "toString", "()Ljava/lang/String;", false);
                         mv.visitVarInsn(Opcodes.ASTORE, exceptionStringIndex);
 
-                        /*---------------------cost:     long end = System.currentTimeMillis(); long duration = end - start;-----------------*/
-                        int durationVarIndex = asmCalculateCost(mv, startTimeVarIndex);
-                        Label elseLabel = new Label();
-                        Label endLabel = new Label();
-                        mv.visitVarInsn(Opcodes.LLOAD, durationVarIndex);
-                        mv.visitLdcInsn((long) minCost);
-                        mv.visitInsn(LCMP);
-                        // if duration < minCost goto elselabel
-                        mv.visitJumpInsn(Opcodes.IFLT, elseLabel);
-
-                        /*---------------------counter: if reach the limitation will remove the transformer----------------*/
-                        mv.visitLdcInsn(uuid.toString());
-                        mv.visitMethodInsn(INVOKESTATIC, "w/Global", "checkCountAndUnload", "(Ljava/lang/String;)V", false);
-
-                        /*---------------------print: concat the final string, and w.Global.info-----------------*/
-                        List<SbNode> list = new ArrayList<>();
-                        list.add(new SbNode(message.getSignature()));
-                        list.add(new SbNode(",cost:"));
-                        list.add(new SbNode(LLOAD, durationVarIndex));
-                        list.add(new SbNode("ms,req:"));
-                        list.add(new SbNode(ALOAD, paramsVarIndex));
-                        list.add(new SbNode(",throw:"));
-                        list.add(new SbNode(ALOAD, exceptionStringIndex));
-                        asmGenerateStringBuilder(mv, list);
-                        mv.visitLdcInsn(traceId);
-                        mv.visitMethodInsn(INVOKESTATIC, "w/util/RequestUtils", "fillCurThread", "(Ljava/lang/String;)V", false);
-                        mv.visitMethodInsn(INVOKESTATIC, "w/Global", "info", "(Ljava/lang/Object;)V", false);
-                        mv.visitJumpInsn(Opcodes.GOTO, endLabel);
-
-                        /*-----------------------cost < minCost skip---------------------------------------------*/
-                        mv.visitLabel(elseLabel);
-                        mv.visitLabel(endLabel);
-
+                        postProcess(true);
                         mv.visitVarInsn(Opcodes.ALOAD, exceptionIndex);
                         mv.visitInsn(Opcodes.ATHROW);
                         mv.visitLabel(endCatch);
                         mv.visitTryCatchBlock(startTry, endTry, startCatch, "java/lang/Throwable");
-
                         effect.set(true);
                         super.visitMaxs(maxStack, maxLocals);
+                    }
+
+                    private void postProcess(boolean whenThrow) {
+                        loadLocal(startTimeVarIndex, Type.LONG_TYPE);
+                        push(minCost);
+                        push(uuid.toString());
+                        push(traceId);
+                        loadLocal(methodSignatureVarIndex, Type.getType(String.class));
+                        loadLocal(paramsVarIndex, Type.getType(String.class));
+
+                        if (whenThrow) {
+                            mv.visitInsn(Opcodes.ACONST_NULL);
+                            loadLocal(exceptionStringIndex, Type.getType(String.class));
+                        } else {
+                            loadLocal(returnValueVarIndex, Type.getType(String.class));
+                            mv.visitInsn(Opcodes.ACONST_NULL);
+                        }
+                        mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "watchPostProcess", "(JILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V", false);
                     }
 
                 };
@@ -175,7 +139,6 @@ public class WatchTransformer extends BaseClassTransformer {
         if (!effect.get()) {
             throw new IllegalArgumentException("Method not declared here.");
         }
-        new FileOutputStream("T.class").write(result);
         status = 1;
         return result;
     }
@@ -234,5 +197,7 @@ public class WatchTransformer extends BaseClassTransformer {
     public String desc() {
         return "Watch_" + getClassName() + "#" + method;
     }
+
+
 
 }

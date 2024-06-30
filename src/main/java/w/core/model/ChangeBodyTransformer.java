@@ -10,7 +10,7 @@ import org.codehaus.commons.compiler.CompileException;
 import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
 import w.Global;
-import w.core.WCompiler;
+import w.core.compiler.WCompiler;
 import w.core.constant.Codes;
 import w.web.message.ChangeBodyMessage;
 
@@ -19,7 +19,6 @@ import java.io.FileOutputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.objectweb.asm.Opcodes.*;
 
@@ -49,7 +48,7 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
     }
 
     @Override
-    public byte[] transform(Class<?> claz, byte[] origin) throws Exception {
+    public byte[] transform(byte[] origin) throws Exception {
         byte[] result = null;
         if (mode == Codes.changeBodyModeUseJavassist) {
             // use javassist, message.body is the method body, a code block starts with { ends with }
@@ -58,7 +57,7 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
             // use asm, message.body is the whole method including signature, like `public void hi {}`
             result = changeBodyByASM(origin);
         }
-        new FileOutputStream("T.class").write(result);
+//        new FileOutputStream("T.class").write(result);
         status = 1;
         return result;
     }
@@ -94,9 +93,6 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
         boolean effect = false;
         String paramDes = paramTypesToDescriptor(paramTypes);
 
-        // A container to collect the outer method insn
-        MethodNode outerNode = new MethodNode(ASM9);
-
         ClassReader cr = new ClassReader(origin);
         ClassReader rcr = null;
 
@@ -119,8 +115,6 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
                         break;
                     }
                 }
-
-
             }
         }
         if (!effect) {
@@ -129,7 +123,7 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
         targetClassNode.accept(classWriter);
         byte[] result = classWriter.toByteArray();
-        new FileOutputStream("T.class").write(result);
+//        new FileOutputStream("T.class").write(result);
         return result;
     }
 

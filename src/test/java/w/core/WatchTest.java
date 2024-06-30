@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import w.Global;
 import w.core.model.WatchTransformer;
+import w.web.message.DecompileMessage;
 import w.web.message.WatchMessage;
 
 import java.lang.instrument.Instrumentation;
@@ -81,7 +82,16 @@ public class WatchTest {
         WatchMessage msg = new WatchMessage();
         msg.setSignature("w.core.WatchTarget#toString");
         Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg));
         System.out.println(new WatchTarget().toString());
+
+        new WatchTarget();
+        DecompileMessage msg2 = new DecompileMessage();
+        msg2.setClassName("w.core.WatchTarget");
+        Assertions.assertTrue(swapper.swap(msg2));
+
     }
 
     @Test

@@ -43,77 +43,11 @@ public class App {
         startHttpd(DEFAULT_HTTP_PORT);
         startWebsocketd(DEFAULT_WEBSOCKET_PORT);
 
-        // 3 start a new compiler server
-        startCompiler();
-
-        // 4 init execInstance
+        // 3 init execInstance
         initExecInstance();
 
-        // 5 task to clean closed ws and related enhancer
+        // 4 task to clean closed ws and related enhancer
         schedule();
-    }
-//
-//    public static void premain(String arg, Instrumentation instrumentation) throws Exception {
-//        agentmain(arg, instrumentation);
-//    }
-
-    public static void startCompiler() {
-        String os = System.getProperty("os.name").toLowerCase();
-        Global.unpackUberJar(Global.getClassLoader());
-        String javaHome = System.getProperty("java.home");
-        String javaBin = javaHome + "/bin/java";
-        String classpath = "";
-        Set<String> cps = new HashSet<>();
-        for (String cp : Global.getClassPaths()) {
-
-            // Windows os need to delete the first /
-            if (os.contains("win") && cp.startsWith("/")) {
-                cp = cp.substring(1);
-            }
-
-            if (cp.endsWith(".jar")) {
-                int pos = cp.lastIndexOf("/") < 0 ? cp.lastIndexOf("\\") : cp.lastIndexOf("/");
-                cp = cp.substring(0, pos + 1) + "*";
-            }
-            if (cp.endsWith(".class")) {
-                continue;
-            }
-            cps.add(cp);
-        }
-        for (String cp : cps) {
-            if (!classpath.isEmpty()) {
-                classpath += File.pathSeparator;
-            }
-            classpath += cp;
-        }
-        classpath += File.pathSeparator + javaHome + "/../lib/tools.jar" + File.pathSeparator + System.getProperty("java.class.path");
-        String className = "w.Compiler";
-        List<String> command = new ArrayList<>();
-        command.add(javaBin);
-        command.add("-cp");
-        command.add(classpath);
-        command.add("-Duser.language=en");
-        command.add("-Dfile.encoding=UTF-8");
-        command.add(className);
-        Global.info(String.format("%s -cp %s -Duser.language=en -Dfile.encoding=UTF-8 %s", javaBin, classpath, className));
-        try {
-            //new jvm process
-            ProcessBuilder builder = new ProcessBuilder(command);
-            Process process = builder.inheritIO().start();
-            Global.info("compiler server started");
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                Global.info("JVM Shutdown Hook: Shutting down child process.");
-                process.destroy();
-                try {
-                    process.waitFor();
-                } catch (InterruptedException e) {
-                    Global.error("Shutdown hook interrupted while waiting for child process to end.");
-                    Thread.currentThread().interrupt();
-                }
-            }));
-        } catch (Exception e) {
-            Global.error("compiler server start error", e);
-        }
     }
 
     private static void startHttpd(int port) throws IOException {

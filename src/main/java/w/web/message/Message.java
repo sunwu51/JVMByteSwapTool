@@ -24,7 +24,9 @@ import java.util.UUID;
         @JsonSubTypes.Type(value = OuterWatchMessage.class, name = "OUTER_WATCH"),
         @JsonSubTypes.Type(value = ExecMessage.class, name = "EXEC"),
         @JsonSubTypes.Type(value = TraceMessage.class, name = "TRACE"),
-        @JsonSubTypes.Type(value = DeleteMessage.class, name = "DELETE")
+        @JsonSubTypes.Type(value = DeleteMessage.class, name = "DELETE"),
+        @JsonSubTypes.Type(value = ResetMessage.class, name = "RESET"),
+        @JsonSubTypes.Type(value = DecompileMessage.class, name = "DECOMPILE"),
 })
 @Data
 public abstract class Message {

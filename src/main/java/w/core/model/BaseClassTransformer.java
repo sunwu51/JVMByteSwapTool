@@ -5,6 +5,7 @@ import lombok.Setter;
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.janino.SimpleCompiler;
 import w.Global;
+import w.util.RequestUtils;
 
 import java.io.IOException;
 import java.lang.instrument.ClassFileTransformer;
@@ -30,7 +31,7 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
 
 
 
-    public abstract byte[] transform(Class<?> className, byte[] origin) throws Exception;
+    public abstract byte[] transform(byte[] origin) throws Exception;
 
     public abstract String desc();
 
@@ -40,8 +41,8 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
         className = className.replace("/", ".");
         if (Objects.equals(this.className, className)) {
             try{
-                byte[] r = transform(classBeingRedefined, origin);
-                Global.info(className + " transformer " + uuid +  " added success <(^－^)>");
+                byte[] r = transform(origin);
+                Global.info(className + " transformer " + uuid +  " added success <(^-^)>");
                 return r;
             } catch (Exception e) {
                 Global.error(className + " transformer " + uuid + " added fail -(′д｀)-: ", e);
