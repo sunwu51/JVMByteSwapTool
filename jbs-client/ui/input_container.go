@@ -219,10 +219,6 @@ func (m InputContainer) Update(msg tea.Msg) (InputContainer, tea.Cmd) {
 		case tea.KeyMsg:
 			// submit enter
 			if m.inputMenu.focusIndex == len(m.inputMenu.inputs) && msg.Type == tea.KeyEnter {
-				if menu[m.chooseMenu.Cursor()].Name == "Reset" {
-					res := request.Reset()
-					return m, tea.Batch(func() tea.Msg { return gotoMainMenu{} }, func() tea.Msg { return request.AppendLogMsg("reset:" + res) })
-				}
 				vals := []string{}
 				for _, inp := range m.inputMenu.inputs {
 					vals = append(vals, inp.Value())

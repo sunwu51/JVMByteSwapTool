@@ -3,9 +3,7 @@ package request
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"net/http"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -42,19 +40,4 @@ func ConnectWebSocket(updateMsgChan chan<- AppendLogMsg) {
 
 func SendMessage(msg string) error {
 	return ws.WriteMessage(websocket.TextMessage, []byte(msg))
-}
-
-func Reset() string {
-	url := fmt.Sprintf("http://%s:%d/reset", Host, HttpPort)
-	resp, err := http.Get(url)
-	if err != nil {
-		log.Panic(err)
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Panic(err)
-	}
-
-	return string(body)
 }

@@ -79,7 +79,7 @@ func ChangeBodyToJSON(params []string) string {
 	m["type"] = "CHANGE_BODY"
 	m["className"] = strings.Split(params[0], "#")[0]
 	m["method"] = strings.Split(params[0], "#")[1]
-	m["paramTypes"] = funk.Map(params[1], func(s string) string {
+	m["paramTypes"] = funk.Map(strings.Split(params[1], ","), func(s string) string {
 		return strings.TrimSpace(s)
 	}).([]string)
 	m["body"] = params[2]
@@ -104,8 +104,22 @@ func ChangeResultToJSON(params []string) string {
 
 func ExecToJSON(params []string) string {
 	m := CommonMap()
-	m["body"] = params[0]
+	m["body"] = `package w;
+import w.Global;
+import w.util.SpringUtils;
+import org.springframework.context.ApplicationContext;
+import java.util.*;
+public class Exec{ 
+  public void exec() {` + params[0] + `}
+}`
 	m["type"] = "EXEC"
+	str, _ := json.Marshal(m)
+	return string(str)
+}
+
+func ResetToJSON(params []string) string {
+	m := CommonMap()
+	m["type"] = "RESET"
 	str, _ := json.Marshal(m)
 	return string(str)
 }
@@ -172,13 +186,15 @@ func init() {
 		Checker   func(s string) bool
 		Value     string
 	}{
-		{"Body", 1, func(s string) bool { return true }, `{
-	try {
-		w.Global.info(w.Global.ognl("#root", ctx));
-	} catch(Exception e) {
-		w.Global.info(e.toString());
-	}
-}`},
+		{"Body", 1, func(s string) bool { return true }, `
+    try {
+	  ApplicationContext ctx = 
+        (ApplicationContext) SpringUtils.getSpringBootApplicationContext();
+      Global.info(Arrays.toString(ctx.getBeanDefinitionNames()));
+    } catch (Exception e) {
+      Global.error(e.toString(), e);
+    }
+`},
 	}, ExecToJSON}
 
 	reset := Function{"Reset", []struct {
@@ -186,7 +202,7 @@ func init() {
 		InputType int
 		Checker   func(s string) bool
 		Value     string
-	}{}, func(s []string) string { return "{}" }}
+	}{}, ResetToJSON}
 
 	menu = []Function{watch, outerWatch, trace, changeBody, changeResult, exec, reset}
 

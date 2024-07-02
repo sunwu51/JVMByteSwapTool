@@ -27,6 +27,14 @@
                 <exclude>META-INF/*.DSA</exclude>
                 <exclude>META-INF/*.RSA</exclude>
                 <exclude>META-INF/*.SF</exclude>
+                <exclude>META-INF/LICENSE</exclude>
+                <exclude>META-INF/versions/**/*</exclude>
+                <exclude>*.md</exclude>
+                <exclude>AUTHORS</exclude>
+                <exclude>LICENSE</exclude>
+                <exclude>*.txt</exclude>
+                <exclude>*.html</exclude>
+                <exclude>*.properties</exclude>
               </excludes>
             </filter>
           </filters>
@@ -88,7 +96,7 @@
       <artifactId>tools</artifactId>
       <version>1.8</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/lib/tools.jar</systemPath>
+      <systemPath>${JAVA8_HOME}/lib/tools.jar</systemPath>
     </dependency>
   </dependencies>
   <properties>

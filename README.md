@@ -5,14 +5,14 @@
 
 A tool that can hot swap the class byte code while jvm is running. Very suitable for `SpringBoot framework`.
 
-Based on the jvm instrumentation tech, javassist lib, JVMTI.
+Based on the jvm instrumentation tech, ASM, javassist and JVMTI.
 
 # Usage
 Download the zip file from the [release](https://github.com/sunwu51/JVMByteSwapTool/releases) page.
 
-Make sure you have a JDK >= 1.8 and should better JDK <= 11, because javassist may not support new language feature util now.
+Make sure you have a JDK >= 1.8.
 ```bash
-$ unzip swapper-<latest-version>.zip
+$ unzip swapper.zip
 
 $ java -jar swapper.jar
 
