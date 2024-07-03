@@ -113,7 +113,7 @@ public class WAdviceAdapter extends AdviceAdapter {
 
     private void formatResult(int printFormat) {
         if (printFormat == 1) {
-            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "toString", "()Ljava/lang/String;", false);
+            mv.visitMethodInsn(INVOKESTATIC, "java/lang/String", "valueOf", "(Ljava/lang/Object;)Ljava/lang/String;", false);
         } else if (printFormat == 2) {
             mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toJson",   "(Ljava/lang/Object;)Ljava/lang/String;", false);
         } else {
