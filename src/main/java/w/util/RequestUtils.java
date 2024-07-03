@@ -1,6 +1,7 @@
 package w.util;
 
 import fi.iki.elonen.NanoWSD;
+import w.core.compiler.WCompiler;
 
 import java.lang.instrument.ClassFileTransformer;
 import java.util.*;
@@ -13,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RequestUtils {
     private final static ThreadLocal<NanoWSD.WebSocket> socketCtx = new ThreadLocal<>();
     private final static ThreadLocal<String> traceIdCtx = new ThreadLocal<>();
-
+    private final static ThreadLocal<Map<String, byte[]>> classNameToByteCode = ThreadLocal.withInitial(HashMap::new);
     public final static Map<String, NanoWSD.WebSocket> traceId2Ws = new ConcurrentHashMap<>();
 
     public static void initRequestCtx(NanoWSD.WebSocket ws, String traceId) {
@@ -27,6 +28,7 @@ public class RequestUtils {
     public static void clearRequestCtx() {
         socketCtx.remove();
         traceIdCtx.remove();
+        classNameToByteCode.remove();
     }
 
     public String getTraceId() {

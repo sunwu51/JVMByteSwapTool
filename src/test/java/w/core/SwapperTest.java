@@ -6,8 +6,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import w.Global;
+import w.core.constant.Codes;
 import w.web.message.*;
 
+import java.io.IOException;
 import java.lang.instrument.Instrumentation;
 import java.util.Arrays;
 
@@ -25,11 +27,15 @@ class SwapperTest {
     R r = new R();
     R2 r2 = new R2();
 
+    WatchTarget target = new WatchTarget();
+
     @BeforeAll
     public static void setUp() throws Exception {
         Instrumentation instrumentation = ByteBuddyAgent.install();
         Global.instrumentation = instrumentation;
         Global.fillLoadedClasses();
+        System.setProperty("maxHit", "3");
+
     }
 
     @BeforeEach
@@ -40,23 +46,48 @@ class SwapperTest {
     @Test
     public void watchTest() {
         WatchMessage watchMessage = new WatchMessage();
-        watchMessage.setSignature("w.core.R#abstractParentMethod");
+
+        watchMessage.setSignature("w.core.Target#voidMethodWithNoParams");
         Assertions.assertTrue(swapper.swap(watchMessage));
-        WatchMessage watchMessage2 = new WatchMessage();
-        watchMessage2.setSignature("w.core.R#interfaceMethod");
-        Assertions.assertTrue(swapper.swap(watchMessage2));
-        WatchMessage watchMessage3 = new WatchMessage();
-        watchMessage3.setSignature("w.core.AbstractService#normalParentMethod");
-        Assertions.assertTrue(swapper.swap(watchMessage3));
-        WatchMessage watchMessage4 = new WatchMessage();
-        watchMessage4.setSignature("w.core.MyInterface#interfaceDefaultMethod");
-        Assertions.assertTrue(swapper.swap(watchMessage4));
-        r.abstractParentMethod();
-        r.interfaceMethod();
-        r.normalParentMethod();
-        r.interfaceDefaultMethod();
-        r2.normalParentMethod();
-        r2.interfaceDefaultMethod();
+        target.voidMethodWithNoParams();
+
+//
+//        watchMessage.setSignature("w.core.MyInterface#interfaceMethod");
+//        Assertions.assertTrue(swapper.swap(watchMessage));
+//
+//        watchMessage = new WatchMessage();
+//        watchMessage.setSignature("w.core.R#interfaceMethod");
+//        Assertions.assertTrue(swapper.swap(watchMessage));
+//
+//
+////        watchMessage = new WatchMessage();
+////        watchMessage.setSignature("w.core.AbstractService#normalParentMethod");
+////        Assertions.assertTrue(swapper.swap(watchMessage));
+//
+////        watchMessage = new WatchMessage();
+////        watchMessage.setSignature("w.core.MyInterface#interfaceDefaultMethod");
+////        Assertions.assertTrue(swapper.swap(watchMessage));
+//
+//        r.abstractParentMethod();
+//        r.interfaceMethod();
+//        r.normalParentMethod();
+//        r.interfaceDefaultMethod();
+//        r2.normalParentMethod();
+//        r2.interfaceDefaultMethod();
+//
+////        WatchMessage watchMessage = new WatchMessage();
+////        watchMessage.setSignature("w.core.TestClass#hello");
+////        Assertions.assertTrue(swapper.swap(watchMessage));
+////        new TestClass().hello("frank", "david", "Smith");
+////        new TestClass().hello("frank", "david", "Smith");
+////        new TestClass().hello("frank", "david", "Smith");
+////        new TestClass().hello("frank", "david", "Smith");
+////        new TestClass().hello("frank", "david", "Smith");
+//
+//        watchMessage = new WatchMessage();
+//        watchMessage.setSignature("w.core.TestClass#generateRandom");
+//        Assertions.assertTrue(swapper.swap(watchMessage));
+//        new TestClass().generateRandom();
     }
 
     @Test
@@ -65,6 +96,9 @@ class SwapperTest {
         message.setSignature("w.core.TestClass#wrapperHello");
         message.setInnerSignature("*#hello");
         Assertions.assertTrue(swapper.swap(message));
+        t.wrapperHello("world");
+        t.wrapperHello("world");
+        t.wrapperHello("world");
         t.wrapperHello("world");
     }
 
@@ -79,17 +113,35 @@ class SwapperTest {
 
     @Test
     public void changeBodyTest() {
+        // javassist test
         ChangeBodyMessage message = new ChangeBodyMessage();
         message.setClassName("w.core.TestClass");
         message.setMethod("wrapperHello");
+        message.setMode(Codes.changeBodyModeUseJavassist);
         message.setParamTypes(Arrays.asList("java.lang.String"));
         message.setBody("{return java.util.UUID.randomUUID().toString();}");
         Assertions.assertTrue(swapper.swap(message));
         Assertions.assertTrue(t.wrapperHello("world").length() > 30);
+        System.out.println(t.wrapperHello("world"));
+
     }
 
     @Test
-    public void changeResultTest() {
+    public void changeBodyAsmTest() {
+        // asm test
+        ChangeBodyMessage message = new ChangeBodyMessage();
+        message.setClassName("w.core.TestClass");
+        message.setMethod("wrapperHello");
+        message.setMode(Codes.changeBodyModeUseASM);
+        message.setParamTypes(Arrays.asList("java.lang.String"));
+        message.setBody("public String wrapperHello(String arg) {return \"arg=\" + arg + \", uuid=\" + java.util.UUID.randomUUID().toString();}");
+        Assertions.assertTrue(swapper.swap(message));
+        Assertions.assertTrue(t.wrapperHello("world").length() > 30);
+        System.out.println(t.wrapperHello("world"));
+    }
+
+    @Test
+    public void changeResultJavassistTest() {
         ChangeResultMessage message = new ChangeResultMessage();
         message.setClassName("w.core.TestClass");
         message.setMethod("wrapperHello");
@@ -102,10 +154,25 @@ class SwapperTest {
     }
 
     @Test
+    public void changeResultASMTest() {
+        ChangeResultMessage message = new ChangeResultMessage();
+        message.setClassName("w.core.TestClass");
+        message.setMethod("wrapperHello");
+        message.setParamTypes(Arrays.asList("java.lang.String"));
+        message.setInnerClassName("*");
+        message.setMode(Codes.changeResultModeUseASM);
+        message.setInnerMethod("hello");
+        message.setBody("public static String replace(){  try {w.Global.readFile(\"3.xml\");} catch(Exception e) {}; return java.util.UUID.randomUUID().toString();}");
+        Assertions.assertTrue(swapper.swap(message));
+        System.out.println(t.wrapperHello("world"));
+        Assertions.assertTrue(t.wrapperHello("world").length() > 30);
+    }
+
+    @Test
     public void execTest() throws Exception {
         ExecMessage message = new ExecMessage();
-        message.setBody("{w.Global.info(\"hello\");}");
-        ExecBundle.changeBodyAndInvoke(0, message.getBody());
+        message.setBody("package w; public class Exec{ public void exec() { w.Global.info(\"hello\");}  }");
+        ExecBundle.changeBodyAndInvoke(message.getBody());
     }
 
     @Test
@@ -130,6 +197,8 @@ class SwapperTest {
 
     @Test
     public void traceRecursiveTest() {
+        System.setProperty("maxHit", "322");
+
         TraceMessage message = new TraceMessage();
         message.setSignature("w.core.R#recursive");
         message.setIgnoreZero(false);
@@ -137,5 +206,13 @@ class SwapperTest {
         for (int i = 0; i < 10; i++) {
             r.recursive(3);
         }
+    }
+
+
+    public String asmTest() {
+        if (1 >= 0) {
+            Global.info(1);
+        }
+        return "1";
     }
 }

@@ -3,14 +3,15 @@ package w.web;
 import fi.iki.elonen.NanoHTTPD;
 import lombok.extern.slf4j.Slf4j;
 import w.Global;
+import w.core.compiler.WCompiler;
 
-import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
-import java.io.FileInputStream;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static fi.iki.elonen.NanoHTTPD.Response.Status.*;
 
@@ -45,6 +46,7 @@ public class Httpd extends NanoHTTPD {
                           Map<String, String> header, Map<String, String> parameters,
                           Map<String, String> files) {
         if (method == Method.GET) {
+            // deprecated, plz use ws reset
             if (uri.equals("/reset")) {
                 Global.reset();
                 return newFixedLengthResponse("ok");
@@ -52,6 +54,7 @@ public class Httpd extends NanoHTTPD {
             return serveFile(uri);
         }
         if (method == Method.POST) {
+            // deprecated, use the ui config port
             switch (uri) {
                 case "/wsPort":
                     return newFixedLengthResponse(Global.wsPort + "");
@@ -71,24 +74,22 @@ public class Httpd extends NanoHTTPD {
             fileName = "/index.html";
         }
         fileName = fileName.startsWith("/") ? fileName : ("/" + fileName);
-        boolean favicon = Objects.equals(fileName, "/favicon.ico");
-        if (favicon) {
-            return newChunkedResponse(OK, "image/x-icon", this.getClass().getResourceAsStream("/nanohttpd" + fileName));
-        }
-        byte[] content = new byte[40960];
+        byte[] content = new byte[409600]; //400k of content
         int len = 0;
-        try (InputStream in = this.getClass().getResourceAsStream("/nanohttpd" + fileName)) {
-            assert in != null;
-            len = in.read(content);
-        } catch (Exception e) {
-//            log.debug("file {} not found in the resource, try to find it from current dir", fileName);
-            try (FileInputStream in = new FileInputStream(fileName.substring(1))) {
-                len = in.read(content);
-            } catch (Exception ex) {
-                return newFixedLengthResponse(NOT_FOUND, NanoHTTPD.MIME_PLAINTEXT, "NOT FOUND");
-            }
-        }
-        return newFixedLengthResponse(OK, NanoHTTPD.MIME_HTML, new String(content, 0, len, StandardCharsets.UTF_8));
 
+        String res = "";
+        try (InputStream in = this.getClass().getResourceAsStream("/nanohttpd" + fileName);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                res = reader.lines().collect(Collectors.joining("\n"));
+        } catch (Exception e) {
+            return newFixedLengthResponse(NOT_FOUND, NanoHTTPD.MIME_PLAINTEXT, "NOT FOUND");
+        }
+        String mimeType = MIME_HTML;
+        if (fileName.endsWith(".js")) {
+            mimeType = "application/javascript";
+        } else if (fileName.endsWith(".css")) {
+            mimeType = "text/css";
+        }
+        return newFixedLengthResponse(OK, mimeType, res);
     }
 }

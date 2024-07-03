@@ -3,6 +3,7 @@ package w.web;
 import w.Global;
 import w.core.ExecBundle;
 import w.core.Swapper;
+import w.core.compiler.WCompiler;
 import w.util.RequestUtils;
 import w.web.message.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -77,7 +78,7 @@ public class Websocketd extends NanoWSD {
                             break;
                         case EXEC:
                             ExecMessage execMessage = (ExecMessage) message;
-                            ExecBundle.changeBodyAndInvoke(execMessage.getMode(), execMessage.getBody());
+                            ExecBundle.changeBodyAndInvoke(execMessage.getBody());
                             break;
                         case DELETE:
                             DeleteMessage deleteMessage = (DeleteMessage) message;
@@ -88,6 +89,10 @@ public class Websocketd extends NanoWSD {
                                     Global.error("delete error:", e);
                                 }
                             }
+                            break;
+                        case RESET:
+                            Global.reset();
+                            Global.info("reset finished");
                             break;
                         default:
                             swapper.swap(message);

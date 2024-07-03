@@ -82,6 +82,12 @@ public class Global {
      */
     public static Map<String, AtomicInteger> hitCounter = new ConcurrentHashMap<>();
 
+    public static Set<String> ignoreTraceMethods = new HashSet<String>() {{
+        add("<init>");
+        add("toString");
+        add("append");
+    }};
+
     /**
      * OgnlContext inited at static code block
      */
@@ -261,6 +267,7 @@ public class Global {
         transformers.removeIf(it -> {
             if (it.getUuid().equals(uuid)) {
                 it.setStatus(-1);
+                it.clear();
                 instrumentation.removeTransformer(it);
                 for (Class<?> aClass : allLoadedClasses.getOrDefault(it.getClassName(), new HashSet<>())) {
                     try {

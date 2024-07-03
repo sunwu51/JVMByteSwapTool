@@ -18,6 +18,7 @@ public class ChangeResultMessage extends Message implements RequestMessage {
     String innerClassName;
     String innerMethod;
     String body;
+    int mode;
     {
         type = MessageType.CHANGE_RESULT;
     }

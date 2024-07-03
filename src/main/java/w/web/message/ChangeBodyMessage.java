@@ -16,6 +16,7 @@ public class ChangeBodyMessage extends Message implements RequestMessage {
     String method;
     List<String> paramTypes;
     String body;
+    int mode = 1;
     {
         type = MessageType.CHANGE_BODY;
     }

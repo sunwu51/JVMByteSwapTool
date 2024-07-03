@@ -39,6 +39,9 @@ public class Swapper {
                 case TRACE:
                     transformer = new TraceTransformer((TraceMessage) message);
                     break;
+                case DECOMPILE:
+                    transformer = new DecompileTransformer((DecompileMessage) message);
+                    break;
                 default:
                     Global.error("type not support");
                     throw new RuntimeException("message type not support");
@@ -57,7 +60,7 @@ public class Swapper {
         }
 
         Global.addTransformer(transformer);
-        Global.debug("add transformer finish, will retrans class");
+        Global.debug("add transformer" + transformer.getUuid() +" finish, will retrans class");
 
 
         for (Class<?> aClass : classes) {
