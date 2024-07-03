@@ -128,6 +128,10 @@
 							<pattern>com.fasterxml.jackson</pattern>
 							<shadedPattern>wshade.com.fasterxml.jackson</shadedPattern>
 						</relocation>
+						<relocation>
+							<pattern>org.objectweb.asm</pattern>
+							<shadedPattern>wshade.org.objectweb.asm</shadedPattern>
+						</relocation>
 					</relocations>
 				</configuration>
 				<executions>
