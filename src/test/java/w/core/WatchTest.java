@@ -11,6 +11,7 @@ import w.web.message.DecompileMessage;
 import w.web.message.WatchMessage;
 
 import java.lang.instrument.Instrumentation;
+import java.util.Arrays;
 
 /**
  * @author Frank
@@ -79,6 +80,21 @@ public class WatchTest {
 
     @Test
     public void toStringTest() {
+        WatchMessage msg = new WatchMessage();
+        msg.setSignature("w.core.WatchTarget#arrayReturn1");
+        Assertions.assertTrue(swapper.swap(msg));
+        System.out.println(Arrays.toString(new WatchTarget().arrayReturn1()));
+
+        new WatchTarget();
+        WatchMessage msg2 = new WatchMessage();
+        msg2.setSignature("w.core.WatchTarget#arrayReturn2");
+        Assertions.assertTrue(swapper.swap(msg2));
+        System.out.println(Arrays.toString(new WatchTarget().arrayReturn2()));
+
+    }
+
+    @Test
+    public void returnArrTest() {
         WatchMessage msg = new WatchMessage();
         msg.setSignature("w.core.WatchTarget#toString");
         Assertions.assertTrue(swapper.swap(msg));
