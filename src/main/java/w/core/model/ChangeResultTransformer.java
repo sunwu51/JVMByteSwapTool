@@ -1,7 +1,6 @@
 package w.core.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import fi.iki.elonen.NanoHTTPD;
 import javassist.CannotCompileException;
 import javassist.CtClass;
 import javassist.CtMethod;
@@ -20,9 +19,9 @@ import w.web.message.ChangeResultMessage;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-import static fi.iki.elonen.NanoHTTPD.Response.Status.NOT_FOUND;
 import static org.objectweb.asm.Opcodes.*;
 
 /**
@@ -63,12 +62,9 @@ public class ChangeResultTransformer extends BaseClassTransformer {
             // use javassist $_=xxx to change result
             result = changeResultByJavassist(origin);
         } else if (mode == Codes.changeResultModeUseASM) {
-            // use asm, will create a new dynamic class with a method contains the code
-            // then the origin code will be replaced by the dynamic method
+            // use asm
             result = changeResultByASM(origin);
         }
-        new FileOutputStream("T.class").write(result);
-
         status = 1;
         return result;
     }
@@ -109,27 +105,12 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         return result;
     }
 
-
     private byte[] changeResultByASM(byte[] origin) throws CompileException, IOException {
-
-        String paramDes = paramTypesToDescriptor(paramTypes);
-        // A container to collect the outer method insn
-        MethodNode outerNode = new MethodNode(ASM9);
-
         ClassReader cr = new ClassReader(origin);
-        cr.accept(new ClassVisitor(Opcodes.ASM9) {
-            @Override
-            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                if (name.equals(method) && descriptor.startsWith(paramDes)) {
-                    return outerNode;
-                }
-                return null;
-            }
-        }, ClassReader.EXPAND_FRAMES);
-
-
-        MethodNode replacementNode = null;
-        String desc = null;
+        ClassNode classNode = new ClassNode();
+        cr.accept(classNode, ClassReader.EXPAND_FRAMES);
+        MethodNode[] nodes  = getOuterAndReplacementMethodNode(classNode);
+        MethodNode outerNode = nodes[0], replacementNode = nodes[1];
         // replace the innerMethod with the replacement
         InsnList list = new InsnList();
         int curMaxLocals = outerNode.maxLocals;
@@ -139,51 +120,21 @@ public class ChangeResultTransformer extends BaseClassTransformer {
                 if (mnode.name.equals(innerMethod) && (
                         mnode.owner.replace("/", ".").equals(innerClassName) || "*".equals(innerClassName))
                 ) {
-                    if (desc == null || desc.equals(mnode.desc)) {
-                        desc = mnode.desc;
-                    } else {
-                        throw new IllegalStateException("Matched method descriptor more than once");
-                    }
-//                    Type[] types = Type.getArgumentTypes(mnode.desc);
-//                    for (int i = types.length - 1; i >= 0; i--) {
-//                        if (types[i] == Type.DOUBLE_TYPE || types[i] == Type.LONG_TYPE) {
-//                            list.add(new InsnNode(POP2));
-//                        } else {
-//                            list.add(new InsnNode(POP));
-//                        }
-//                    }
-//                    switch (mnode.getOpcode()) {
-//                        case INVOKEVIRTUAL:
-//                        case INVOKEINTERFACE:
-//                        case INVOKESPECIAL:
-//                            list.add(new InsnNode(POP));
-//                            break;
-//                        case INVOKESTATIC:
-//                            break;
-//                        default:
-//                            throw new IllegalStateException("Not supported method invocation type: " + mnode.getOpcode());
-//                    }
-                    boolean isStatic = (mnode.getOpcode() & ACC_STATIC) > 0;
-                    replacementNode = replacementNode == null ?
-                            getReplacementMethodNode(isStatic, mnode.owner, mnode.desc) : replacementNode;
-
-                    transArgsToVars(replacementNode.desc, curMaxLocals, list);
-//
-//                    if (isStatic) {
-//                        transArgsToVars(replacementNode.desc, curMaxLocals, list);
-//                    } else {
-//                        transArgsToVars(replacementNode.desc, ++curMaxLocals, list);
-//                        list.add(new VarInsnNode(ASTORE, curMaxLocals - 1)); // this
-//                    }
-                    int resVarIndex = curMaxLocals + Type.getArgumentCount(replacementNode.desc) - 1;
-
-
+                    int[] indexes = transArgsToVars(replacementNode.desc, curMaxLocals, list);
+                    int resVarIndex = indexes[indexes.length - 1];
                     Map<LabelNode, LabelNode> labels = new HashMap<>();
+                    // clone all labels
                     for (AbstractInsnNode repInsn : replacementNode.instructions) {
                         if (repInsn instanceof LabelNode) labels.put((LabelNode) repInsn, new LabelNode());
                     }
+                    LabelNode endLabel = new LabelNode();
+                    // clone every node in replacement, ignore linenumber, return.
                     for (AbstractInsnNode repInsn : replacementNode.instructions) {
-                        if (repInsn instanceof LineNumberNode || repInsn.getOpcode() == RETURN) continue;
+                        if (repInsn instanceof LineNumberNode) continue;
+                        if (repInsn.getOpcode() == RETURN) {
+                            list.add(new JumpInsnNode(GOTO, endLabel));
+                            continue;
+                        }
                         if (repInsn instanceof LabelNode) {
                             LabelNode t = labels.get(repInsn);
                             list.add(t);
@@ -191,54 +142,94 @@ public class ChangeResultTransformer extends BaseClassTransformer {
                         }
                         if (repInsn instanceof VarInsnNode) {
                             VarInsnNode newInsn = (VarInsnNode)repInsn.clone(labels);
-                            newInsn.var += curMaxLocals - 1;
+                            newInsn.var += curMaxLocals;
                             list.add(newInsn);
                             continue;
                         }
                         if (repInsn instanceof IincInsnNode) {
                             IincInsnNode newInsn = (IincInsnNode)repInsn.clone(labels);
-                            newInsn.var += curMaxLocals - 1;
+                            newInsn.var += curMaxLocals;
                             list.add(newInsn);
                             continue;
                         }
+                        if (repInsn instanceof MethodInsnNode) {
+                            MethodInsnNode cur = (MethodInsnNode) repInsn;
+                            // $proceed(); will call the original method
+                            if (cur.owner.equals("w/InlineWrapper") && cur.name.equals("$proceed")) {
+                                Type[] argumentTypes = Type.getArgumentTypes(replacementNode.desc);
+                                for (int i = 0; i < argumentTypes.length - 1; i++) {
+                                    list.add(loadVar(argumentTypes[i], indexes[i]));
+                                }
+                                list.add(instruction.clone(null));
+                                continue;
+                            }
+                        }
                         list.add(repInsn.clone(labels));
                     }
-                    list.add(new VarInsnNode(DLOAD, resVarIndex));
+                    list.add(endLabel);
+                    // push the result to stack
+                    Type resType = Type.getReturnType(mnode.desc);
+                    list.add(loadVar(resType, resVarIndex));
+                    // update maxLocals for the next inline process
                     curMaxLocals +=  replacementNode.maxLocals;
+                    // add try-catch
+                    replacementNode.tryCatchBlocks.stream().map(it -> new TryCatchBlockNode(
+                            labels.get(it.start), labels.get(it.end), labels.get(it.handler),
+                            it.type
+                    )).forEach(b -> {
+                        if (outerNode.tryCatchBlocks == null) {
+                            outerNode.tryCatchBlocks = new ArrayList<>();
+                        }
+                        outerNode.tryCatchBlocks.add(b);
+                    });
                     continue;
                 }
             }
             list.add(instruction);
         }
-        final MethodNode rnode = replacementNode;
-
-        if (rnode == null) {
-            throw new IllegalArgumentException("Inner method not found");
-        }
+        outerNode.instructions.clear();
+        outerNode.instructions.add(list);
         // Create a class writer to modify the class
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
-        cr.accept(new ClassVisitor(Opcodes.ASM9, classWriter) {
-            @Override
-            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
-                if (name.equals(method) && descriptor.startsWith(paramDes)) {
-                    return new MethodVisitor(ASM9, mv) {
-                        @Override
-                        public void visitCode() {
-                            list.accept(mv);
-                            if (rnode.tryCatchBlocks != null) {
-                                rnode.tryCatchBlocks.forEach(a->{
-                                    a.accept(mv);
-                                });
-                            }
-                        }
-                    };
-                }
-                return mv;
-            }
-        }, ClassReader.EXPAND_FRAMES);
+        classNode.accept(classWriter);
         byte[] result = classWriter.toByteArray();
         return result;
+    }
+
+    private MethodNode[] getOuterAndReplacementMethodNode(ClassNode classNode) throws CompileException, IOException {
+        String paramDes = paramTypesToDescriptor(paramTypes);
+        Optional<MethodNode> outerNodeOpt = classNode.methods.stream()
+                .filter(it->it.name.equals(method) && it.desc.startsWith(paramDes)).findFirst();
+
+        if (!outerNodeOpt.isPresent()) {
+            throw new IllegalArgumentException("Method " + method + paramDes + " not declared here");
+        }
+        MethodNode outerNode = outerNodeOpt.get();
+        // check
+        Set<String> distinctMethod = new HashSet<>();
+        AtomicReference<MethodInsnNode> methodInsnRef = new AtomicReference<>();
+        Arrays.stream(outerNode.instructions.toArray()).forEach(it -> {
+            if (it instanceof MethodInsnNode) {
+                MethodInsnNode item = (MethodInsnNode) it;
+                if (item.name.equals(innerMethod) && (
+                        item.owner.replace("/", ".").equals(innerClassName) || "*".equals(innerClassName))
+                ) {
+                    String methodCode = item.getOpcode() + "#" + item.owner + "#" + item.name + "#" + item.desc;
+                    distinctMethod.add(methodCode);
+                    methodInsnRef.compareAndSet(null, item);
+                    if (distinctMethod.size() > 1 ) {
+                        throw new IllegalArgumentException("Multi methods match the " + innerClassName + "#" + innerMethod + ", " +
+                                "which have different owner/desc");
+                    }
+                }
+            }
+        });
+        if (distinctMethod.isEmpty()) {
+            throw new IllegalArgumentException("No methods match the *#" + innerMethod);
+        }
+        MethodInsnNode methodInsn = methodInsnRef.get();
+        MethodNode replacementNode = getReplacementMethodNode(methodInsn.getOpcode() == INVOKESTATIC, methodInsn.owner, methodInsn.desc);
+        return new MethodNode[]{outerNode, replacementNode};
     }
 
     private static byte[] compile(boolean staticMethod, String owner, String desc, String body) throws CompileException, IOException {
@@ -249,10 +240,7 @@ public class ChangeResultTransformer extends BaseClassTransformer {
 
         StringBuilder fields_placeholder = new StringBuilder();
         StringBuilder args_placeholder = new StringBuilder();
-        StringBuilder args_process_placeholder = new StringBuilder();
 
-        String className = owner.replace("/", ".");
-        String packageName = className.substring(0, className.lastIndexOf("."));
         if (!staticMethod) {
             args_placeholder.append(owner.replace("/", ".")).append(" $0,");
         }
@@ -272,16 +260,12 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         String sourceCode = template.replace("{{fields_placeholder}}", fields_placeholder)
                 .replace("{{args_placeholder}}", args_placeholder)
                 .replace("{{body_placeholder}}", body)
-                .replace("{{package_placeholder}}", "package " + packageName + ";");
+                .replace("{{package_placeholder}}", "package w;")
+                .replace("{{return_type}}", returnType.getClassName())
                 ;
-        ;
 
         byte[] res = WCompiler.compileWholeClass(sourceCode);
         return res;
-    }
-
-    public static void main(String[] args) throws CompileException, IOException {
-        compile(false, "w/Global","(ILjava/lang/String;JLjava/lang/Object;)D", "{$_ = $1+$2.length()+$3 + $4.hashCode();}");
     }
 
     private static String getTemplate() {
@@ -297,25 +281,33 @@ public class ChangeResultTransformer extends BaseClassTransformer {
 
 
     private MethodNode getReplacementMethodNode(boolean isStatic, String owner, String descriptor) throws CompileException, IOException {
-        MethodNode replacementNode = new MethodNode(ASM9);
         ClassReader rcr = new ClassReader(compile(isStatic, owner, descriptor, message.getBody()));
         // A container to collect the injection method insn
-        rcr.accept(new ClassVisitor(Opcodes.ASM9) {
-            @Override
-            public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                if (name.equals("replace")) {
-                    replacementNode.desc = descriptor;
-                    return replacementNode;
-                }
-                return null;
-            }
-        }, ClassReader.EXPAND_FRAMES);
-
-        return replacementNode;
+        ClassNode classNode = new ClassNode();
+        rcr.accept(classNode, ClassReader.EXPAND_FRAMES);
+        return classNode.methods.stream().filter(it -> it.name.equals("replace")).findFirst().get();
     }
 
-    private static void transArgsToVars(String desc, int curMaxLocals, InsnList enList) {
+    private int[] transArgsToVars(String desc, int offset, InsnList enList) {
         Type[] argumentTypes = Type.getArgumentTypes(desc);
+
+        // indexes is the index of the argument mapping.
+        // well for the argumentTypes, a[0]=`this` a[1]=arg1 ... a[last]=returnValue
+        // the variableOffset shouldn't use the index from 0, because of inline, need add an offset
+        int[] indexes = new int[argumentTypes.length];
+        indexes[0] = offset;
+        int curLen = argumentTypes[0].getSize();
+        for (int i = 1; i < argumentTypes.length; i++) {
+            indexes[i] = indexes[i - 1] + curLen;
+            curLen = argumentTypes[i].getSize();
+        }
+        // reverse pop
+        // the last argument is the return value of original method. Assign a default value 0/null
+        for (AbstractInsnNode _t : storeVarWithDefaultValue(
+                argumentTypes[indexes.length - 1], indexes[indexes.length - 1])) {
+            enList.add(_t);
+        }
+        // the other arguments now in the top of stack, pop each one to a localVariable
         for (int i = argumentTypes.length - 2; i >= 0; i--) {
             Type t = argumentTypes[i];
             switch (t.getSort()) {
@@ -324,25 +316,26 @@ public class ChangeResultTransformer extends BaseClassTransformer {
                 case Type.BYTE:
                 case Type.BOOLEAN:
                 case Type.CHAR:
-                    enList.add(new VarInsnNode(ISTORE, curMaxLocals + i));
+                    enList.add(new VarInsnNode(ISTORE, indexes[i]));
                     break;
                 case Type.FLOAT:
-                    enList.add(new VarInsnNode(FSTORE, curMaxLocals + i));
+                    enList.add(new VarInsnNode(FSTORE, indexes[i]));
                     break;
                 case Type.DOUBLE:
-                    enList.add(new VarInsnNode(DSTORE, curMaxLocals + i));
+                    enList.add(new VarInsnNode(DSTORE, indexes[i]));
                     break;
                 case Type.LONG:
-                    enList.add(new VarInsnNode(LSTORE, curMaxLocals + i));
+                    enList.add(new VarInsnNode(LSTORE, indexes[i]));
                     break;
                 case Type.ARRAY:
                 case Type.OBJECT:
-                    enList.add(new VarInsnNode(ASTORE, curMaxLocals + i));
+                    enList.add(new VarInsnNode(ASTORE, indexes[i]));
                     break;
                 default:
                     throw new RuntimeException("Unsupport type");
             }
         }
+        return indexes;
     }
 
     public boolean equals(Object other) {
@@ -351,10 +344,9 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         }
         return false;
     }
+
     @Override
     public String desc() {
         return "ChangeResult_" + getClassName() + "#" + method + " " + paramTypes;
     }
-
-
 }
