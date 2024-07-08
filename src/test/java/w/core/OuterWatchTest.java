@@ -67,7 +67,8 @@ public class OuterWatchTest {
         msg.setSignature("w.core.WatchTarget#subMethodCallExp");
         msg.setInnerSignature("*#readFile");
         Assertions.assertTrue(swapper.swap(msg));
-        target.doubleMethodWithParams();
+        target.doubleMethodWithParams(0.1);
+
     }
 
     @Test
@@ -76,7 +77,7 @@ public class OuterWatchTest {
         msg.setSignature("w.core.WatchTarget#doubleMethodWithParams");
         msg.setPrintFormat(2);
         Assertions.assertTrue(swapper.swap(msg));
-        target.doubleMethodWithParams();
+        target.doubleMethodWithParams(0.1);
     }
     @Test
     public void toStringTest() {

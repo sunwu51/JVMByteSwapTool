@@ -72,7 +72,7 @@ public class ChangeResultTest {
         msg.setParamTypes(Arrays.asList());
         msg.setInnerMethod("getName");
         msg.setInnerClassName("*");
-        msg.setBody("{return \"10086\";}");
+        msg.setBody("{$_= \"10086\";}");
         Assertions.assertTrue(swapper.swap(msg));
         System.out.println(target.hello());
 
