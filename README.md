@@ -25,11 +25,7 @@ Visit this url `http://localhost:8000` then you will get the following Web UI.
 
 Now you can enjoy the functionalities of swapper tool. 
 
-For example, `Watch` some methods
-
-![image](https://i.imgur.com/JGW0JCv.png)
-
-Trigger this method, and then the params and return value and execution time cost will be printed. 
+For example, `Watch` some methods. Trigger this method, and then the params and return value and execution time cost will be printed. 
 
 ![image](https://i.imgur.com/RaEZ1w5.png)
 
