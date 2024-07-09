@@ -42,10 +42,11 @@ public class ChangeResultTest {
         msg.setParamTypes(Arrays.asList("int", "int"));
         msg.setInnerMethod("add");
         msg.setInnerClassName("*");
-        msg.setBody("{$_=10086;}");
+        msg.setBody("{try { $_ = 0;} catch (Exception e) {$_ = 1;}}");
         Assertions.assertTrue(swapper.swap(msg));
         System.out.println(target.addWrapper(1,1));
     }
+
 
     @Test
     public void asmTest() throws IOException, InterruptedException {
@@ -56,7 +57,7 @@ public class ChangeResultTest {
         msg.setParamTypes(Arrays.asList("int", "int"));
         msg.setInnerMethod("add");
         msg.setInnerClassName("*");
-        msg.setBody("{return 10086;}");
+        msg.setBody("try { $_ = 100 /(int)$_; } catch (Exception e) {w.Global.error(\"error\", e);$_ = 33;}");
         Assertions.assertTrue(swapper.swap(msg));
         System.out.println(target.addWrapper(1,1));
 
@@ -71,7 +72,7 @@ public class ChangeResultTest {
         msg.setParamTypes(Arrays.asList());
         msg.setInnerMethod("getName");
         msg.setInnerClassName("*");
-        msg.setBody("{return \"10086\";}");
+        msg.setBody("{$_= \"10086\";}");
         Assertions.assertTrue(swapper.swap(msg));
         System.out.println(target.hello());
 

@@ -132,6 +132,10 @@
 							<pattern>org.objectweb.asm</pattern>
 							<shadedPattern>wshade.org.objectweb.asm</shadedPattern>
 						</relocation>
+						<relocation>
+							<pattern>org.codehaus</pattern>
+							<shadedPattern>wshade.org.codehaus</shadedPattern>
+						</relocation>
 					</relocations>
 				</configuration>
 				<executions>

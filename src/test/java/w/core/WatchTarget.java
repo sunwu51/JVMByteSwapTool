@@ -109,6 +109,14 @@ public class WatchTarget implements Runnable {
         return fib(n - 1) + fib(n - 2);
     }
 
+    public int[] arrayReturn1() {
+        return new int[]{1,2};
+    }
+
+
+    public String[] arrayReturn2() {
+        return new String[]{"1"};
+    }
 
     public int ow1(int a, int b) {
         return ow1(a + b);

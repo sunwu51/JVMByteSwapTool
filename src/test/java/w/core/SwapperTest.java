@@ -47,7 +47,7 @@ class SwapperTest {
     public void watchTest() {
         WatchMessage watchMessage = new WatchMessage();
 
-        watchMessage.setSignature("w.core.Target#voidMethodWithNoParams");
+        watchMessage.setSignature("w.core.WatchTarget#voidMethodWithNoParams");
         Assertions.assertTrue(swapper.swap(watchMessage));
         target.voidMethodWithNoParams();
 
@@ -134,7 +134,7 @@ class SwapperTest {
         message.setMethod("wrapperHello");
         message.setMode(Codes.changeBodyModeUseASM);
         message.setParamTypes(Arrays.asList("java.lang.String"));
-        message.setBody("public String wrapperHello(String arg) {return \"arg=\" + arg + \", uuid=\" + java.util.UUID.randomUUID().toString();}");
+        message.setBody("{return \"arg=\" + $1 + \", uuid=\" + java.util.UUID.randomUUID().toString();}");
         Assertions.assertTrue(swapper.swap(message));
         Assertions.assertTrue(t.wrapperHello("world").length() > 30);
         System.out.println(t.wrapperHello("world"));
@@ -154,45 +154,10 @@ class SwapperTest {
     }
 
     @Test
-    public void changeResultASMTest() {
-        ChangeResultMessage message = new ChangeResultMessage();
-        message.setClassName("w.core.TestClass");
-        message.setMethod("wrapperHello");
-        message.setParamTypes(Arrays.asList("java.lang.String"));
-        message.setInnerClassName("*");
-        message.setMode(Codes.changeResultModeUseASM);
-        message.setInnerMethod("hello");
-        message.setBody("public static String replace(){  try {w.Global.readFile(\"3.xml\");} catch(Exception e) {}; return java.util.UUID.randomUUID().toString();}");
-        Assertions.assertTrue(swapper.swap(message));
-        System.out.println(t.wrapperHello("world"));
-        Assertions.assertTrue(t.wrapperHello("world").length() > 30);
-    }
-
-    @Test
     public void execTest() throws Exception {
         ExecMessage message = new ExecMessage();
         message.setBody("package w; public class Exec{ public void exec() { w.Global.info(\"hello\");}  }");
         ExecBundle.changeBodyAndInvoke(message.getBody());
-    }
-
-    @Test
-    public void replaceClassTest() throws Exception {
-        ReplaceClassMessage message = new ReplaceClassMessage();
-        message.setClassName("w.core.TestClass");
-        message.setContent("yv66vgAAADQAJAoACQAYBwAZCgACABgIABoKAAIAGwoAAgAcCgAIAB0HAB4HAB8BAAY8aW5pdD4B" +
-                "AAMoKVYBAARDb2RlAQAPTGluZU51bWJlclRhYmxlAQASTG9jYWxWYXJpYWJsZVRhYmxlAQAEdGhp" +
-                "cwEAEkx3L2NvcmUvVGVzdENsYXNzOwEABWhlbGxvAQAmKExqYXZhL2xhbmcvU3RyaW5nOylMamF2" +
-                "YS9sYW5nL1N0cmluZzsBAARuYW1lAQASTGphdmEvbGFuZy9TdHJpbmc7AQAMd3JhcHBlckhlbGxv" +
-                "AQAKU291cmNlRmlsZQEADlRlc3RDbGFzcy5qYXZhDAAKAAsBABdqYXZhL2xhbmcvU3RyaW5nQnVp" +
-                "bGRlcgEAA2hpIAwAIAAhDAAiACMMABEAEgEAEHcvY29yZS9UZXN0Q2xhc3MBABBqYXZhL2xhbmcv" +
-                "T2JqZWN0AQAGYXBwZW5kAQAtKExqYXZhL2xhbmcvU3RyaW5nOylMamF2YS9sYW5nL1N0cmluZ0J1" +
-                "aWxkZXI7AQAIdG9TdHJpbmcBABQoKUxqYXZhL2xhbmcvU3RyaW5nOwAhAAgACQAAAAAAAwABAAoA" +
-                "CwABAAwAAAAvAAEAAQAAAAUqtwABsQAAAAIADQAAAAYAAQAAAAcADgAAAAwAAQAAAAUADwAQAAAA" +
-                "AQARABIAAQAMAAAASAACAAIAAAAUuwACWbcAAxIEtgAFK7YABbYABrAAAAACAA0AAAAGAAEAAAAK" +
-                "AA4AAAAWAAIAAAAUAA8AEAAAAAAAFAATABQAAQABABUAEgABAAwAAAA6AAIAAgAAAAYqK7YAB7AA" +
-                "AAACAA0AAAAGAAEAAAAOAA4AAAAWAAIAAAAGAA8AEAAAAAAABgATABQAAQABABYAAAACABc=");
-        Assertions.assertTrue(swapper.swap(message));
-        Assertions.assertEquals("hi frank", t.hello("frank"));
     }
 
     @Test

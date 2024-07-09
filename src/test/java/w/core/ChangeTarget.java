@@ -24,6 +24,10 @@ public class ChangeTarget implements Runnable {
     }
 
     public double addWrapper(int a, int b) throws IOException, InterruptedException {
+        // this a
+        // var6 = double(b) var5 = a var4 = this
+        // var14 = double(100)
+        // 0this 1a 2b 3this 4a 5b 6x
         return add(a, b) + 10000.0;
     }
 

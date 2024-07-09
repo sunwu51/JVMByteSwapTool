@@ -78,10 +78,6 @@ public class WAdviceAdapter extends AdviceAdapter {
     protected int asmStoreRetString(MethodVisitor mv, String descriptor, int printFormat, int returnValueVarIndex) {
         Type returnType = Type.getReturnType(descriptor);
         switch (returnType.getSort()) {
-            case Type.ARRAY:
-                mv.visitInsn(DUP);
-                mv.visitMethodInsn(INVOKESTATIC, "java/util/Arrays", "toString", "([Ljava/lang/Object;)Ljava/lang/String;", false);
-                break;
             case Type.DOUBLE:
             case Type.LONG:
                 mv.visitInsn(DUP2);
@@ -98,6 +94,7 @@ public class WAdviceAdapter extends AdviceAdapter {
                 box(returnType);
                 formatResult(printFormat);
                 break;
+            case Type.ARRAY:
             case Type.OBJECT:
                 mv.visitInsn(DUP);
                 formatResult(printFormat);
@@ -109,7 +106,6 @@ public class WAdviceAdapter extends AdviceAdapter {
         mv.visitVarInsn(ASTORE, returnValueVarIndex);
         return returnValueVarIndex;
     }
-
 
     private void formatResult(int printFormat) {
         if (printFormat == 1) {

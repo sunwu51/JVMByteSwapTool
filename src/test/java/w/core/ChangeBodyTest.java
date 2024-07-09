@@ -38,8 +38,9 @@ public class ChangeBodyTest {
         ChangeBodyMessage msg = new ChangeBodyMessage();
         msg.setClassName("w.core.ChangeTarget");
         msg.setMethod("getName");
+        msg.setMode(0);
         msg.setParamTypes(Arrays.asList());
-        msg.setBody("{w.Global.readFile(\"pom.xml2\");  return \"newName\";}");
+        msg.setBody("{ return \"newName\";}");
         Assertions.assertTrue(swapper.swap(msg));
         System.out.println(target.getName());
     }
