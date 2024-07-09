@@ -37,10 +37,9 @@ public class ExecuteTest {
 
 
     @Test
-    public void test() throws InvocationTargetException, NoSuchMethodException, IllegalAccessException {
-//        ExecMessage msg = new ExecMessage();
-//        msg.setBody("{System.out.println(\"Hello Swapper!\");}");
-//        Assertions.assertTrue(swapper.swap(msg));
-//        ExecBundle.invoke();
+    public void test() throws Exception {
+        ExecMessage message = new ExecMessage();
+        message.setBody("package w; public class Exec{ public void exec() { w.Global.info(\"hello\");}  }");
+        ExecBundle.changeBodyAndInvoke(message.getBody());
     }
 }
