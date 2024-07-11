@@ -120,7 +120,13 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
         if (!effect) {
             throw new IllegalArgumentException("Method not declared here.");
         }
-        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS) {
+            @Override
+            protected ClassLoader getClassLoader() {
+                return Global.getClassLoader();
+            }
+        };
+        
         targetClassNode.accept(classWriter);
         byte[] result = classWriter.toByteArray();
 //        new FileOutputStream("T.class").write(result);

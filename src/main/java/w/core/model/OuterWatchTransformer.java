@@ -50,7 +50,12 @@ public class OuterWatchTransformer extends BaseClassTransformer {
     @Override
     public byte[] transform(byte[] origin) throws Exception {
         ClassReader classReader = new ClassReader(origin);
-        ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES) {
+            @Override
+            protected ClassLoader getClassLoader() {
+                return Global.getClassLoader();
+            }
+        };
 
         classReader.accept(new ClassVisitor(ASM9, classWriter) {
             @Override

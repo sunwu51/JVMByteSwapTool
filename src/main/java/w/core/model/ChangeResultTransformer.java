@@ -190,7 +190,13 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         outerNode.instructions.clear();
         outerNode.instructions.add(list);
         // Create a class writer to modify the class
-        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS) {
+            @Override
+            protected ClassLoader getClassLoader() {
+                return Global.getClassLoader();
+            }
+        };
+        
         classNode.accept(classWriter);
         byte[] result = classWriter.toByteArray();
         return result;
