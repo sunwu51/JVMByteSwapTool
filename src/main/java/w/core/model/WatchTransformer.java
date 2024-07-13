@@ -148,49 +148,6 @@ public class WatchTransformer extends BaseClassTransformer {
         return result;
     }
 
-    private void addWatchCodeToMethod(CtMethod ctMethod) throws CannotCompileException, NotFoundException {
-        ctMethod.addLocalVariable("startTime", CtClass.longType);
-        ctMethod.addLocalVariable("endTime", CtClass.longType);
-        ctMethod.addLocalVariable("duration", CtClass.longType);
-        ctMethod.addLocalVariable("req", Global.classPool.get("java.lang.String"));
-        ctMethod.addLocalVariable("res", Global.classPool.get("java.lang.String"));
-        ctMethod.insertBefore("startTime = System.currentTimeMillis();");
-        ctMethod.insertBefore("w.Global.checkCountAndUnload(\"" + uuid + "\");\n");
-
-        StringBuilder afterCode = new StringBuilder("{\n")
-                .append("endTime = System.currentTimeMillis();\n")
-                .append("duration = endTime - startTime;\n");
-
-        afterCode.append("if (duration>=").append(minCost).append(") {\n");
-        StringBuilder catchCode = new StringBuilder("{\n");
-        if (printFormat == 1) {
-            afterCode.append("req = Arrays.toString($args);");
-            afterCode.append("res = \"\" + $_;");
-            catchCode.append("String req = Arrays.toString($args);");
-        } else if (printFormat == 2) {
-            afterCode.append("req = w.Global.toJson($args);");
-            afterCode.append("res = w.Global.toJson(($w)$_);");
-            catchCode.append("String req = w.Global.toJson($args);");
-        } else {
-            afterCode.append("req = w.Global.toString($args);");
-            afterCode.append("res = w.Global.toString(($w)$_);");
-            catchCode.append("String req = w.Global.toString($args);");
-        }
-        afterCode.append("w.util.RequestUtils.fillCurThread(\"").append(message.getId()).append("\");")
-                .append("w.Global.info(\"cost:\"+duration+\"ms,req:\"+req+\",res:\"+res);")
-                .append("w.util.RequestUtils.clearRequestCtx();")
-                .append("}");
-        afterCode.append("}");
-        catchCode.append("w.util.RequestUtils.fillCurThread(\"").append(message.getId()).append("\");")
-                .append("w.Global.info(\"req:\"+req+\",exception:\"+$e); throw $e;")
-                .append("w.util.RequestUtils.clearRequestCtx();")
-                .append("}");
-        ctMethod.insertAfter(afterCode.toString());
-        if (Global.nonVerifying) {
-            ctMethod.addCatch(catchCode.toString(), Global.classPool.get("java.lang.Throwable"));
-        }
-    }
-
     public boolean equals(Object other) {
         if (other instanceof WatchTransformer) {
             return this.uuid.equals(((WatchTransformer) other).getUuid());

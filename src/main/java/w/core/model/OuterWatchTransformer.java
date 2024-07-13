@@ -102,9 +102,6 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
                             returnValueVarIndex = asmStoreRetString(mv, descriptor, printFormat);
 
-//                            postProcess(false);
-
-
                             // long duration = System.currentTimeMillis() - start;
                             int durationVarIndex = asmCalculateCost(mv, startTimeVarIndex);
 
@@ -142,20 +139,6 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             mv.visitVarInsn(Opcodes.ASTORE, exceptionStringIndex);
 
                             postProcess(true);
-//                            int durationVarIndexInCatch = asmCalculateCost(mv, startTimeVarIndex);
-//                            List<SbNode> listInCatch = new ArrayList<SbNode>();
-//                            listInCatch.add(new SbNode("line:" + line + ", req: "));
-//                            listInCatch.add(new SbNode(ALOAD, paramsVarIndex));
-//                            listInCatch.add(new SbNode(", throw: "));
-//                            listInCatch.add(new SbNode(ALOAD, exceptionStringIndex));
-//                            listInCatch.add(new SbNode(", cost: "));
-//                            listInCatch.add(new SbNode(LLOAD, durationVarIndexInCatch));
-//                            listInCatch.add(new SbNode("ms"));
-//                            asmGenerateStringBuilder(mv, listInCatch);
-//                            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "info", "(Ljava/lang/Object;)V", false);
-//                            /*---------------------counter: if reach the limitation will remove the transformer----------------*/
-//                            mv.visitLdcInsn(uuid.toString());
-//                            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "checkCountAndUnload", "(Ljava/lang/String;)V", false);
                             mv.visitVarInsn(Opcodes.ALOAD, exceptionIndex);
                             mv.visitInsn(Opcodes.ATHROW);
                             Label catchEnd = new Label();
@@ -191,73 +174,10 @@ public class OuterWatchTransformer extends BaseClassTransformer {
             }
         }, ClassReader.EXPAND_FRAMES);
         byte[] result = classWriter.toByteArray();
-//        new FileOutputStream("T.class").write(result);
         status = 1;
         return result;
     }
 
-    private void addOuterWatchCodeToMethod(CtMethod ctMethod) throws CannotCompileException, NotFoundException {
-        ctMethod.instrument(new ExprEditor() {
-            public void edit(MethodCall m) throws CannotCompileException {
-                if (m.getMethodName().equals(innerMethod)) {
-                    if (innerClassName.equals("*") || m.getClassName().equals(innerClassName)) {
-                        String code = "{" +
-                                "w.Global.checkCountAndUnload(\"" + uuid + "\");\n" +
-                                "long start = System.currentTimeMillis();" +
-                                "String req = null;" +
-                                "String res = null;" +
-                                "Throwable t = null;" +
-                                "try {" +
-                                "    $_ = $proceed($$);" +
-                                "} catch (Throwable e) {" +
-                                "   t = e;" +
-                                "   throw e;" +
-                                "} finally {" +
-                                "long duration = System.currentTimeMillis() - start;" +
-                                "int printFormat = " + printFormat +";" +
-                                "if (printFormat == 1) {" +
-                                "   req = Arrays.toString($args);" +
-                                "   res = \"\" + $_;" +
-                                "} else if (printFormat == 2) {" +
-                                "req = w.Global.toJson($args);" +
-                                "res = w.Global.toJson(($w)$_);" +
-                                "} else {" +
-                                "   req = w.Global.toString($args);" +
-                                "   res = w.Global.toString(($w)$_);" +
-                                "}"  +
-                                "w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");" +
-                                "w.Global.info(\"line" + m.getLineNumber() + ",cost:\"+duration+\"ms,req:\"+req+\",res:\"+res+\",exception:\"+t);" +
-                                "w.util.RequestUtils.clearRequestCtx();" +
-                                "}}";
-                     if (!Global.nonVerifying) {
-                         code = "{" +
-                                 "long start = System.currentTimeMillis();" +
-                                 "$_ = $proceed($$);" +
-                                 "long duration = System.currentTimeMillis() - start;" +
-                                 "String req = null;" +
-                                 "String res = null;" +
-                                 "int printFormat = " + printFormat +";" +
-                                 "if (printFormat == 1) {" +
-                                 "   req = Arrays.toString($args);" +
-                                 "   res = \"\" + $_;" +
-                                 "} else if (printFormat == 2) {" +
-                                 "req = w.Global.toJson($args);" +
-                                 "res = w.Global.toJson(($w)$_);" +
-                                 "} else {" +
-                                 "   req = w.Global.toString($args);" +
-                                 "   res = w.Global.toString(($w)$_);" +
-                                 "}"  +
-                                 "w.util.RequestUtils.fillCurThread(\"" + message.getId() + "\");" +
-                                 "w.Global.info(\"line" + m.getLineNumber() + ",cost:\"+duration+\"ms,req:\"+req+\",res:\"+res);" +
-                                 "w.util.RequestUtils.clearRequestCtx();" +
-                                 "}";
-                     }
-                     m.replace(code);
-                    }
-                }
-            }
-        });
-    }
     public boolean equals(Object other) {
         if (other instanceof OuterWatchTransformer) {
             return this.uuid.equals(((OuterWatchTransformer) other).getUuid());

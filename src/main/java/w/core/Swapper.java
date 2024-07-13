@@ -55,7 +55,9 @@ public class Swapper {
 
         boolean classExists = false;
         for (Class<?> aClass : classes) {
-            if (aClass.isInterface() || Modifier.isAbstract(aClass.getModifiers())) {
+            if (transformer instanceof DecompileTransformer) {
+                // Decompile needn't check abstract
+            } else if (aClass.isInterface() || Modifier.isAbstract(aClass.getModifiers())) {
                 Set<String> candidates = new HashSet<>();
                 for (Object instances : Global.getInstances(aClass)) {
                     candidates.add(instances.getClass().getName());
