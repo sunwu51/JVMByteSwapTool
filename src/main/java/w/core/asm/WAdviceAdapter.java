@@ -16,6 +16,14 @@ public class WAdviceAdapter extends AdviceAdapter {
         super(api, methodVisitor, access, name, descriptor);
     }
 
+    /**
+     * get current milliseconds
+     *
+     *  long startTime = System.currentTimeMillis();
+     *
+     * @param mv
+     * @return the start time variable index
+     */
     protected int asmStoreStartTime(MethodVisitor mv) {
         mv.visitMethodInsn(INVOKESTATIC, "java/lang/System", "currentTimeMillis", "()J", false);
         int startTimeVarIndex = newLocal(Type.LONG_TYPE);
@@ -23,6 +31,15 @@ public class WAdviceAdapter extends AdviceAdapter {
         return startTimeVarIndex;
     }
 
+    /**
+     * calculate the cost, return cost variable index
+     *
+     *  long duration = System.currentTimeMillis() - startTime;
+     *
+     * @param mv
+     * @param startTimeVarIndex
+     * @return the duration time variable index
+     */
     protected int asmCalculateCost(MethodVisitor mv, int startTimeVarIndex) {
         mv.visitMethodInsn(INVOKESTATIC, "java/lang/System", "currentTimeMillis", "()J", false);
         mv.visitVarInsn(LLOAD, startTimeVarIndex);
@@ -32,6 +49,19 @@ public class WAdviceAdapter extends AdviceAdapter {
         return durationVarIndex;
     }
 
+    /**
+     * params to string and return the string variable index
+     *
+     *  Object[] array = new Object[] {arg1, arg2, arg3...};
+     *  String paramsVar = null;
+     *  if (printFormat == 1)  paramsVar =  Arrays.toString(array);
+     *  else if (printFormat == 2) paramsVar = Global.toJson(array);
+     *  else paramsVar = Global.toString(array);
+     *
+     * @param mv
+     * @param printFormat 1 toString 2 toJson 3 toPrettyString
+     * @return the paramsVar index
+     */
     protected int asmStoreParamsString(MethodVisitor mv, int printFormat) {
         loadArgArray();
         if (printFormat == 1) {
@@ -47,6 +77,14 @@ public class WAdviceAdapter extends AdviceAdapter {
     }
 
 
+    /**
+     * sub method params to string and return the string variable index, similar to asmStoreParamsString
+     * but for the sub method
+     * @param mv
+     * @param printFormat
+     * @param descriptor
+     * @return
+     */
     protected int asmSubCallStoreParamsString(MethodVisitor mv, int printFormat, String descriptor) {
         int _i = subCallParamsToArray(descriptor);
         mv.visitVarInsn(ALOAD, _i);
@@ -75,6 +113,14 @@ public class WAdviceAdapter extends AdviceAdapter {
         return asmStoreRetString(mv, descriptor, printFormat, returnValueVarIndex);
     }
 
+    /**
+     * return value toString and store in local variable
+     * @param mv
+     * @param descriptor
+     * @param printFormat
+     * @param returnValueVarIndex given local variable index
+     * @return
+     */
     protected int asmStoreRetString(MethodVisitor mv, String descriptor, int printFormat, int returnValueVarIndex) {
         Type returnType = Type.getReturnType(descriptor);
         switch (returnType.getSort()) {
@@ -117,6 +163,11 @@ public class WAdviceAdapter extends AdviceAdapter {
         }
     }
 
+    /**
+     * similar process with loadArgArray, but for sub method params
+     * @param descriptor
+     * @return
+     */
     private int subCallParamsToArray(String descriptor) {
         Type[] argumentTypes = Type.getArgumentTypes(descriptor);
         int[] loads = new int[argumentTypes.length];
@@ -187,6 +238,11 @@ public class WAdviceAdapter extends AdviceAdapter {
         return result;
     }
 
+    /**
+     * generate StringBuilder and append method, after method, the stringBuilder address will at the top of stack
+     * @param mv
+     * @param list
+     */
     protected void asmGenerateStringBuilder(MethodVisitor mv, List<SbNode> list) {
         if (list == null || list.isEmpty()) {
             return;

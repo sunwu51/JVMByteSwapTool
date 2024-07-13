@@ -15,12 +15,9 @@ import w.core.constant.Codes;
 import w.web.message.ChangeBodyMessage;
 
 import java.io.ByteArrayInputStream;
-import java.io.FileOutputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-
-import static org.objectweb.asm.Opcodes.*;
 
 /**
  * @author Frank
@@ -57,7 +54,6 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
             // use asm, message.body is the whole method including signature, like `public void hi {}`
             result = changeBodyByASM(origin);
         }
-//        new FileOutputStream("T.class").write(result);
         status = 1;
         return result;
     }
@@ -120,10 +116,15 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
         if (!effect) {
             throw new IllegalArgumentException("Method not declared here.");
         }
-        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
+        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS) {
+            @Override
+            protected ClassLoader getClassLoader() {
+                return Global.getClassLoader();
+            }
+        };
+        
         targetClassNode.accept(classWriter);
         byte[] result = classWriter.toByteArray();
-//        new FileOutputStream("T.class").write(result);
         return result;
     }
 

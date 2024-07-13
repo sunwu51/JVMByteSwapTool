@@ -14,8 +14,6 @@ import static org.objectweb.asm.Opcodes.ASM9;
 
 @Data
 public class TraceTransformer extends BaseClassTransformer {
-//    public static ThreadLocal<Map<String, int[]>> traceContent = ThreadLocal.withInitial(LinkedHashMap::new);
-//    public static ThreadLocal<Integer> stackDeep = ThreadLocal.withInitial(()->1);
 
     public static ThreadLocal<Map<String, TraceCtx>> traceCtx = ThreadLocal.withInitial(HashMap::new);
 
@@ -39,7 +37,12 @@ public class TraceTransformer extends BaseClassTransformer {
     @Override
     public byte[] transform(byte[] origin) throws Exception {
         ClassReader classReader = new ClassReader(origin);
-        ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES) {
+            @Override
+            protected ClassLoader getClassLoader() {
+                return Global.getClassLoader();
+            }
+        };
         AtomicBoolean effect = new AtomicBoolean();
         classReader.accept(new ClassVisitor(ASM9, classWriter) {
             @Override
