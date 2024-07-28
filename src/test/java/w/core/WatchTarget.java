@@ -93,7 +93,7 @@ public class WatchTarget implements Runnable {
     }
 
     public String callManyMethod() {
-        for (int i = 0; i <10; i++) {
+        for (int i = 0; i < 10; i++) {
             sleep(1);
             System.out.println("name=" + getName());
         }

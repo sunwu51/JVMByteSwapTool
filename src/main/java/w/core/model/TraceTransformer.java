@@ -1,6 +1,5 @@
 package w.core.model;
 
-import java.io.FileOutputStream;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -102,9 +101,6 @@ public class TraceTransformer extends BaseClassTransformer {
                         mv.visitLdcInsn("line" + line + "," + owner.replace("/", ".") + "#" + name);
                         mv.visitVarInsn(LLOAD, localDurationIndex);
                         mv.visitMethodInsn(INVOKESTATIC, "w/core/model/TraceTransformer", "subTrace", "(Ljava/lang/String;Ljava/lang/String;J)V", false);
-                        /*---------------------counter: if reach the limitation will remove the transformer----------------*/
-                        mv.visitLdcInsn(uuid.toString());
-                        mv.visitMethodInsn(INVOKESTATIC, "w/Global", "checkCountAndUnload", "(Ljava/lang/String;)V", false);
                     }
                 };
             }
@@ -170,6 +166,6 @@ public class TraceTransformer extends BaseClassTransformer {
 
     public static class TraceCtx {
         int stackDeep = 1;
-        Map<String, int[]> traceContent = new HashMap<>();
+        Map<String, int[]> traceContent = new LinkedHashMap<>();
     }
 }
