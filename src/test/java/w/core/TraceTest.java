@@ -41,6 +41,7 @@ public class TraceTest {
         target.name = "test";
         target.callManyMethod();
         target.callManyMethod();
+        Assertions.assertTrue(TraceTransformer.traceCtx.get().isEmpty());
     }
 
     @Test

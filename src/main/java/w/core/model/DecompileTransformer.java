@@ -36,7 +36,7 @@ public class DecompileTransformer extends BaseClassTransformer {
 
     @Override
     public byte[] transform(byte[] origin) throws Exception {
-        String sourceCode = WCompiler.decompile(className, origin);
+        String sourceCode = WCompiler.decompile(origin);
         Global.info("/* " + className + " source code: */\n" + sourceCode);
         CompletableFuture.runAsync(() -> Global.deleteTransformer(uuid));
         return origin;

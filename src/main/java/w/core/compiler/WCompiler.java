@@ -1,19 +1,17 @@
 package w.core.compiler;
 
-import com.strobel.assembler.metadata.ArrayTypeLoader;
-import com.strobel.decompiler.Decompiler;
-import com.strobel.decompiler.DecompilerSettings;
-import com.strobel.decompiler.PlainTextOutput;
-import javassist.CannotCompileException;
-import javassist.CtClass;
-import javassist.NotFoundException;
+import org.benf.cfr.reader.api.CfrDriver;
+import org.benf.cfr.reader.api.OutputSinkFactory;
+import org.benf.cfr.reader.bytecode.analysis.parse.utils.Pair;
+import org.benf.cfr.reader.state.ClassFileSourceImpl;
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.janino.SimpleCompiler;
 import w.Global;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * @author Frank
@@ -67,41 +65,36 @@ public class WCompiler {
 
     /**
      * Decompile a class
-     * @param className
      * @param byteCode
      * @return
      */
-    public static String decompile(String className, byte[] byteCode) {
-        String desc = className.replace(".", "/");
-        ArrayTypeLoader typeLoader = new ArrayTypeLoader(byteCode);
-        DecompilerSettings settings = DecompilerSettings.javaDefaults();
-        settings.setTypeLoader(typeLoader);
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        try (PrintWriter writer = new PrintWriter(outputStream)) {
-            Decompiler.decompile(desc, new PlainTextOutput(writer), settings);
-        }
-        return outputStream.toString();
+    public static String decompile(byte[] byteCode) {
+        StringBuilder sb = new StringBuilder();
+        OutputSinkFactory outputSinkFactory = new OutputSinkFactory() {
+            @Override
+            public List<SinkClass> getSupportedSinks(SinkType sinkType, Collection<SinkClass> collection) {
+                return new ArrayList<SinkClass>() { { add(SinkClass.STRING); }};
+            }
+            @Override
+            public <T> Sink<T> getSink(SinkType sinkType, SinkClass sinkClass) {
+                return sinkable -> sb.append(sinkable.toString()).append('\n');
+            }
+        };
+        CfrDriver driver = new CfrDriver.Builder()
+                .withClassFileSource(new ClassFileSourceImpl(null) {
+                    @Override
+                    public Pair<byte[], String> getClassFileContent(String path) throws IOException {
+                        if (path.equals("tmp.class")) {
+                            return Pair.make(byteCode, path);
+                        }
+                        return null;
+                    }
+                })
+                .withOutputSink(outputSinkFactory).build();
+        List<String> tmp = new ArrayList<>();
+        tmp.add("tmp.class");
+        driver.analyse(tmp);
+        String res = sb.toString();
+        return res.substring(!res.contains(" */\n") ? 0 : res.indexOf(" */\n") + 3);
     }
-
-    /**
-     * original class file content
-     * @param className
-     * @return
-     * @throws NotFoundException
-     * @throws IOException
-     * @throws CannotCompileException
-     */
-    public static String decompile(String className) throws NotFoundException, IOException, CannotCompileException {
-        String desc = className.replace(".", "/");
-        CtClass ctClass = Global.classPool.get(className);
-        ArrayTypeLoader typeLoader = new ArrayTypeLoader(ctClass.toBytecode());
-        DecompilerSettings settings = DecompilerSettings.javaDefaults();
-        settings.setTypeLoader(typeLoader);
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        try (PrintWriter writer = new PrintWriter(outputStream)) {
-            Decompiler.decompile(desc, new PlainTextOutput(writer), settings);
-        }
-        return outputStream.toString();
-    }
-
 }

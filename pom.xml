@@ -30,12 +30,12 @@
 			<version>2.2.0</version>
 		</dependency>
 
-		<!-- https://mvnrepository.com/artifact/org.bitbucket.mstrobel/procyon-compilertools -->
 		<dependency>
-			<groupId>org.bitbucket.mstrobel</groupId>
-			<artifactId>procyon-compilertools</artifactId>
-			<version>0.6.0</version>
+			<groupId>org.benf</groupId>
+			<artifactId>cfr</artifactId>
+			<version>0.152</version>
 		</dependency>
+
 		<!-- https://mvnrepository.com/artifact/org.ow2.asm/asm-commons -->
 		<dependency>
 			<groupId>org.ow2.asm</groupId>
