@@ -87,7 +87,7 @@ public class Websocketd extends NanoWSD {
                                 Global.info((evalMessage.getBody().startsWith("!") ?
                                         "$ " + evalMessage.getBody().substring(1) : "groovy > " + evalMessage.getBody()) + "\n> " + res);
                             } catch (Exception e) {
-                                Global.info(e.toString());
+                                Global.error(e.toString(), e);
                             }
                             break;
                         case DELETE:

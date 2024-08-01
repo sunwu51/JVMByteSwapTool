@@ -3,15 +3,20 @@ package w.core;
 import groovy.lang.GroovyClassLoader;
 import lombok.Data;
 import org.codehaus.groovy.jsr223.GroovyScriptEngineImpl;
+import w.Global;
 import w.util.SpringUtils;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import static w.Attach.currentUrl;
 
 /**
  * @author Frank
@@ -19,16 +24,35 @@ import java.util.concurrent.TimeUnit;
  */
 @Data
 public class GroovyBundle {
+    static WGroovyClassLoader cl;
     static GroovyScriptEngineImpl engine;
     static {
-        engine = new GroovyScriptEngineImpl(new GroovyClassLoader(w.Global.getClassLoader()));
-
-        if (SpringUtils.isSpring()) {
-            engine.put("ctx", SpringUtils.getSpringBootApplicationContext());
+        if (!GroovyBundle.class.getClassLoader().toString().startsWith(WGroovyClassLoader.class.getName())) {
+            try {
+                engine = new GroovyScriptEngineImpl(new GroovyClassLoader());
+                Global.info("Groovy Engine Initialization finished");
+                if (SpringUtils.isSpring()) {
+                    engine.put("ctx", SpringUtils.getSpringBootApplicationContext());
+                }
+            } catch (Exception e) {
+                Global.error("Could not load Groovy Engine", e);
+            }
+        } else {
+            try {
+                cl = new WGroovyClassLoader(Global.getClassLoader());
+            } catch (Exception e) {
+                Global.error("Could not init Groovy Classloader", e);
+            }
         }
     }
 
     public static Object eval(String script) throws Exception {
+        if (cl != null) {
+            Thread.currentThread().setContextClassLoader(cl);
+            Class<?> bundle = cl.loadClass(GroovyBundle.class.getName());
+            return bundle.getDeclaredMethod("eval", String.class).invoke(null, script);
+        }
+
         if (script.startsWith("!")) {
             return executeCmd(Arrays.asList(script.substring(1).split(" ")));
         } else {
@@ -77,7 +101,19 @@ public class GroovyBundle {
         return process.waitFor(10, TimeUnit.SECONDS) ? sb.toString() : "timeout";
     }
 
-    public static void main(String[] args) throws Exception {
-        System.out.println(GroovyBundle.executeCmd(Arrays.asList("ls")));
+    public static class WGroovyClassLoader extends URLClassLoader {
+
+        public WGroovyClassLoader(ClassLoader parent) throws Exception {
+            super(new URL[] { currentUrl() }, parent);
+        }
+        @Override
+        public Class<?> loadClass(String name) throws ClassNotFoundException {
+            if (name.startsWith("org.apache.groovy") || name.startsWith("org.codehaus.groovy") || name.startsWith("groovy") || name.startsWith("w.core.GroovyBundle")) {
+                Class<?> c = findLoadedClass(name);
+                if (c != null) return c;
+                return findClass(name);
+            }
+            return super.loadClass(name);
+        }
     }
 }

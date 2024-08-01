@@ -1,7 +1,7 @@
 package w;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import groovy.json.JsonOutput;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import javassist.ClassPool;
 import ognl.*;
 import w.core.model.BaseClassTransformer;
@@ -76,6 +76,9 @@ public class Global {
      * Change the default value by environment variable $HIT_COUNT
      */
     public static Map<String, AtomicInteger> hitCounter = new ConcurrentHashMap<>();
+
+
+    public static final ObjectMapper mapper = new ObjectMapper();
 
     public static Set<String> ignoreTraceMethods = new HashSet<String>() {{
         add("<init>");
@@ -199,7 +202,7 @@ public class Global {
      */
     public static String toJson(Object obj) throws JsonProcessingException {
         try {
-            return JsonOutput.prettyPrint(JsonOutput.toJson(obj));
+            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(obj);
         } catch (Exception e) {
             Global.error("re transform error:", e);
             return "toJson error";

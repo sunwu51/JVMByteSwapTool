@@ -21,7 +21,7 @@ import java.util.Scanner;
  */
 public class Attach {
     public static void main(String[] args) throws Exception {
-        if (!Attach.class.getClassLoader().toString().startsWith(WClassLoader.namePrefix)) {
+        if (!Attach.class.getClassLoader().toString().startsWith(WClassLoader.class.getName())) {
             String jdkVersion = System.getProperty("java.version");
             if (jdkVersion.startsWith("1.")) {
                 if (jdkVersion.startsWith("1.8")) {
@@ -113,7 +113,7 @@ public class Attach {
         return toolsJarUrl;
     }
 
-    private static URL currentUrl() throws Exception {
+    public static URL currentUrl() throws Exception {
         ProtectionDomain domain = Attach.class.getProtectionDomain();
         CodeSource codeSource = domain.getCodeSource();
         return codeSource.getLocation();

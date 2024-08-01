@@ -54,11 +54,6 @@
 			<artifactId>janino</artifactId>
 			<version>3.1.12</version>
 		</dependency>
-		<dependency>
-			<groupId>org.javassist</groupId>
-			<artifactId>javassist</artifactId>
-			<version>3.29.2-GA</version>
-		</dependency>
 		<!-- https://mvnrepository.com/artifact/ognl/ognl -->
 		<dependency>
 			<groupId>ognl</groupId>
