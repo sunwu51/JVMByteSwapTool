@@ -16,19 +16,18 @@ import java.util.HashMap;
  */
 @Data
 public class ExecBundle {
+    private static final String EXEC_CLASS = "w.Exec";
     static Object inst;
 
     static {
         try {
-            Class<?> c = new ExecClassLoader(w.Global.getClassLoader()).loadClass("w.Exec");
+            Class<?> c = new ExecClassLoader(w.Global.getClassLoader()).loadClass(EXEC_CLASS);
             inst = c.newInstance();
             Global.fillLoadedClasses();
         } catch (Throwable e) {
             e.printStackTrace();
         }
     }
-
-    private static final String EXEC_CLASS = "w.Exec";
 
     public static void invoke() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         Global.info("start to invoke");
@@ -52,14 +51,14 @@ public class ExecBundle {
     private static void clear() {
         // remove the old transformer
         Global.activeTransformers
-                .getOrDefault("w.Exec", new HashMap<>()).values().forEach(baseClassTransformers -> {
+                .getOrDefault(EXEC_CLASS, new HashMap<>()).values().forEach(baseClassTransformers -> {
                     baseClassTransformers.forEach(transformer -> {
                         Global.instrumentation.removeTransformer(transformer);
                         Global.transformers.remove(transformer);
                     });
                 });
         Global.activeTransformers
-                .getOrDefault("w.Exec", new HashMap<>()).clear();
+                .getOrDefault(EXEC_CLASS, new HashMap<>()).clear();
     }
 
     public static class ExecClassLoader extends ClassLoader {
@@ -69,13 +68,13 @@ public class ExecBundle {
 
         @Override
         public Class<?> loadClass(String name) throws ClassNotFoundException {
-            if (!name.equals("w.Exec")) {
+            if (!name.equals(EXEC_CLASS)) {
                 return super.loadClass(name);
             }
             FileInputStream f;
             try {
                 byte[] bytes = WCompiler.compileWholeClass("package w; public class Exec { public void exec() {} }");
-                return defineClass("w.Exec", bytes, 0, bytes.length);
+                return defineClass(EXEC_CLASS, bytes, 0, bytes.length);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

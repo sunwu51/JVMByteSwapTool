@@ -77,6 +77,21 @@
 			<version>2.13.5</version>
 		</dependency>
 		<dependency>
+			<groupId>org.apache.groovy</groupId>
+			<artifactId>groovy</artifactId>
+			<version>4.0.22</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.groovy</groupId>
+			<artifactId>groovy-json</artifactId>
+			<version>4.0.22</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.groovy</groupId>
+			<artifactId>groovy-jsr223</artifactId>
+			<version>4.0.22</version>
+		</dependency>
+		<dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>5.8.1</version>
@@ -133,8 +148,8 @@
 							<shadedPattern>wshade.org.objectweb.asm</shadedPattern>
 						</relocation>
 						<relocation>
-							<pattern>org.codehaus</pattern>
-							<shadedPattern>wshade.org.codehaus</shadedPattern>
+							<pattern>org.codehaus.janino</pattern>
+							<shadedPattern>wshade.org.codehaus.janino</shadedPattern>
 						</relocation>
 					</relocations>
 				</configuration>

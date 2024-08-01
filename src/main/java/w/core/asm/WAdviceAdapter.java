@@ -90,10 +90,8 @@ public class WAdviceAdapter extends AdviceAdapter {
         mv.visitVarInsn(ALOAD, _i);
         if (printFormat == 1) {
             mv.visitMethodInsn(INVOKESTATIC, "java/util/Arrays", "toString", "([Ljava/lang/Object;)Ljava/lang/String;", false);
-        } else if (printFormat == 2) {
-            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toJson", "(Ljava/lang/Object;)Ljava/lang/String;", false);
         } else {
-            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toString", "(Ljava/lang/Object;)Ljava/lang/String;", false);
+            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toJson", "(Ljava/lang/Object;)Ljava/lang/String;", false);
         }
         int paramsVarIndex = newLocal(Type.getType(String.class));
         mv.visitVarInsn(ASTORE, paramsVarIndex);
@@ -156,10 +154,8 @@ public class WAdviceAdapter extends AdviceAdapter {
     private void formatResult(int printFormat) {
         if (printFormat == 1) {
             mv.visitMethodInsn(INVOKESTATIC, "java/lang/String", "valueOf", "(Ljava/lang/Object;)Ljava/lang/String;", false);
-        } else if (printFormat == 2) {
-            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toJson",   "(Ljava/lang/Object;)Ljava/lang/String;", false);
         } else {
-            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toString", "(Ljava/lang/Object;)Ljava/lang/String;", false);
+            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toJson",   "(Ljava/lang/Object;)Ljava/lang/String;", false);
         }
     }
 

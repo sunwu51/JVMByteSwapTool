@@ -27,6 +27,7 @@ import java.util.UUID;
         @JsonSubTypes.Type(value = DeleteMessage.class, name = "DELETE"),
         @JsonSubTypes.Type(value = ResetMessage.class, name = "RESET"),
         @JsonSubTypes.Type(value = DecompileMessage.class, name = "DECOMPILE"),
+        @JsonSubTypes.Type(value = EvalMessage.class, name = "EVAL"),
 })
 @Data
 public abstract class Message {

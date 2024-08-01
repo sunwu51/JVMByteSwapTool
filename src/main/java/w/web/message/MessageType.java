@@ -34,4 +34,7 @@ public enum MessageType {
     DECOMPILE,
 
     RESET,
+
+    EVAL,
+
 }

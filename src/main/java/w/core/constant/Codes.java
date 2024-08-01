@@ -9,8 +9,6 @@ public class Codes {
 
     public static int printFormatForToJson = 2;
 
-    public static int printFormatForToPretty = 3;
-
     public static int changeBodyModeUseJavassist = 0;
 
     public static int changeBodyModeUseASM = 1;

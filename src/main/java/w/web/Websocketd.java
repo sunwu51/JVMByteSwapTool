@@ -2,8 +2,8 @@ package w.web;
 
 import w.Global;
 import w.core.ExecBundle;
+import w.core.GroovyBundle;
 import w.core.Swapper;
-import w.core.compiler.WCompiler;
 import w.util.RequestUtils;
 import w.web.message.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -79,6 +79,16 @@ public class Websocketd extends NanoWSD {
                         case EXEC:
                             ExecMessage execMessage = (ExecMessage) message;
                             ExecBundle.changeBodyAndInvoke(execMessage.getBody());
+                            break;
+                        case EVAL:
+                            EvalMessage evalMessage = (EvalMessage) message;
+                            try {
+                                Object res = GroovyBundle.eval(evalMessage.getBody());
+                                Global.info((evalMessage.getBody().startsWith("!") ?
+                                        "$ " + evalMessage.getBody().substring(1) : "groovy > " + evalMessage.getBody()) + "\n> " + res);
+                            } catch (Exception e) {
+                                Global.info(e.toString());
+                            }
                             break;
                         case DELETE:
                             DeleteMessage deleteMessage = (DeleteMessage) message;
