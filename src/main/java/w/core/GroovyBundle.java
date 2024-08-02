@@ -27,7 +27,7 @@ public class GroovyBundle {
     static WGroovyClassLoader cl;
     static GroovyScriptEngineImpl engine;
     static {
-        if (!GroovyBundle.class.getClassLoader().toString().startsWith(WGroovyClassLoader.class.getName())) {
+        if (GroovyBundle.class.getClassLoader().toString().startsWith(WGroovyClassLoader.class.getName())) {
             try {
                 engine = new GroovyScriptEngineImpl(new GroovyClassLoader());
                 Global.info("Groovy Engine Initialization finished");
