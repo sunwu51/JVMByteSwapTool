@@ -146,6 +146,10 @@
 							<pattern>org.codehaus.janino</pattern>
 							<shadedPattern>wshade.org.codehaus.janino</shadedPattern>
 						</relocation>
+						<relocation>
+							<pattern>org.codehaus.commons.compiler</pattern>
+							<shadedPattern>wshade.org.codehaus.commons.compiler</shadedPattern>
+						</relocation>
 					</relocations>
 				</configuration>
 				<executions>
