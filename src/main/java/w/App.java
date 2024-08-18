@@ -3,10 +3,7 @@ package w;
 import java.io.*;
 import java.lang.instrument.Instrumentation;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -40,8 +37,30 @@ public class App {
         SpringUtils.initFromLoadedClasses();
 
         // 2 start http and websocket server
-        startHttpd(DEFAULT_HTTP_PORT);
-        startWebsocketd(DEFAULT_WEBSOCKET_PORT);
+
+        String workingDir = System.getProperty("user.dir");
+        String configFilePath = workingDir + File.separator + "swapConfig.properties";
+        File configFile = new File(configFilePath);
+        if (configFile.exists()) {
+            System.out.println("Reading configuration file");
+            Properties properties = new Properties();
+            try (FileInputStream fis = new FileInputStream(configFile)) {
+                properties.load(fis);
+                // Read configuration, customize ports
+                Integer customHttpPort = Integer.parseInt(properties.getProperty("CUSTOM_HTTP_PORT",Integer.valueOf(DEFAULT_HTTP_PORT).toString()));
+                Integer customWebsocketPort = Integer.parseInt(properties.getProperty("CUSTOM_WEBSOCKET_PORT",Integer.valueOf(DEFAULT_WEBSOCKET_PORT).toString()));
+
+                startHttpd(customHttpPort);
+                startWebsocketd(customWebsocketPort);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+        }else {
+            startHttpd(DEFAULT_HTTP_PORT);
+            startWebsocketd(DEFAULT_WEBSOCKET_PORT);
+        }
+
 
         // 3 init execInstance
         initExecInstance();
