@@ -11,6 +11,7 @@ import w.Global;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 
 /**
@@ -81,6 +82,10 @@ public class WCompiler {
             }
         };
         CfrDriver driver = new CfrDriver.Builder()
+                // fix: 中文显示为Unicode
+                .withOptions(new HashMap<String, String>() {{
+                    put("hideutf", "false");
+                }})
                 .withClassFileSource(new ClassFileSourceImpl(null) {
                     @Override
                     public Pair<byte[], String> getClassFileContent(String path) throws IOException {
