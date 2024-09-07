@@ -40,8 +40,8 @@ public class App {
         SpringUtils.initFromLoadedClasses();
 
         // 2 start http and websocket server
-        startHttpd(DEFAULT_HTTP_PORT);
-        startWebsocketd(DEFAULT_WEBSOCKET_PORT);
+        startHttpd();
+        startWebsocketd();
 
         // 3 init execInstance
         initExecInstance();
@@ -50,31 +50,23 @@ public class App {
         schedule();
     }
 
-    private static void startHttpd(int port) throws IOException {
-        if (port > 8100) {
-            System.err.println("Httpd start failed " + port);
-            throw new IOException("Httpd start failed");
+    private static void startHttpd() throws IOException {
+        int port = DEFAULT_HTTP_PORT;
+        if (System.getProperty("http_port") != null) {
+            port = Integer.parseInt(System.getProperty("http_port"));
         }
-        try {
-            new Httpd(port).start(5000, false);
-            System.out.println("Http server start at port "+ port);
-        } catch (IOException e) {
-            startHttpd(port + 1);
-        }
+        new Httpd(port).start(5000, false);
+        System.out.println("Http server start at port "+ port);
     }
 
-    private static void startWebsocketd(int port) throws IOException {
-        if (port > 18100) {
-            System.err.println("Websocketd start failed");
-            throw new IOException("Websocketd start failed");
+    private static void startWebsocketd() throws IOException {
+        int port = DEFAULT_WEBSOCKET_PORT;
+        if (System.getProperty("ws_port") != null) {
+            port = Integer.parseInt(System.getProperty("ws_port"));
         }
-        try {
-            new Websocketd(port).start(24 * 60 * 60000, false);
-            System.out.println("Websocket server start at port  " +  port);
-            Global.wsPort = port;
-        } catch (IOException e) {
-            startWebsocketd(port + 1);
-        }
+        new Websocketd(port).start(24 * 60 * 60000, false);
+        System.out.println("Websocket server start at port  " +  port);
+        Global.wsPort = port;
     }
 
     private static void initExecInstance() throws CannotCompileException, InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException, NotFoundException, IOException {

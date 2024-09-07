@@ -54,7 +54,6 @@ public class Httpd extends NanoHTTPD {
             return serveFile(uri);
         }
         if (method == Method.POST) {
-            // deprecated, use the ui config port
             switch (uri) {
                 case "/wsPort":
                     return newFixedLengthResponse(Global.wsPort + "");

@@ -21,6 +21,11 @@ $ java -jar swapper.jar
 
 Visit this url `http://localhost:8000` then you will get the following Web UI.
 
+If you want to change the http server port or web socket port:
+```bash
+$ java -jar -Dw_http_port=9999 -Dw_ws_port_19999 swapper.jar
+```
+
 ![image](https://i.imgur.com/WSKkrxX.png)
 
 Now you can enjoy the functionalities of swapper tool. 

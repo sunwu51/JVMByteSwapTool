@@ -100,7 +100,12 @@ public class Attach {
                 throw e;
             }
         }
+        String port = System.getProperty("w_http_port");
+        if (port == null) {
+            port = "8000";
+        }
         System.out.println("============Attach finish");
+        System.out.println("============Web server started at http://localhost:" + port);
     }
 
     private static URL toolsJarUrl() throws Exception {
