@@ -89,10 +89,10 @@ func ChangeBodyToJSON(params []string) string {
 
 func ChangeResultToJSON(params []string) string {
 	m := CommonMap()
-	m["type"] = "CHANGE_BODY"
+	m["type"] = "CHANGE_RESULT"
 	m["className"] = strings.Split(params[0], "#")[0]
 	m["method"] = strings.Split(params[0], "#")[1]
-	m["paramTypes"] = funk.Map(params[1], func(s string) string {
+	m["paramTypes"] = funk.Map(strings.Split(params[1], ","), func(s string) string {
 		return strings.TrimSpace(s)
 	}).([]string)
 	m["innerClassName"] = strings.Split(params[2], "#")[0]
