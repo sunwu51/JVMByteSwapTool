@@ -64,8 +64,11 @@ jobs:
     steps:
       - name: download
         uses: actions/download-artifact@v4
-      - name: ls
-        run: ls
+      - name: tree
+        run: |
+          tree .
+          mv artifacts-*/* artifacts
+          tree artifacts
       
 
   release:
