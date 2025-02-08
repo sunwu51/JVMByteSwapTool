@@ -23,7 +23,7 @@ jobs:
           mvn package && cp target/swapper-0.0.1-SNAPSHOT.jar swapper.jar
         shell: bash
       - name: Upload Jar
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: artifacts
           path: swapper.jar
