@@ -58,17 +58,17 @@ jobs:
         with:
           name: artifacts-${{ matrix.goos }}-${{ matrix.goarch }}
           path: jbs-client-${{ matrix.goos }}-${{ matrix.goarch }}.zip
-  download:
-    needs: ["build-java", "build-go"]
-    runs-on: ubuntu-latest
-    steps:
-      - name: download
-        uses: actions/download-artifact@v4
-      - name: tree
-        run: |
-          tree .
-          mv artifacts-*/* artifacts
-          tree artifacts
+  # test-download:
+  #   needs: ["build-java", "build-go"]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: download
+  #       uses: actions/download-artifact@v4
+  #     - name: tree
+  #       run: |
+  #         tree .
+  #         mv artifacts-*/* artifacts
+  #         tree artifacts
       
 
   release:
@@ -78,6 +78,10 @@ jobs:
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
+      - name: tree
+        run: |
+          mv artifacts-*/* artifacts
+          tree artifacts
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -91,6 +95,6 @@ jobs:
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
         with:
-          files: artifacts*/*
+          files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
