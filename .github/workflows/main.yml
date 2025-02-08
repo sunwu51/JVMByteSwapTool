@@ -59,6 +59,7 @@ jobs:
           name: artifacts-${{ matrix.goos }}-${{ matrix.goarch }}
           path: jbs-client-${{ matrix.goos }}-${{ matrix.goarch }}.zip
   download:
+    needs: ["build-java", "build-go"]
     runs-on: ubuntu-latest
     steps:
       - name: download
