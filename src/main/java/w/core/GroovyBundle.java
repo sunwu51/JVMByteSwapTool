@@ -3,6 +3,7 @@ package w.core;
 import groovy.lang.GroovyClassLoader;
 import lombok.Data;
 import org.codehaus.groovy.jsr223.GroovyScriptEngineImpl;
+import sun.misc.CompoundEnumeration;
 import w.Global;
 import w.util.SpringUtils;
 
@@ -13,6 +14,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -30,9 +32,14 @@ public class GroovyBundle {
         if (GroovyBundle.class.getClassLoader().toString().startsWith(WGroovyClassLoader.class.getName())) {
             try {
                 engine = new GroovyScriptEngineImpl(new GroovyClassLoader());
-                Global.info("Groovy Engine Initialization finished");
+                Global.info("Groovy Engine Initialization finished ctx loader is " + Thread.currentThread().getContextClassLoader());
                 if (SpringUtils.isSpring()) {
                     engine.put("ctx", SpringUtils.getSpringBootApplicationContext());
+                }
+
+                Enumeration e = Thread.currentThread().getContextClassLoader().getResources("META-INF/groovy/org.codehaus.groovy.runtime.ExtensionModule");
+                while (e.hasMoreElements()) {
+                    System.out.println( e.nextElement());
                 }
             } catch (Exception e) {
                 Global.error("Could not load Groovy Engine", e);
@@ -102,18 +109,22 @@ public class GroovyBundle {
     }
 
     public static class WGroovyClassLoader extends URLClassLoader {
-
-        public WGroovyClassLoader(ClassLoader parent) throws Exception {
-            super(new URL[] { currentUrl() }, parent);
+        private final ClassLoader delegate;
+        public WGroovyClassLoader(ClassLoader delegate) throws Exception {
+            super(new URL[] { currentUrl() }, String.class.getClassLoader());
+            this.delegate = delegate;
         }
         @Override
-        public Class<?> loadClass(String name) throws ClassNotFoundException {
-            if (name.startsWith("org.apache.groovy") || name.startsWith("org.codehaus.groovy") || name.startsWith("groovy") || name.startsWith("w.core.GroovyBundle")) {
+        public Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            try {
                 Class<?> c = findLoadedClass(name);
                 if (c != null) return c;
-                return findClass(name);
+                c = findClass(name);
+                return c;
+            } catch (ClassNotFoundException e) {
+                return delegate.loadClass(name);
             }
-            return super.loadClass(name);
         }
+
     }
 }
