@@ -2,6 +2,7 @@ package w;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import javassist.ClassPool;
 import ognl.*;
 import w.core.model.BaseClassTransformer;
@@ -128,6 +129,9 @@ public class Global {
                 new DefaultTypeConverter(),
                 new DefaultMemberAccess(true)
         );
+        mapper.findAndRegisterModules();
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        mapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
     }
 
 
@@ -203,7 +207,7 @@ public class Global {
     public static String toJson(Object obj) throws JsonProcessingException {
         try {
             return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(obj);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Global.error("re transform error:", e);
             return "toJson error";
         }
