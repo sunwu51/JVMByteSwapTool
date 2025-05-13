@@ -116,6 +116,9 @@ public class GroovyBundle {
         }
         @Override
         public Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            if (name.startsWith("w.") && !name.equals(GroovyBundle.class.getName())) {
+                return delegate.loadClass(name);
+            }
             try {
                 Class<?> c = findLoadedClass(name);
                 if (c != null) return c;
