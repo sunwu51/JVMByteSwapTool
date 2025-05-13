@@ -71,7 +71,6 @@ public class ExecBundle {
             if (!name.equals(EXEC_CLASS)) {
                 return super.loadClass(name);
             }
-            FileInputStream f;
             try {
                 byte[] bytes = WCompiler.compileWholeClass("package w; public class Exec { public void exec() {} }");
                 return defineClass(EXEC_CLASS, bytes, 0, bytes.length);
