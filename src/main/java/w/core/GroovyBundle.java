@@ -3,8 +3,8 @@ package w.core;
 import groovy.lang.GroovyClassLoader;
 import lombok.Data;
 import org.codehaus.groovy.jsr223.GroovyScriptEngineImpl;
-import sun.misc.CompoundEnumeration;
 import w.Global;
+import w.util.JarInJarClassLoader;
 import w.util.SpringUtils;
 
 import java.io.BufferedReader;
@@ -26,7 +26,7 @@ import static w.Attach.currentUrl;
  */
 @Data
 public class GroovyBundle {
-    static WGroovyClassLoader cl;
+    static ClassLoader cl;
     static GroovyScriptEngineImpl engine;
     static {
         if (GroovyBundle.class.getClassLoader().toString().startsWith(WGroovyClassLoader.class.getName())) {
@@ -46,7 +46,11 @@ public class GroovyBundle {
             }
         } else {
             try {
-                cl = new WGroovyClassLoader(Global.getClassLoader());
+//                cl = new WGroovyClassLoader(Global.getClassLoader());
+                cl = new JarInJarClassLoader(currentUrl(), "W-INF/lib",
+                        ClassLoader.getSystemClassLoader().getParent(),
+                        Global.getClassLoader()
+                        );
             } catch (Exception e) {
                 Global.error("Could not init Groovy Classloader", e);
             }
@@ -111,7 +115,7 @@ public class GroovyBundle {
     public static class WGroovyClassLoader extends URLClassLoader {
         private final ClassLoader delegate;
         public WGroovyClassLoader(ClassLoader delegate) throws Exception {
-            super(new URL[] { currentUrl() }, String.class.getClassLoader());
+            super(new URL[] { currentUrl() }, ClassLoader.getSystemClassLoader().getParent());
             this.delegate = delegate;
         }
         @Override
