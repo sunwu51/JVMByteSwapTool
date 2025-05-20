@@ -27,45 +27,29 @@ import static w.Attach.currentUrl;
 @Data
 public class GroovyBundle {
     static ClassLoader cl;
-    static GroovyScriptEngineImpl engine;
+
+    static Object engineObj;
+
     static {
-        if (GroovyBundle.class.getClassLoader().toString().startsWith(WGroovyClassLoader.class.getName())) {
-            try {
-                engine = new GroovyScriptEngineImpl(new GroovyClassLoader());
-                Global.info("Groovy Engine Initialization finished ctx loader is " + Thread.currentThread().getContextClassLoader());
-                if (SpringUtils.isSpring()) {
-                    engine.put("ctx", SpringUtils.getSpringBootApplicationContext());
-                }
-            } catch (Exception e) {
-                Global.error("Could not load Groovy Engine", e);
-            }
-        } else {
-            try {
-                JarInJarClassLoader jarInJarClassLoader = 
+        try {
+            JarInJarClassLoader jarInJarClassLoader =
                     new JarInJarClassLoader(currentUrl(), "W-INF/lib", ClassLoader.getSystemClassLoader().getParent());
-                cl = new WGroovyClassLoader(jarInJarClassLoader, Global.getClassLoader());
-            } catch (Exception e) {
-                Global.error("Could not init Groovy Classloader", e);
-            }
+            cl = new WGroovyClassLoader(jarInJarClassLoader, Global.getClassLoader());
+            Thread.currentThread().setContextClassLoader(cl);
+            Class<?> engineClass = cl.loadClass("org.codehaus.groovy.jsr223.GroovyScriptEngineImpl");
+            Class<?> gclClass = cl.loadClass("groovy.lang.GroovyClassLoader");
+            engineObj = engineClass.getConstructor(gclClass).newInstance(gclClass.newInstance());
+            engineClass.getMethod("put", String.class, Object.class).invoke(engineObj, "ctx", SpringUtils.getSpringBootApplicationContext());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
     public static Object eval(String script) throws Exception {
-        if (cl != null) {
-            Thread.currentThread().setContextClassLoader(cl);
-            Class<?> bundle = cl.loadClass(GroovyBundle.class.getName());
-            return bundle.getDeclaredMethod("eval", String.class).invoke(null, script);
-        }
-
         if (script.startsWith("!")) {
             return executeCmd(Arrays.asList(script.substring(1).split(" ")));
         } else {
-            long start = System.currentTimeMillis();
-            try {
-                return engine.eval(script);
-            } finally {
-                System.out.println("cost=" + (System.currentTimeMillis() - start));
-            }
+            return engineObj.getClass().getMethod("eval", String.class).invoke(engineObj, script);
         }
     }
 
@@ -126,12 +110,11 @@ public class GroovyBundle {
             }
             try {
                 // For groovy, need to load it by parent(jarInJarClassLoader)
-                return super.loadClass(name, resolve);
+                return getParent().loadClass(name);
             } catch (ClassNotFoundException e) {
                 // Else load it by delegate(Global.getClassLoader())
                 return delegate.loadClass(name);
             }
         }
-
     }
 }

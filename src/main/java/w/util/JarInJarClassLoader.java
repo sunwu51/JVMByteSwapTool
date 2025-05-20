@@ -1,18 +1,13 @@
 package w.util;
 
-import w.core.GroovyBundle;
+import org.codehaus.groovy.jsr223.GroovyScriptEngineImpl;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.*;
 import java.security.CodeSource;
 import java.security.cert.Certificate;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
@@ -34,7 +29,9 @@ public class JarInJarClassLoader extends URLClassLoader {
     private final JarFile rootJarFile;
 
 
-    private final List<NestedJarEntry> nestedJars = new ArrayList<>();
+    private final Map<String, byte[]> classDataCache = new ConcurrentHashMap<>();
+
+    private final Map<String, List<URL>> resourceUrlCache = new ConcurrentHashMap<>();
 
     public JarInJarClassLoader(URL jarUrl, String entryPrefix, ClassLoader parent) throws IOException {
         super(new URL[0], parent);
@@ -42,80 +39,101 @@ public class JarInJarClassLoader extends URLClassLoader {
         this.rootJarFile = new JarFile(jarUrl.getFile());
         // Search all jars in rootJar!/entryPrefix/xx.jar, add to nestedJars
         // And create nestedJarUrl add to the URLClassLoader.
+        loadAndPreprocessJars(entryPrefix);
+    }
+    private void loadAndPreprocessJars(String entryPrefix) throws IOException {
+        // search all jars
         Enumeration<JarEntry> entries = rootJarFile.entries();
+        List<JarEntry> jarEntries = new ArrayList<>();
+
         while (entries.hasMoreElements()) {
             JarEntry entry = entries.nextElement();
             if (entry.getName().startsWith(entryPrefix) && entry.getName().endsWith(".jar")) {
-                NestedJarEntry nestedJar = new NestedJarEntry(rootJarFile, entry);
-                nestedJars.add(nestedJar);
-                // URL: root.jar!/W-INF/lib/dep1.jar
-                URL nestedJarUrl = new URL(PROTOCOL, "", -1,
-                        rootJarUrl + "!/" + entry.getName(), new Handler());
-                addURL(nestedJarUrl);
+                jarEntries.add(entry);
+            }
+        }
+        // parallel process each jar
+        jarEntries.parallelStream().forEach(entry -> {
+            try {
+                preprocessJar(entry);
+            } catch (IOException e) {
+                throw new RuntimeException("Error preprocessing JAR: " + entry.getName() + ": " + e.getMessage());
+            }
+        });
+    }
+    private void preprocessJar(JarEntry jarEntry) throws IOException {
+        NestedJarEntry nestedJar = new NestedJarEntry(rootJarFile, jarEntry);
+        URL nestedJarUrl = new URL(PROTOCOL, "", -1,
+                rootJarUrl + "!/" + jarEntry.getName(), new Handler());
+        addURL(nestedJarUrl);
+
+        // read all jars in rootJar, and cache the resource to mem
+        byte[] jarContent = nestedJar.getContent();
+        try (InputStream is = new ByteArrayInputStream(jarContent);
+             JarInputStream jis = new JarInputStream(is)) {
+            JarEntry entry;
+            while ((entry = jis.getNextJarEntry()) != null) {
+                String name = entry.getName();
+                if (!entry.isDirectory()) {
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream(
+                            entry.getSize() > 0 ? (int)entry.getSize() : 4096);
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = jis.read(buffer)) != -1) {
+                        baos.write(buffer, 0, bytesRead);
+                    }
+                    byte[] entryData = baos.toByteArray();
+                    if (name.endsWith(".class")) {
+                        String className = name.substring(0, name.length() - 6).replace('/', '.');
+                        synchronized (classDataCache) {
+                            classDataCache.putIfAbsent(className, entryData);
+                        }
+                    }
+                    try {
+                        URL resourceUrl = new URL(PROTOCOL, "", -1,
+                                rootJarUrl.toString() + "!/" + jarEntry.getName() + "!/" + name,
+                                new Handler(name, entryData));
+
+                        synchronized (resourceUrlCache) {
+                            resourceUrlCache
+                                    .computeIfAbsent(name, k -> new ArrayList<>())
+                                    .add(resourceUrl);
+                        }
+                    } catch (MalformedURLException e) {
+                    }
+                }
             }
         }
     }
-    
+
+
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException {
-        try {
-            return super.findClass(name);
-        } catch (ClassNotFoundException e) {
-            String path = name.replace('.', '/') + ".class";
-            // Search class from every nestedJar
-            for (NestedJarEntry nestedJar : nestedJars) {
-                try {
-                    byte[] classData = nestedJar.getClassData(path);
-                    if (classData != null) {
-                        return defineClass(name, classData, 0, classData.length,
-                                new CodeSource(new URL(rootJarUrl, nestedJar.getEntryName()), (Certificate[]) null));
-                    }
-                } catch (IOException ex) {
-                    continue;
-                }
-            }
-            throw e;
+        byte[] classData = classDataCache.get(name);
+        if (classData != null) {
+            return defineClass(name, classData, 0, classData.length,
+                    new CodeSource(rootJarUrl, (Certificate[]) null));
         }
+        throw new ClassNotFoundException(name);
     }
 
     @Override
     public URL findResource(String name) {
-        URL resource = super.findResource(name);
-        if (resource != null) {
-            return resource;
-        }
-        for (NestedJarEntry nestedJar : nestedJars) {
-            if (nestedJar.containsEntry(name)) {
-                try {
-                    return new URL("nestedjar", "", -1,
-                            rootJarUrl.toString() + "!/" + nestedJar.getEntryName() + "!/" + name, null);
-                } catch (MalformedURLException e) {
-                    continue;
-                }
-            }
+        List<URL> urls = resourceUrlCache.get(name);
+        if (urls != null && !urls.isEmpty()) {
+            return urls.get(0);
         }
         return null;
     }
 
     @Override
     public Enumeration<URL> findResources(String name) throws IOException {
-        final Enumeration<URL> superResources = super.findResources(name);
-        final List<URL> resources = new ArrayList<>();
-        while (superResources.hasMoreElements()) {
-            resources.add(superResources.nextElement());
-        }
-        for (NestedJarEntry nestedJar : nestedJars) {
-            if (nestedJar.containsEntry(name)) {
-                try {
-                    URL resourceUrl = new URL(PROTOCOL, "", -1,
-                            rootJarUrl.toString() + "!/" + nestedJar.getEntryName() + "!/" + name, new Handler());
-                    resources.add(resourceUrl);
-                } catch (MalformedURLException e) {
-                    continue;
-                }
-            }
-        }
+        List<URL> resources = new ArrayList<>();
 
+        List<URL> cachedUrls = resourceUrlCache.get(name);
+        if (cachedUrls != null) {
+            resources.addAll(cachedUrls);
+        }
         return new Enumeration<URL>() {
             private final Iterator<URL> iterator = resources.iterator();
             @Override
@@ -132,6 +150,8 @@ public class JarInJarClassLoader extends URLClassLoader {
     @Override
     public void close() throws IOException {
         try {
+            classDataCache.clear();
+            resourceUrlCache.clear();
             super.close();
         } finally {
             rootJarFile.close();
@@ -142,93 +162,86 @@ public class JarInJarClassLoader extends URLClassLoader {
         private final JarFile rootJarFile;
         private final JarEntry jarEntry;
         private byte[] cachedContent;
+        private final Set<String> entryIndex = new HashSet<>();
 
         public NestedJarEntry(JarFile rootJarFile, JarEntry jarEntry) {
             this.rootJarFile = rootJarFile;
             this.jarEntry = jarEntry;
         }
 
-        public String getEntryName() {
-            return jarEntry.getName();
-        }
-
         public byte[] getContent() throws IOException {
             if (cachedContent == null) {
-                try (InputStream is = rootJarFile.getInputStream(jarEntry)) {
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    byte[] buffer = new byte[8192];
-                    int bytesRead;
-                    while ((bytesRead = is.read(buffer)) != -1) {
-                        baos.write(buffer, 0, bytesRead);
+                synchronized (this) {
+                    if (cachedContent == null) {
+                        try (InputStream is = rootJarFile.getInputStream(jarEntry)) {
+                            int size = (int) jarEntry.getSize();
+                            if (size > 0) {
+                                cachedContent = new byte[size];
+                                int totalRead = 0, bytesRead;
+                                while (totalRead < size &&
+                                        (bytesRead = is.read(cachedContent, totalRead, size - totalRead)) != -1) {
+                                    totalRead += bytesRead;
+                                }
+                            } else {
+                                ByteArrayOutputStream baos = new ByteArrayOutputStream(65536);
+                                byte[] buffer = new byte[16384];
+                                int bytesRead;
+                                while ((bytesRead = is.read(buffer)) != -1) {
+                                    baos.write(buffer, 0, bytesRead);
+                                }
+                                cachedContent = baos.toByteArray();
+                            }
+                        }
                     }
-                    cachedContent = baos.toByteArray();
                 }
             }
             return cachedContent;
         }
-
-        public byte[] getClassData(String classPath) throws IOException {
-            JarEntryReader reader = new JarEntryReader(getContent());
-            return reader.getEntryContent(classPath);
-        }
-
-        public boolean containsEntry(String entryName) {
-            try {
-                JarEntryReader reader = new JarEntryReader(getContent());
-                return reader.containsEntry(entryName);
-            } catch (IOException e) {
-                return false;
-            }
-        }
-    }
-    private static class JarEntryReader {
-        private final byte[] jarContent;
-
-        public JarEntryReader(byte[] jarContent) {
-            this.jarContent = jarContent;
-        }
-
-        public byte[] getEntryContent(String entryName) throws IOException {
-            try (InputStream is = new java.io.ByteArrayInputStream(jarContent);
-                 java.util.jar.JarInputStream jis = new java.util.jar.JarInputStream(is)) {
-
-                JarEntry entry;
-                while ((entry = jis.getNextJarEntry()) != null) {
-                    if (entryName.equals(entry.getName())) {
-                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                        byte[] buffer = new byte[8192];
-                        int bytesRead;
-                        while ((bytesRead = jis.read(buffer)) != -1) {
-                            baos.write(buffer, 0, bytesRead);
-                        }
-                        return baos.toByteArray();
-                    }
-                }
-            }
-            return null;
-        }
-
-        public boolean containsEntry(String entryName) throws IOException {
-            try (InputStream is = new java.io.ByteArrayInputStream(jarContent);
-                 java.util.jar.JarInputStream jis = new java.util.jar.JarInputStream(is)) {
-
-                JarEntry entry;
-                while ((entry = jis.getNextJarEntry()) != null) {
-                    if (entryName.equals(entry.getName())) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
     }
 }
 class Handler extends URLStreamHandler {
+    private String resourceName;
+    private byte[] resourceData;
+    public Handler() {
+    }
+
+    public Handler(String resourceName, byte[] resourceData) {
+        this.resourceName = resourceName;
+        this.resourceData = resourceData;
+    }
+    private static class CachedURLConnection extends URLConnection {
+        private final byte[] resourceData;
+
+        public CachedURLConnection(URL url, byte[] resourceData) {
+            super(url);
+            this.resourceData = resourceData;
+        }
+
+        @Override
+        public void connect() throws IOException {
+            connected = true;
+        }
+
+        @Override
+        public InputStream getInputStream() throws IOException {
+            return new ByteArrayInputStream(resourceData);
+        }
+
+        @Override
+        public int getContentLength() {
+            return resourceData.length;
+        }
+    }
 
     @Override
     protected URLConnection openConnection(URL url) throws IOException {
-        return new NestedJarURLConnection(url);
+        if (resourceData != null) {
+            return new CachedURLConnection(url, resourceData);
+        } else {
+            return new NestedJarURLConnection(url);
+        }
     }
+
     private static class NestedJarURLConnection extends URLConnection {
         private static final String JAR_URL_SEPARATOR = "!/";
 
@@ -376,5 +389,26 @@ class Handler extends URLStreamHandler {
                 return delegate.markSupported();
             }
         }
+    }
+
+
+    public static void main(String[] args) throws Exception {
+        String rootJar = "C:/Users/sunwu/Desktop/sw/JVMByteSwapTool/target/swapper-0.0.1-SNAPSHOT.jar";
+
+
+        JarInJarClassLoader cl = new JarInJarClassLoader(new URL("file:/"+rootJar), "W-INF/lib", ClassLoader.getSystemClassLoader().getParent());
+
+        test1(cl);
+        test1(ClassLoader.getSystemClassLoader());
+
+    }
+    private static void test1(ClassLoader cl) throws  Exception {
+        Thread.currentThread().setContextClassLoader(cl);
+        Class<?> engineC = cl.loadClass(GroovyScriptEngineImpl.class.getName());
+        long start = System.currentTimeMillis();
+        engineC.getMethod("eval", String.class).invoke(
+                engineC.newInstance(), "System.out.println('hello world')"
+        );
+        System.out.println("cost" +(System.currentTimeMillis()- start));
     }
 }
