@@ -17,7 +17,10 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
 
-
+/**
+ * @author Frank
+ * @date 2025/05/20 01:07
+ */
 public class JarInJarClassLoader extends URLClassLoader {
     private final static String PROTOCOL = "nestedjar";
     /**
@@ -30,13 +33,11 @@ public class JarInJarClassLoader extends URLClassLoader {
      */
     private final JarFile rootJarFile;
 
-    private final ClassLoader delegate;
 
     private final List<NestedJarEntry> nestedJars = new ArrayList<>();
 
-    public JarInJarClassLoader(URL jarUrl, String entryPrefix, ClassLoader parent, ClassLoader delegate) throws IOException {
+    public JarInJarClassLoader(URL jarUrl, String entryPrefix, ClassLoader parent) throws IOException {
         super(new URL[0], parent);
-        this.delegate = delegate;
         this.rootJarUrl = jarUrl;
         this.rootJarFile = new JarFile(jarUrl.getFile());
         // Search all jars in rootJar!/entryPrefix/xx.jar, add to nestedJars
@@ -54,21 +55,7 @@ public class JarInJarClassLoader extends URLClassLoader {
             }
         }
     }
-
-    public Class<?> loadClass(String name) throws ClassNotFoundException {
-        if (name.startsWith("w.") && !name.equals(GroovyBundle.class.getName())) {
-            return delegate.loadClass(name);
-        }
-        try {
-            Class<?> c = findLoadedClass(name);
-            if (c != null) return c;
-            c = findClass(name);
-            return c;
-        } catch (ClassNotFoundException e) {
-            return delegate.loadClass(name);
-        }
-    }
-
+    
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException {
         try {

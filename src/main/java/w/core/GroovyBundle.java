@@ -36,21 +36,14 @@ public class GroovyBundle {
                 if (SpringUtils.isSpring()) {
                     engine.put("ctx", SpringUtils.getSpringBootApplicationContext());
                 }
-
-                Enumeration e = Thread.currentThread().getContextClassLoader().getResources("META-INF/groovy/org.codehaus.groovy.runtime.ExtensionModule");
-                while (e.hasMoreElements()) {
-                    System.out.println( e.nextElement());
-                }
             } catch (Exception e) {
                 Global.error("Could not load Groovy Engine", e);
             }
         } else {
             try {
-//                cl = new WGroovyClassLoader(Global.getClassLoader());
-                cl = new JarInJarClassLoader(currentUrl(), "W-INF/lib",
-                        ClassLoader.getSystemClassLoader().getParent(),
-                        Global.getClassLoader()
-                        );
+                JarInJarClassLoader jarInJarClassLoader = 
+                    new JarInJarClassLoader(currentUrl(), "W-INF/lib", ClassLoader.getSystemClassLoader().getParent());
+                cl = new WGroovyClassLoader(jarInJarClassLoader, Global.getClassLoader());
             } catch (Exception e) {
                 Global.error("Could not init Groovy Classloader", e);
             }
@@ -67,7 +60,12 @@ public class GroovyBundle {
         if (script.startsWith("!")) {
             return executeCmd(Arrays.asList(script.substring(1).split(" ")));
         } else {
-            return engine.eval(script);
+            long start = System.currentTimeMillis();
+            try {
+                return engine.eval(script);
+            } finally {
+                System.out.println("cost=" + (System.currentTimeMillis() - start));
+            }
         }
     }
 
@@ -114,21 +112,23 @@ public class GroovyBundle {
 
     public static class WGroovyClassLoader extends URLClassLoader {
         private final ClassLoader delegate;
-        public WGroovyClassLoader(ClassLoader delegate) throws Exception {
-            super(new URL[] { currentUrl() }, ClassLoader.getSystemClassLoader().getParent());
-            this.delegate = delegate;
+        public WGroovyClassLoader(ClassLoader parent, ClassLoader delegate) throws Exception {
+            super(new URL[] { currentUrl() }, parent);
+            this.delegate = Global.getClassLoader();
         }
         @Override
         public Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-            if (name.startsWith("w.") && !name.equals(GroovyBundle.class.getName())) {
-                return delegate.loadClass(name);
-            }
-            try {
+            // For entrypoint class, must load it by self
+            if (name.equals(GroovyBundle.class.getName())) {
                 Class<?> c = findLoadedClass(name);
                 if (c != null) return c;
-                c = findClass(name);
-                return c;
+                return findClass(name);
+            }
+            try {
+                // For groovy, need to load it by parent(jarInJarClassLoader)
+                return super.loadClass(name, resolve);
             } catch (ClassNotFoundException e) {
+                // Else load it by delegate(Global.getClassLoader())
                 return delegate.loadClass(name);
             }
         }
