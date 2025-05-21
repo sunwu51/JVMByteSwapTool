@@ -3,8 +3,8 @@ package w.core;
 import groovy.lang.GroovyClassLoader;
 import lombok.Data;
 import org.codehaus.groovy.jsr223.GroovyScriptEngineImpl;
-import sun.misc.CompoundEnumeration;
 import w.Global;
+import w.util.JarInJarClassLoader;
 import w.util.SpringUtils;
 
 import java.io.BufferedReader;
@@ -26,44 +26,30 @@ import static w.Attach.currentUrl;
  */
 @Data
 public class GroovyBundle {
-    static WGroovyClassLoader cl;
-    static GroovyScriptEngineImpl engine;
-    static {
-        if (GroovyBundle.class.getClassLoader().toString().startsWith(WGroovyClassLoader.class.getName())) {
-            try {
-                engine = new GroovyScriptEngineImpl(new GroovyClassLoader());
-                Global.info("Groovy Engine Initialization finished ctx loader is " + Thread.currentThread().getContextClassLoader());
-                if (SpringUtils.isSpring()) {
-                    engine.put("ctx", SpringUtils.getSpringBootApplicationContext());
-                }
+    static ClassLoader cl;
 
-                Enumeration e = Thread.currentThread().getContextClassLoader().getResources("META-INF/groovy/org.codehaus.groovy.runtime.ExtensionModule");
-                while (e.hasMoreElements()) {
-                    System.out.println( e.nextElement());
-                }
-            } catch (Exception e) {
-                Global.error("Could not load Groovy Engine", e);
-            }
-        } else {
-            try {
-                cl = new WGroovyClassLoader(Global.getClassLoader());
-            } catch (Exception e) {
-                Global.error("Could not init Groovy Classloader", e);
-            }
+    static Object engineObj;
+
+    static {
+        try {
+            JarInJarClassLoader jarInJarClassLoader =
+                    new JarInJarClassLoader(currentUrl(), "W-INF/lib", ClassLoader.getSystemClassLoader().getParent());
+            cl = new WGroovyClassLoader(jarInJarClassLoader, Global.getClassLoader());
+            Thread.currentThread().setContextClassLoader(cl);
+            Class<?> engineClass = cl.loadClass("org.codehaus.groovy.jsr223.GroovyScriptEngineImpl");
+            Class<?> gclClass = cl.loadClass("groovy.lang.GroovyClassLoader");
+            engineObj = engineClass.getConstructor(gclClass).newInstance(gclClass.newInstance());
+            engineClass.getMethod("put", String.class, Object.class).invoke(engineObj, "ctx", SpringUtils.getSpringBootApplicationContext());
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
     public static Object eval(String script) throws Exception {
-        if (cl != null) {
-            Thread.currentThread().setContextClassLoader(cl);
-            Class<?> bundle = cl.loadClass(GroovyBundle.class.getName());
-            return bundle.getDeclaredMethod("eval", String.class).invoke(null, script);
-        }
-
         if (script.startsWith("!")) {
             return executeCmd(Arrays.asList(script.substring(1).split(" ")));
         } else {
-            return engine.eval(script);
+            return engineObj.getClass().getMethod("eval", String.class).invoke(engineObj, script);
         }
     }
 
@@ -110,24 +96,25 @@ public class GroovyBundle {
 
     public static class WGroovyClassLoader extends URLClassLoader {
         private final ClassLoader delegate;
-        public WGroovyClassLoader(ClassLoader delegate) throws Exception {
-            super(new URL[] { currentUrl() }, String.class.getClassLoader());
-            this.delegate = delegate;
+        public WGroovyClassLoader(ClassLoader parent, ClassLoader delegate) throws Exception {
+            super(new URL[] { currentUrl() }, parent);
+            this.delegate = Global.getClassLoader();
         }
         @Override
         public Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-            if (name.startsWith("w.") && !name.equals(GroovyBundle.class.getName())) {
-                return delegate.loadClass(name);
-            }
-            try {
+            // For entrypoint class, must load it by self
+            if (name.equals(GroovyBundle.class.getName())) {
                 Class<?> c = findLoadedClass(name);
                 if (c != null) return c;
-                c = findClass(name);
-                return c;
+                return findClass(name);
+            }
+            try {
+                // For groovy, need to load it by parent(jarInJarClassLoader)
+                return getParent().loadClass(name);
             } catch (ClassNotFoundException e) {
+                // Else load it by delegate(Global.getClassLoader())
                 return delegate.loadClass(name);
             }
         }
-
     }
 }
