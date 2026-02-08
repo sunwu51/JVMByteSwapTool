@@ -99,8 +99,12 @@ public class Global {
         String arch = System.getProperty("os.arch").toLowerCase();
         if (os.contains("win") && (arch.equals("x86_64") || arch.equals("amd64"))) {
             lib = "w_amd64.dll";
-        } else if (os.contains("linux") && (arch.equals("x86_64") || arch.equals("amd64"))) {
-            lib = "w_amd64.so";
+        } else if (os.contains("linux")) {
+            if (arch.equals("x86_64") || arch.equals("amd64")) {
+                lib = "w_amd64.so";
+            } else if (arch.equals("aarch64")) {
+                lib = "w_aarch64.so";
+            }
         } else if (os.contains("mac")) {
             if (arch.equals("x86_64") || arch.equals("amd64")) {
                 lib = "w_amd64.dylib";
