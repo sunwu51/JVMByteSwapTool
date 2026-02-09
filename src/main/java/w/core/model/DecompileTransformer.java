@@ -23,15 +23,12 @@ public class DecompileTransformer extends BaseClassTransformer {
 
     transient DecompileMessage message;
 
-    int mode;
-
     ThreadLocal<Map<String, byte[]>> relatedClassesCtx = ThreadLocal.withInitial(HashMap::new);
 
     public DecompileTransformer(DecompileMessage decompileMessage) {
         this.className = decompileMessage.getClassName();
         this.message = decompileMessage;
         this.traceId = decompileMessage.getId();
-        this.mode = decompileMessage.getMode();
     }
 
     @Override
