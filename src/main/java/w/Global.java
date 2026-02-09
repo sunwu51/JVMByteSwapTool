@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import javassist.ClassPool;
 import ognl.*;
 import w.core.model.BaseClassTransformer;
+import w.core.model.DecompileTransformer;
 import w.util.NativeUtils;
 import w.util.RequestUtils;
 import w.util.SpringUtils;
@@ -261,7 +262,15 @@ public class Global {
                 it.setStatus(-1);
                 it.clear();
                 instrumentation.removeTransformer(it);
-                for (Class<?> aClass : allLoadedClasses.getOrDefault(it.getClassName(), new HashSet<>())) {
+                Set<Class<?>> effectedClasses = new HashSet<>();
+                effectedClasses.addAll(allLoadedClasses.getOrDefault(it.getClassName(), new HashSet<>()));
+                if (it instanceof DecompileTransformer) {
+                    allLoadedClasses.keySet().stream()
+                            .filter(k -> k.startsWith(it.getClassName() + "$"))
+                            .forEach(k -> effectedClasses.addAll(allLoadedClasses.getOrDefault(k, new HashSet<>())));
+                }
+
+                for (Class<?> aClass : effectedClasses) {
                     try {
                         instrumentation.retransformClasses(aClass);
                     } catch (Exception e) {
@@ -407,7 +416,6 @@ public class Global {
                 allLoadedClasses.computeIfAbsent(name, k -> new HashSet<>())
                         .add(cls);
                 count ++;
-
             }
         }
 //        debug("fill loaded classes cost: " + (System.currentTimeMillis() - start) + "ms, class num:" + count);
