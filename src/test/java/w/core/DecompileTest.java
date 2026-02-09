@@ -6,7 +6,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import w.Global;
-import w.core.model.DecompileTransformer;
 import w.web.message.DecompileMessage;
 
 import java.lang.instrument.Instrumentation;
@@ -41,6 +40,6 @@ public class DecompileTest {
         DecompileMessage msg = new DecompileMessage();
         msg.setClassName("w.core.ChangeTarget");
         Assertions.assertTrue(swapper.swap(msg));
-
+        Assertions.assertTrue(swapper.swap(msg));
     }
 }

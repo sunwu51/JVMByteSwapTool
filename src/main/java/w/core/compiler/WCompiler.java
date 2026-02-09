@@ -1,18 +1,12 @@
 package w.core.compiler;
 
-import org.benf.cfr.reader.api.CfrDriver;
-import org.benf.cfr.reader.api.OutputSinkFactory;
-import org.benf.cfr.reader.bytecode.analysis.parse.utils.Pair;
-import org.benf.cfr.reader.state.ClassFileSourceImpl;
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.janino.SimpleCompiler;
+import org.jetbrains.java.decompiler.main.decompiler.InMemoryDecompiler;
 import w.Global;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author Frank
@@ -64,42 +58,39 @@ public class WCompiler {
         return compileMethod("w.Dynamic", "public "+ reType +" replace()" + content);
     }
 
-    /**
-     * Decompile a class
-     * @param byteCode
-     * @return
-     */
-    public static String decompile(byte[] byteCode) {
-        StringBuilder sb = new StringBuilder();
-        OutputSinkFactory outputSinkFactory = new OutputSinkFactory() {
-            @Override
-            public List<SinkClass> getSupportedSinks(SinkType sinkType, Collection<SinkClass> collection) {
-                return new ArrayList<SinkClass>() { { add(SinkClass.STRING); }};
-            }
-            @Override
-            public <T> Sink<T> getSink(SinkType sinkType, SinkClass sinkClass) {
-                return sinkable -> sb.append(sinkable.toString()).append('\n');
-            }
-        };
-        CfrDriver driver = new CfrDriver.Builder()
-                // fix: 中文显示为Unicode
-                .withOptions(new HashMap<String, String>() {{
-                    put("hideutf", "false");
-                }})
-                .withClassFileSource(new ClassFileSourceImpl(null) {
-                    @Override
-                    public Pair<byte[], String> getClassFileContent(String path) throws IOException {
-                        if (path.equals("tmp.class")) {
-                            return Pair.make(byteCode, path);
-                        }
-                        return null;
+
+    public static String decompile(Map<String, byte[]> classes, String entrypoint) {
+        Map<String, Object> defaultOpt = new HashMap<>();
+        defaultOpt.put("cps", "1");
+        defaultOpt.put("crp", "1");
+        return decompileWithFernFlower(classes, entrypoint, defaultOpt);
+    }
+
+    private static String decompileWithFernFlower(Map<String, byte[]> classes, String entrypoint, Map<String, Object> options) {
+        AtomicBoolean needReDecompile = new AtomicBoolean(false);
+
+        String result = InMemoryDecompiler.decompileClass(classes, entrypoint, options, null, (innerClassName) -> {
+            String pureClassName = innerClassName.replace(".class", "").replace("/", ".");
+            if (pureClassName.startsWith(entrypoint)) {
+                if (!Global.allLoadedClasses.containsKey(pureClassName)) {
+                    try {
+                        Global.getClassLoader().loadClass(pureClassName);
+                        needReDecompile.set(true);
+                        Global.info("Try to load class:" + pureClassName);
+                        return true;
+                    } catch (Exception e) {
+                        Global.error("Try to load class error, skip:" + pureClassName);
                     }
-                })
-                .withOutputSink(outputSinkFactory).build();
-        List<String> tmp = new ArrayList<>();
-        tmp.add("tmp.class");
-        driver.analyse(tmp);
-        String res = sb.toString();
-        return res.substring(!res.contains(" */\n") ? 0 : res.indexOf(" */\n") + 3);
+                }
+            }
+            needReDecompile.compareAndSet(false, false);
+            return false;
+        });
+
+        if (needReDecompile.get()) {
+            Global.fillLoadedClasses();
+            return "There are some inner class need to be loaded firstly, try again!";
+        }
+        return result;
     }
 }

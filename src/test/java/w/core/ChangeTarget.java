@@ -4,6 +4,7 @@ import lombok.Data;
 import w.Global;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 @Data
 public class ChangeTarget implements Runnable {
@@ -33,5 +34,26 @@ public class ChangeTarget implements Runnable {
 
     public String hello() {
         return "user will save: name=" + getName() + ", age=" + getAge();
+    }
+
+
+    public String lambdaTest() {
+        Runnable a = () -> System.out.println("a");
+
+        new Thread(
+                ()-> System.out.println("b")
+        );
+
+        new Thread(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        System.out.println("c");
+                    }
+                }
+        );
+
+        Arrays.asList(1,2,3).stream().map(it -> it * it).filter(it -> it > 2).forEach(System.out::println);
+        return "lambdaTest";
     }
 }

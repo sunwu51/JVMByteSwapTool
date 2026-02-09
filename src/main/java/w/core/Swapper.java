@@ -81,7 +81,18 @@ public class Swapper {
         Global.addTransformer(transformer);
         Global.debug("add transformer" + transformer.getUuid() +" finish, will retrans class");
 
-        for (Class<?> aClass : classes) {
+        LinkedHashSet<Class<?>> finalClasses = new LinkedHashSet<>();
+        // decompile also need to retransform inner.class
+        if (transformer instanceof DecompileTransformer) {
+            String outerClassName = transformer.getClassName();
+            Global.allLoadedClasses.entrySet().stream()
+                    .filter(entry -> entry.getKey().startsWith(outerClassName + "$"))
+                    .flatMap(entry -> entry.getValue().stream())
+                    .forEach(finalClasses::add);
+        }
+        finalClasses.addAll(classes);
+
+        for (Class<?> aClass : finalClasses) {
             try {
                 Global.addActiveTransformer(aClass, transformer);
             } catch (Throwable e) {
