@@ -1,9 +1,6 @@
 package w.core.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import javassist.*;
-import javassist.expr.ExprEditor;
-import javassist.expr.MethodCall;
 import lombok.Data;
 import org.objectweb.asm.*;
 import w.Global;
@@ -11,7 +8,6 @@ import w.core.asm.SbNode;
 import w.core.asm.WAdviceAdapter;
 import w.web.message.OuterWatchMessage;
 
-import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 

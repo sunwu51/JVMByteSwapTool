@@ -1,16 +1,13 @@
 package w.web;
 
 import fi.iki.elonen.NanoHTTPD;
-import lombok.extern.slf4j.Slf4j;
 import w.Global;
-import w.core.compiler.WCompiler;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static fi.iki.elonen.NanoHTTPD.Response.Status.*;
@@ -73,8 +70,6 @@ public class Httpd extends NanoHTTPD {
             fileName = "/index.html";
         }
         fileName = fileName.startsWith("/") ? fileName : ("/" + fileName);
-        byte[] content = new byte[409600]; //400k of content
-        int len = 0;
 
         String res = "";
         try (InputStream in = this.getClass().getResourceAsStream("/nanohttpd" + fileName);

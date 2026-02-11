@@ -2,8 +2,15 @@ package w.util;
 
 import org.codehaus.groovy.jsr223.GroovyScriptEngineImpl;
 
-import java.io.*;
-import java.net.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.net.URLConnection;
+import java.net.URLStreamHandler;
 import java.security.CodeSource;
 import java.security.cert.Certificate;
 import java.util.*;
@@ -162,7 +169,6 @@ public class JarInJarClassLoader extends URLClassLoader {
         private final JarFile rootJarFile;
         private final JarEntry jarEntry;
         private byte[] cachedContent;
-        private final Set<String> entryIndex = new HashSet<>();
 
         public NestedJarEntry(JarFile rootJarFile, JarEntry jarEntry) {
             this.rootJarFile = rootJarFile;
@@ -200,13 +206,12 @@ public class JarInJarClassLoader extends URLClassLoader {
     }
 }
 class Handler extends URLStreamHandler {
-    private String resourceName;
     private byte[] resourceData;
+    
     public Handler() {
     }
 
     public Handler(String resourceName, byte[] resourceData) {
-        this.resourceName = resourceName;
         this.resourceData = resourceData;
     }
     private static class CachedURLConnection extends URLConnection {
@@ -396,19 +401,19 @@ class Handler extends URLStreamHandler {
         String rootJar = "C:/Users/sunwu/Desktop/sw/JVMByteSwapTool/target/swapper-0.0.1-SNAPSHOT.jar";
 
 
-        JarInJarClassLoader cl = new JarInJarClassLoader(new URL("file:/"+rootJar), "W-INF/lib", ClassLoader.getSystemClassLoader().getParent());
+        JarInJarClassLoader cl = new JarInJarClassLoader(new URL("file:/" + rootJar), "W-INF/lib", ClassLoader.getSystemClassLoader().getParent());
 
         test1(cl);
         test1(ClassLoader.getSystemClassLoader());
 
     }
-    private static void test1(ClassLoader cl) throws  Exception {
+    private static void test1(ClassLoader cl) throws Exception {
         Thread.currentThread().setContextClassLoader(cl);
         Class<?> engineC = cl.loadClass(GroovyScriptEngineImpl.class.getName());
         long start = System.currentTimeMillis();
         engineC.getMethod("eval", String.class).invoke(
-                engineC.newInstance(), "System.out.println('hello world')"
+                engineC.getDeclaredConstructor().newInstance(), "System.out.println('hello world')"
         );
-        System.out.println("cost" +(System.currentTimeMillis()- start));
+        System.out.println("cost" + (System.currentTimeMillis() - start));
     }
 }

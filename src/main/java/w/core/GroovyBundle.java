@@ -1,8 +1,6 @@
 package w.core;
 
-import groovy.lang.GroovyClassLoader;
 import lombok.Data;
-import org.codehaus.groovy.jsr223.GroovyScriptEngineImpl;
 import w.Global;
 import w.util.JarInJarClassLoader;
 import w.util.SpringUtils;
@@ -14,7 +12,6 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 

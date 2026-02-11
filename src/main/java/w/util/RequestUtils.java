@@ -1,9 +1,7 @@
 package w.util;
 
 import fi.iki.elonen.NanoWSD;
-import w.core.compiler.WCompiler;
 
-import java.lang.instrument.ClassFileTransformer;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 

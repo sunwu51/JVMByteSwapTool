@@ -1,14 +1,8 @@
 package w.core;
 
-import w.core.asm.Tool;
-import w.core.model.WatchTransformer;
-import w.util.RequestUtils;
-
-import java.io.*;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
 
 /**
@@ -45,11 +39,9 @@ public class WatchTarget implements Runnable {
         return name;
     }
 
-
     public int getAge() {
         return age;
     }
-
 
     public static List<String> readFile(String path) throws IOException {
         return Files.readAllLines(Paths.get(path));
@@ -63,7 +55,6 @@ public class WatchTarget implements Runnable {
             throw e;
         } finally {
             System.out.println("finally");
-
         }
     }
 
@@ -71,7 +62,7 @@ public class WatchTarget implements Runnable {
         return a + b + c;
     }
     private int div(double a, double b) {
-        return (int) a / (int) b ;
+        return (int) a / (int) b;
     }
 
     public void subMethodCall() {
@@ -99,7 +90,7 @@ public class WatchTarget implements Runnable {
         }
         for (int i = 0; i < 5; i++) {
             sleep(3);
-            System.out.println(add(1,1, 3));
+            System.out.println(add(1, 1, 3));
         }
         return "Hello World";
     }
@@ -110,7 +101,7 @@ public class WatchTarget implements Runnable {
     }
 
     public int[] arrayReturn1() {
-        return new int[]{1,2};
+        return new int[]{1, 2};
     }
 
 

@@ -3,9 +3,7 @@ package w.core.asm;
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.AdviceAdapter;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Stack;
 
 /**
  * @author Frank

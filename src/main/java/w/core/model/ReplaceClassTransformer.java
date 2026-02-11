@@ -1,9 +1,7 @@
 package w.core.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
-import w.Global;
 import w.web.message.ReplaceClassMessage;
 
 import java.io.IOException;

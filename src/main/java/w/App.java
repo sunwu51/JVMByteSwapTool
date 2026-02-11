@@ -1,12 +1,8 @@
 package w;
 
-import java.io.*;
+import java.io.IOException;
 import java.lang.instrument.Instrumentation;
 import java.lang.reflect.InvocationTargetException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -56,7 +52,7 @@ public class App {
             port = Integer.parseInt(System.getProperty("http_port"));
         }
         new Httpd(port).start(5000, false);
-        System.out.println("Http server start at port "+ port);
+        System.out.println("Http server start at port " + port);
     }
 
     private static void startWebsocketd() throws IOException {
@@ -65,7 +61,7 @@ public class App {
             port = Integer.parseInt(System.getProperty("ws_port"));
         }
         new Websocketd(port).start(24 * 60 * 60000, false);
-        System.out.println("Websocket server start at port  " +  port);
+        System.out.println("Websocket server start at port " + port);
         Global.wsPort = port;
     }
 

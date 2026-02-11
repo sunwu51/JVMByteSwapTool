@@ -1,7 +1,6 @@
 package w.core.model;
 
 import lombok.Data;
-import org.objectweb.asm.*;
 import w.Global;
 import w.core.compiler.WCompiler;
 import w.web.message.DecompileMessage;

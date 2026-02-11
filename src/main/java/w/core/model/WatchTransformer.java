@@ -1,19 +1,11 @@
 package w.core.model;
 
-import javassist.*;
 import lombok.Data;
 import org.objectweb.asm.*;
 import w.Global;
-import w.core.asm.SbNode;
 import w.core.asm.WAdviceAdapter;
-import w.util.RequestUtils;
 import w.web.message.WatchMessage;
 
-
-import java.io.FileOutputStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.objectweb.asm.Opcodes.*;

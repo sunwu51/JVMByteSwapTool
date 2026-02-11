@@ -44,8 +44,8 @@ public class WCompiler {
      */
     public static byte[] compileMethod(String className, String methodContent) throws CompileException {
         String packageName = className.substring(0, className.lastIndexOf("."));
-        String simpleClassName = className.substring(className.lastIndexOf(".") +1);
-        return compileWholeClass("package " + packageName +";\n import java.util.*;\n public class " + simpleClassName + " {" + methodContent + "}");
+        String simpleClassName = className.substring(className.lastIndexOf(".") + 1);
+        return compileWholeClass("package " + packageName + ";\n import java.util.*;\n public class " + simpleClassName + " {" + methodContent + "}");
     }
 
     /**
@@ -54,8 +54,8 @@ public class WCompiler {
      * @return
      * @throws CompileException
      */
-    public static byte[] compileDynamicCodeBlock(String reType, String content)  throws CompileException {
-        return compileMethod("w.Dynamic", "public "+ reType +" replace()" + content);
+    public static byte[] compileDynamicCodeBlock(String reType, String content) throws CompileException {
+        return compileMethod("w.Dynamic", "public " + reType + " replace()" + content);
     }
 
 

@@ -13,7 +13,9 @@ import w.util.SpringUtils;
 import w.web.message.LogMessage;
 import fi.iki.elonen.NanoWSD;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
 import java.nio.file.Files;
@@ -403,6 +405,7 @@ public class Global {
             return 100;
         }
     }
+
     public static List<String> readFile(String path) throws IOException {
         return Files.readAllLines(Paths.get(path));
     }
@@ -415,7 +418,7 @@ public class Global {
                 String name = cls.getName();
                 allLoadedClasses.computeIfAbsent(name, k -> new HashSet<>())
                         .add(cls);
-                count ++;
+                count++;
             }
         }
 //        debug("fill loaded classes cost: " + (System.currentTimeMillis() - start) + "ms, class num:" + count);

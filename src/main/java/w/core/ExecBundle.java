@@ -5,7 +5,6 @@ import w.Global;
 import w.core.compiler.WCompiler;
 import w.web.message.ReplaceClassMessage;
 
-import java.io.FileInputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Base64;
 import java.util.HashMap;

@@ -20,7 +20,7 @@ import java.util.Arrays;
  */
 class SwapperTest {
 
-    Swapper swapper = Swapper.getInstance();;
+    Swapper swapper = Swapper.getInstance();
 
     TestClass t = new TestClass();
 

@@ -11,8 +11,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import fi.iki.elonen.NanoWSD;
 
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.UUID;
 import java.util.logging.Logger;
 
