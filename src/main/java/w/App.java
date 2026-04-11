@@ -6,7 +6,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import javassist.*;
+import javassist.CannotCompileException;
+import javassist.NotFoundException;
 
 import w.core.ExecBundle;
 import w.util.SpringUtils;

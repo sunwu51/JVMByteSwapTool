@@ -5,7 +5,8 @@ import org.codehaus.janino.SimpleCompiler;
 import org.jetbrains.java.decompiler.main.decompiler.InMemoryDecompiler;
 import w.Global;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**

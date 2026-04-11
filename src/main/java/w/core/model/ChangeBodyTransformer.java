@@ -47,10 +47,10 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
     @Override
     public byte[] transform(byte[] origin) throws Exception {
         byte[] result = null;
-        if (mode == Codes.changeBodyModeUseJavassist) {
+        if (mode == Codes.CHANGE_BODY_MODE_USE_JAVASSIST) {
             // use javassist, message.body is the method body, a code block starts with { ends with }
             result = changeBodyByJavassist(origin);
-        } else if (mode == Codes.changeBodyModeUseASM) {
+        } else if (mode == Codes.CHANGE_BODY_MODE_USE_ASM) {
             // use asm, message.body is the whole method including signature, like `public void hi {}`
             result = changeBodyByASM(origin);
         }
@@ -122,7 +122,7 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
                 return Global.getClassLoader();
             }
         };
-        
+
         targetClassNode.accept(classWriter);
         byte[] result = classWriter.toByteArray();
         return result;
@@ -168,5 +168,4 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
             throw new IllegalArgumentException("Source code compile error", e);
         }
     }
-
 }

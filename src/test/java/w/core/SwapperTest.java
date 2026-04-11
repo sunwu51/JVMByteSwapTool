@@ -117,7 +117,7 @@ class SwapperTest {
         ChangeBodyMessage message = new ChangeBodyMessage();
         message.setClassName("w.core.TestClass");
         message.setMethod("wrapperHello");
-        message.setMode(Codes.changeBodyModeUseJavassist);
+        message.setMode(Codes.CHANGE_BODY_MODE_USE_JAVASSIST);
         message.setParamTypes(Arrays.asList("java.lang.String"));
         message.setBody("{return java.util.UUID.randomUUID().toString();}");
         Assertions.assertTrue(swapper.swap(message));
@@ -132,7 +132,7 @@ class SwapperTest {
         ChangeBodyMessage message = new ChangeBodyMessage();
         message.setClassName("w.core.TestClass");
         message.setMethod("wrapperHello");
-        message.setMode(Codes.changeBodyModeUseASM);
+        message.setMode(Codes.CHANGE_BODY_MODE_USE_ASM);
         message.setParamTypes(Arrays.asList("java.lang.String"));
         message.setBody("{return \"arg=\" + $1 + \", uuid=\" + java.util.UUID.randomUUID().toString();}");
         Assertions.assertTrue(swapper.swap(message));

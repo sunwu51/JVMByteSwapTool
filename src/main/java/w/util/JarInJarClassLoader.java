@@ -1,7 +1,5 @@
 package w.util;
 
-import org.codehaus.groovy.jsr223.GroovyScriptEngineImpl;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -13,7 +11,11 @@ import java.net.URLConnection;
 import java.net.URLStreamHandler;
 import java.security.CodeSource;
 import java.security.cert.Certificate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -48,6 +50,7 @@ public class JarInJarClassLoader extends URLClassLoader {
         // And create nestedJarUrl add to the URLClassLoader.
         loadAndPreprocessJars(entryPrefix);
     }
+
     private void loadAndPreprocessJars(String entryPrefix) throws IOException {
         // search all jars
         Enumeration<JarEntry> entries = rootJarFile.entries();
@@ -68,6 +71,7 @@ public class JarInJarClassLoader extends URLClassLoader {
             }
         });
     }
+
     private void preprocessJar(JarEntry jarEntry) throws IOException {
         NestedJarEntry nestedJar = new NestedJarEntry(rootJarFile, jarEntry);
         URL nestedJarUrl = new URL(PROTOCOL, "", -1,
@@ -107,6 +111,7 @@ public class JarInJarClassLoader extends URLClassLoader {
                                     .add(resourceUrl);
                         }
                     } catch (MalformedURLException e) {
+                        // URL is constructed from known-good parts, should never happen
                     }
                 }
             }
@@ -205,15 +210,17 @@ public class JarInJarClassLoader extends URLClassLoader {
         }
     }
 }
+
 class Handler extends URLStreamHandler {
     private byte[] resourceData;
-    
+
     public Handler() {
     }
 
     public Handler(String resourceName, byte[] resourceData) {
         this.resourceData = resourceData;
     }
+
     private static class CachedURLConnection extends URLConnection {
         private final byte[] resourceData;
 
@@ -394,26 +401,5 @@ class Handler extends URLStreamHandler {
                 return delegate.markSupported();
             }
         }
-    }
-
-
-    public static void main(String[] args) throws Exception {
-        String rootJar = "C:/Users/sunwu/Desktop/sw/JVMByteSwapTool/target/swapper-0.0.1-SNAPSHOT.jar";
-
-
-        JarInJarClassLoader cl = new JarInJarClassLoader(new URL("file:/" + rootJar), "W-INF/lib", ClassLoader.getSystemClassLoader().getParent());
-
-        test1(cl);
-        test1(ClassLoader.getSystemClassLoader());
-
-    }
-    private static void test1(ClassLoader cl) throws Exception {
-        Thread.currentThread().setContextClassLoader(cl);
-        Class<?> engineC = cl.loadClass(GroovyScriptEngineImpl.class.getName());
-        long start = System.currentTimeMillis();
-        engineC.getMethod("eval", String.class).invoke(
-                engineC.getDeclaredConstructor().newInstance(), "System.out.println('hello world')"
-        );
-        System.out.println("cost" + (System.currentTimeMillis() - start));
     }
 }

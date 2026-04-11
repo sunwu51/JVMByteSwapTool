@@ -7,7 +7,10 @@ import w.Global;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
 import java.lang.reflect.InvocationTargetException;
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * @author Frank
@@ -79,5 +82,4 @@ public class SpringUtils {
         return String.format("%s ctx = (%s) (%s).getSpringBootApplicationContext();\n",
                 APP_CTX_CLASS_NAME, APP_CTX_CLASS_NAME, SpringUtils.class.getName());
     }
-
 }

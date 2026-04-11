@@ -22,7 +22,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -62,10 +70,10 @@ public class ChangeResultTransformer extends BaseClassTransformer {
     @Override
     public byte[] transform(byte[] origin) throws Exception {
         byte[] result = null;
-        if (mode == Codes.changeResultModeUseJavassist) {
+        if (mode == Codes.CHANGE_RESULT_MODE_USE_JAVASSIST) {
             // use javassist $_=xxx to change result
             result = changeResultByJavassist(origin);
-        } else if (mode == Codes.changeResultModeUseASM) {
+        } else if (mode == Codes.CHANGE_RESULT_MODE_USE_ASM) {
             // use asm
             result = changeResultByASM(origin);
         }
@@ -200,7 +208,7 @@ public class ChangeResultTransformer extends BaseClassTransformer {
                 return Global.getClassLoader();
             }
         };
-        
+
         classNode.accept(classWriter);
         byte[] result = classWriter.toByteArray();
         return result;

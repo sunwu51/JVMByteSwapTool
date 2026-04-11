@@ -53,7 +53,7 @@ public class ChangeResultTest {
         ChangeResultMessage msg = new ChangeResultMessage();
         msg.setClassName("w.core.ChangeTarget");
         msg.setMethod("addWrapper");
-        msg.setMode(Codes.changeResultModeUseASM);
+        msg.setMode(Codes.CHANGE_RESULT_MODE_USE_ASM);
         msg.setParamTypes(Arrays.asList("int", "int"));
         msg.setInnerMethod("add");
         msg.setInnerClassName("*");
@@ -68,7 +68,7 @@ public class ChangeResultTest {
         ChangeResultMessage msg = new ChangeResultMessage();
         msg.setClassName("w.core.ChangeTarget");
         msg.setMethod("hello");
-        msg.setMode(Codes.changeResultModeUseASM);
+        msg.setMode(Codes.CHANGE_RESULT_MODE_USE_ASM);
         msg.setParamTypes(Arrays.asList());
         msg.setInnerMethod("getName");
         msg.setInnerClassName("*");

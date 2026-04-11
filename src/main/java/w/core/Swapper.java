@@ -1,11 +1,27 @@
 package w.core;
 
-import w.*;
-import w.core.model.*;
-import w.web.message.*;
+import w.Global;
+import w.core.model.BaseClassTransformer;
+import w.core.model.ChangeBodyTransformer;
+import w.core.model.ChangeResultTransformer;
+import w.core.model.DecompileTransformer;
+import w.core.model.OuterWatchTransformer;
+import w.core.model.ReplaceClassTransformer;
+import w.core.model.TraceTransformer;
+import w.core.model.WatchTransformer;
+import w.web.message.ChangeBodyMessage;
+import w.web.message.ChangeResultMessage;
+import w.web.message.DecompileMessage;
+import w.web.message.Message;
+import w.web.message.OuterWatchMessage;
+import w.web.message.ReplaceClassMessage;
+import w.web.message.TraceMessage;
+import w.web.message.WatchMessage;
 
 import java.lang.reflect.Modifier;
-import java.util.*;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 
 public class Swapper {

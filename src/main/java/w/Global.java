@@ -4,7 +4,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import javassist.ClassPool;
-import ognl.*;
+import ognl.DefaultMemberAccess;
+import ognl.DefaultTypeConverter;
+import ognl.Ognl;
+import ognl.OgnlContext;
+import ognl.OgnlException;
 import w.core.model.BaseClassTransformer;
 import w.core.model.DecompileTransformer;
 import w.util.NativeUtils;
@@ -20,7 +24,14 @@ import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
@@ -82,7 +93,7 @@ public class Global {
     public static Map<String, AtomicInteger> hitCounter = new ConcurrentHashMap<>();
 
 
-    public static final ObjectMapper mapper = new ObjectMapper();
+    public static final ObjectMapper MAPPER = new ObjectMapper();
 
     public static Set<String> ignoreTraceMethods = new HashSet<String>() {{
         add("<init>");
@@ -136,9 +147,9 @@ public class Global {
                 new DefaultTypeConverter(),
                 new DefaultMemberAccess(true)
         );
-        mapper.findAndRegisterModules();
-        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        mapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
+        MAPPER.findAndRegisterModules();
+        MAPPER.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        MAPPER.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
     }
 
 
@@ -213,7 +224,7 @@ public class Global {
      */
     public static String toJson(Object obj) throws JsonProcessingException {
         try {
-            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(obj);
+            return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(obj);
         } catch (Throwable e) {
             Global.error("re transform error:", e);
             return "toJson error";

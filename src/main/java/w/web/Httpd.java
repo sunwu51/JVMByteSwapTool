@@ -10,7 +10,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static fi.iki.elonen.NanoHTTPD.Response.Status.*;
+import static fi.iki.elonen.NanoHTTPD.Response.Status.BAD_REQUEST;
+import static fi.iki.elonen.NanoHTTPD.Response.Status.NOT_FOUND;
+import static fi.iki.elonen.NanoHTTPD.Response.Status.OK;
 
 /**
  * @author Frank
@@ -87,3 +89,4 @@ public class Httpd extends NanoHTTPD {
         return newFixedLengthResponse(OK, mimeType, res);
     }
 }
+

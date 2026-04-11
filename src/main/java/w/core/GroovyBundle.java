@@ -95,7 +95,7 @@ public class GroovyBundle {
         private final ClassLoader delegate;
         public WGroovyClassLoader(ClassLoader parent, ClassLoader delegate) throws Exception {
             super(new URL[] { currentUrl() }, parent);
-            this.delegate = Global.getClassLoader();
+            this.delegate = delegate;
         }
         @Override
         public Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
@@ -115,3 +115,4 @@ public class GroovyBundle {
         }
     }
 }
+
