@@ -2,7 +2,8 @@ package w.util;
 
 import fi.iki.elonen.NanoWSD;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -10,43 +11,43 @@ import java.util.concurrent.ConcurrentHashMap;
  * @date 2023/12/21 11:43
  */
 public class RequestUtils {
-    private final static ThreadLocal<NanoWSD.WebSocket> socketCtx = new ThreadLocal<>();
-    private final static ThreadLocal<String> traceIdCtx = new ThreadLocal<>();
-    private final static ThreadLocal<Map<String, byte[]>> classNameToByteCode = ThreadLocal.withInitial(HashMap::new);
-    public final static Map<String, NanoWSD.WebSocket> traceId2Ws = new ConcurrentHashMap<>();
+    private static final ThreadLocal<NanoWSD.WebSocket> SOCKET_CTX = new ThreadLocal<>();
+    private static final ThreadLocal<String> TRACE_ID_CTX = new ThreadLocal<>();
+    private static final ThreadLocal<Map<String, byte[]>> CLASS_NAME_TO_BYTE_CODE = ThreadLocal.withInitial(HashMap::new);
+    public static final Map<String, NanoWSD.WebSocket> TRACE_ID_TO_WS = new ConcurrentHashMap<>();
 
     public static void initRequestCtx(NanoWSD.WebSocket ws, String traceId) {
-        socketCtx.set(ws);
-        traceIdCtx.set(traceId);
+        SOCKET_CTX.set(ws);
+        TRACE_ID_CTX.set(traceId);
         if (traceId != null && ws != null) {
-            traceId2Ws.put(traceId, ws);
+            TRACE_ID_TO_WS.put(traceId, ws);
         }
     }
 
     public static void clearRequestCtx() {
-        socketCtx.remove();
-        traceIdCtx.remove();
-        classNameToByteCode.remove();
+        SOCKET_CTX.remove();
+        TRACE_ID_CTX.remove();
+        CLASS_NAME_TO_BYTE_CODE.remove();
     }
 
-    public String getTraceId() {
-        return traceIdCtx.get();
+    public static String getTraceId() {
+        return TRACE_ID_CTX.get();
     }
 
     public static NanoWSD.WebSocket getCurWs() {
-        return socketCtx.get();
+        return SOCKET_CTX.get();
     }
 
     public static void fillCurThread(String traceId) {
-        initRequestCtx(traceId2Ws.get(traceId), traceId);
+        initRequestCtx(TRACE_ID_TO_WS.get(traceId), traceId);
     }
 
     public static String getCurTraceId() {
-        return traceIdCtx.get();
+        return TRACE_ID_CTX.get();
     }
 
     public static NanoWSD.WebSocket getWsByTraceId(String traceId) {
-        return traceId2Ws.get(traceId);
+        return TRACE_ID_TO_WS.get(traceId);
     }
 
 }
