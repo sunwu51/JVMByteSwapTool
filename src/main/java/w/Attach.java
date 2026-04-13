@@ -57,6 +57,7 @@ public class Attach {
                 Integer.parseInt(pid);
             } catch (Exception e) {
                 System.err.println("The pid should be integer.");
+                scanner.close();
                 throw e;
             }
         } else {
@@ -97,6 +98,7 @@ public class Attach {
             jvm.detach();
         } catch (Exception e) {
             if (!Objects.equals(e.getMessage(), "0")) {
+                scanner.close();
                 throw e;
             }
         }
@@ -106,6 +108,7 @@ public class Attach {
         }
         System.out.println("============Attach finish");
         System.out.println("============Web server started at http://localhost:" + port);
+        scanner.close();
     }
 
     private static URL toolsJarUrl() throws Exception {
