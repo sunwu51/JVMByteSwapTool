@@ -422,14 +422,14 @@ public class Global {
     }
 
     public synchronized static void fillLoadedClasses() {
-        int count = 0;
-        long start = System.currentTimeMillis();
-        for (Class cls : instrumentation.getAllLoadedClasses()) {
+        // int count = 0;
+        // long start = System.currentTimeMillis();
+        for (Class<?> cls : instrumentation.getAllLoadedClasses()) {
             if (cls.getClassLoader() != null) {
                 String name = cls.getName();
                 allLoadedClasses.computeIfAbsent(name, k -> new HashSet<>())
                         .add(cls);
-                count++;
+                // count++;
             }
         }
 //        debug("fill loaded classes cost: " + (System.currentTimeMillis() - start) + "ms, class num:" + count);
