@@ -1,6 +1,6 @@
 package w.core.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.alibaba.fastjson2.annotation.JSONField;
 import lombok.Data;
 import w.web.message.ReplaceClassMessage;
 
@@ -14,7 +14,7 @@ import java.util.Base64;
 @Data
 public class ReplaceClassTransformer extends BaseClassTransformer {
 
-    @JsonIgnore
+    @JSONField(serialize = false, deserialize = false)
     transient ReplaceClassMessage message;
 
     byte[] content;

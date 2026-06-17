@@ -1,6 +1,6 @@
 package w.core.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.alibaba.fastjson2.annotation.JSONField;
 import javassist.CtClass;
 import javassist.CtMethod;
 import javassist.Modifier;
@@ -26,7 +26,7 @@ import java.util.Objects;
 @Data
 public class ChangeBodyTransformer extends BaseClassTransformer {
 
-    @JsonIgnore
+    @JSONField(serialize = false, deserialize = false)
     transient ChangeBodyMessage message;
 
     String method;

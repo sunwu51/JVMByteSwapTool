@@ -1,5 +1,8 @@
 package w.web;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONException;
+import com.alibaba.fastjson2.JSONObject;
 import w.Global;
 import w.core.ExecBundle;
 import w.core.GroovyBundle;
@@ -11,8 +14,6 @@ import w.web.message.ExecMessage;
 import w.web.message.Message;
 import w.web.message.MessageType;
 import w.web.message.PongMessage;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import fi.iki.elonen.NanoWSD;
 
 import java.io.IOException;
@@ -26,8 +27,6 @@ import java.util.logging.Logger;
 
 public class Websocketd extends NanoWSD {
     Logger log = Logger.getLogger(Websocketd.class.getName());
-
-    ObjectMapper objectMapper = new ObjectMapper();
 
     Swapper swapper = Swapper.getInstance();
 
@@ -67,16 +66,16 @@ public class Websocketd extends NanoWSD {
 
             private void dispatch(String msg) {
                 try {
-                    Message message = objectMapper.readValue(msg, Message.class);
+                    Message message = parseMessage(msg);
                     if (message.getType() != MessageType.PING) {
-                        log.info(objectMapper.writeValueAsString(message));
+                        log.info(Global.toJson(message));
                         RequestUtils.initRequestCtx(this, message.getId());
                     }
                     switch (message.getType()) {
                         case PING:
                             PongMessage m = new PongMessage();
                             m.setId(message.getId());
-                            String json = objectMapper.writeValueAsString(m);
+                            String json = Global.toJson(m);
                             this.send(json);
                             break;
                         case EXEC:
@@ -111,13 +110,51 @@ public class Websocketd extends NanoWSD {
                             swapper.swap(message);
                     }
 
-                } catch (JsonProcessingException e) {
+                } catch (JSONException | IllegalArgumentException e) {
                     e.printStackTrace();
                     Global.error("not a valid message");
                 } catch (Throwable e) {
                     Global.error("error:", e);
                 } finally {
                     RequestUtils.clearRequestCtx();
+                }
+            }
+
+            private Message parseMessage(String msg) {
+                JSONObject jsonObject = JSON.parseObject(msg);
+                MessageType type = jsonObject.getObject("type", MessageType.class);
+                if (type == null) {
+                    throw new IllegalArgumentException("message type is required");
+                }
+                switch (type) {
+                    case REPLACE_CLASS:
+                        return jsonObject.toJavaObject(w.web.message.ReplaceClassMessage.class);
+                    case CHANGE_BODY:
+                        return jsonObject.toJavaObject(w.web.message.ChangeBodyMessage.class);
+                    case CHANGE_RESULT:
+                        return jsonObject.toJavaObject(w.web.message.ChangeResultMessage.class);
+                    case PING:
+                        return jsonObject.toJavaObject(w.web.message.PingMessage.class);
+                    case PONG:
+                        return jsonObject.toJavaObject(w.web.message.PongMessage.class);
+                    case WATCH:
+                        return jsonObject.toJavaObject(w.web.message.WatchMessage.class);
+                    case OUTER_WATCH:
+                        return jsonObject.toJavaObject(w.web.message.OuterWatchMessage.class);
+                    case EXEC:
+                        return jsonObject.toJavaObject(w.web.message.ExecMessage.class);
+                    case TRACE:
+                        return jsonObject.toJavaObject(w.web.message.TraceMessage.class);
+                    case DELETE:
+                        return jsonObject.toJavaObject(w.web.message.DeleteMessage.class);
+                    case RESET:
+                        return jsonObject.toJavaObject(w.web.message.ResetMessage.class);
+                    case DECOMPILE:
+                        return jsonObject.toJavaObject(w.web.message.DecompileMessage.class);
+                    case EVAL:
+                        return jsonObject.toJavaObject(w.web.message.EvalMessage.class);
+                    default:
+                        throw new IllegalArgumentException("unsupported message type: " + type);
                 }
             }
         };

@@ -1,6 +1,6 @@
 package w.core.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.alibaba.fastjson2.annotation.JSONField;
 import lombok.Data;
 import org.objectweb.asm.*;
 import w.Global;
@@ -21,7 +21,7 @@ import static org.objectweb.asm.Opcodes.*;
 @Data
 public class OuterWatchTransformer extends BaseClassTransformer {
 
-    @JsonIgnore
+    @JSONField(serialize = false, deserialize = false)
     transient OuterWatchMessage message;
 
     String method;

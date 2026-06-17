@@ -1,8 +1,7 @@
 package w;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONWriter;
 import javassist.ClassPool;
 import ognl.DefaultMemberAccess;
 import ognl.DefaultTypeConverter;
@@ -93,8 +92,6 @@ public class Global {
     public static Map<String, AtomicInteger> hitCounter = new ConcurrentHashMap<>();
 
 
-    public static final ObjectMapper MAPPER = new ObjectMapper();
-
     public static Set<String> ignoreTraceMethods = new HashSet<String>() {{
         add("<init>");
         add("toString");
@@ -147,9 +144,6 @@ public class Global {
                 new DefaultTypeConverter(),
                 new DefaultMemberAccess(true)
         );
-        MAPPER.findAndRegisterModules();
-        MAPPER.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        MAPPER.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
     }
 
 
@@ -217,14 +211,13 @@ public class Global {
 
 
     /**
-     * To json string, by Jackson
+     * To json string, by Fastjson
      * @param obj
      * @return
-     * @throws JsonProcessingException
      */
-    public static String toJson(Object obj) throws JsonProcessingException {
+    public static String toJson(Object obj) {
         try {
-            return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(obj);
+            return JSON.toJSONString(obj, JSONWriter.Feature.PrettyFormat);
         } catch (Throwable e) {
             Global.error("re transform error:", e);
             return "toJson error";

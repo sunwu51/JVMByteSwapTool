@@ -1,6 +1,6 @@
 package w.core.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.alibaba.fastjson2.annotation.JSONField;
 import javassist.CannotCompileException;
 import javassist.CtClass;
 import javassist.CtMethod;
@@ -43,7 +43,7 @@ import static org.objectweb.asm.Opcodes.*;
 @Data
 public class ChangeResultTransformer extends BaseClassTransformer {
 
-    @JsonIgnore
+    @JSONField(serialize = false, deserialize = false)
     transient ChangeResultMessage message;
 
     String method;
