@@ -21,4 +21,6 @@ public class WatchMessage extends Message implements RequestMessage {
     int printFormat = 1;
 
     int minCost;
+
+    String ognl;
 }

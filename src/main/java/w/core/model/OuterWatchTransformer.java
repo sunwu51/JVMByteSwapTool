@@ -14,14 +14,30 @@ import w.core.asm.SbNode;
 import w.core.asm.WAdviceAdapter;
 import w.web.message.OuterWatchMessage;
 
+import java.io.InputStream;
+import java.lang.instrument.IllegalClassFormatException;
+import java.security.ProtectionDomain;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import static org.objectweb.asm.Opcodes.ALOAD;
 import static org.objectweb.asm.Opcodes.ASM9;
+import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
+import static org.objectweb.asm.Opcodes.GOTO;
+import static org.objectweb.asm.Opcodes.IFNE;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
 import static org.objectweb.asm.Opcodes.LLOAD;
+import static org.objectweb.asm.Opcodes.NEW;
 
 
 /**
@@ -30,6 +46,8 @@ import static org.objectweb.asm.Opcodes.LLOAD;
  */
 @Data
 public class OuterWatchTransformer extends BaseClassTransformer {
+
+    public static ThreadLocal<Map<String, Integer>> outerWatchCtx = ThreadLocal.withInitial(HashMap::new);
 
     @JSONField(serialize = false, deserialize = false)
     transient OuterWatchMessage message;
@@ -42,6 +60,12 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
     int printFormat;
 
+    boolean includeNested;
+
+    String ognl;
+
+    private final Map<String, Set<String>> targetMethods = new LinkedHashMap<>();
+
 
     public OuterWatchTransformer(OuterWatchMessage watchMessage) {
         this.message = watchMessage;
@@ -51,10 +75,149 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         this.innerMethod = watchMessage.getInnerSignature().split("#")[1];
         this.printFormat = watchMessage.getPrintFormat();
         this.traceId = watchMessage.getId();
+        this.includeNested = watchMessage.isIncludeNested();
+        this.ognl = watchMessage.getOgnl();
+        addTargetMethod(this.className, this.method);
     }
 
     @Override
     public byte[] transform(byte[] origin) throws Exception {
+        return transform(origin, className);
+    }
+
+    @Override
+    public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] origin) throws IllegalClassFormatException {
+        if (className == null) {
+            return origin;
+        }
+        className = className.replace("/", ".");
+        if (targetMethods.containsKey(className)) {
+            try {
+                byte[] r = transform(origin, className);
+                recordApplySuccess(loader, className);
+                Global.info(className + " transformer " + uuid +  " added success <(^-^)>");
+                return r;
+            } catch (Throwable e) {
+                recordApplyFailure(loader, className, e);
+                Global.error(className + " transformer " + uuid + " added fail -(′д｀)-: ", e);
+                CompletableFuture.runAsync(() -> Global.deleteTransformer(uuid));
+            }
+        }
+        return null;
+    }
+
+    public Set<Class<?>> prepareNestedTargets(Set<Class<?>> rootClasses) {
+        if (!includeNested) {
+            return Collections.emptySet();
+        }
+        Set<Class<?>> nestedClasses = new LinkedHashSet<>();
+        for (Class<?> rootClass : rootClasses) {
+            collectNestedTargets(rootClass);
+        }
+        Set<String> extraClassNames = new HashSet<>(targetMethods.keySet());
+        extraClassNames.remove(className);
+        for (Class<?> rootClass : rootClasses) {
+            ClassLoader loader = rootClass.getClassLoader();
+            for (String extraClassName : extraClassNames) {
+                try {
+                    nestedClasses.add(Class.forName(extraClassName, false, loader));
+                } catch (Throwable e) {
+                    Global.debug("outer watch nested class not loaded: " + extraClassName + ", " + e.getMessage());
+                }
+            }
+        }
+        return nestedClasses;
+    }
+
+    private void collectNestedTargets(Class<?> rootClass) {
+        String resourceName = rootClass.getName().replace('.', '/') + ".class";
+        InputStream inputStream = null;
+        try {
+            ClassLoader loader = rootClass.getClassLoader();
+            inputStream = loader == null
+                    ? ClassLoader.getSystemResourceAsStream(resourceName)
+                    : loader.getResourceAsStream(resourceName);
+            if (inputStream == null) {
+                return;
+            }
+            ClassReader classReader = new ClassReader(inputStream);
+            classReader.accept(new ClassVisitor(ASM9) {
+                @Override
+                public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                    MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
+                    if (!Objects.equals(name, method)) {
+                        return mv;
+                    }
+                    return new MethodVisitor(ASM9, mv) {
+                        @Override
+                        public void visitInvokeDynamicInsn(String name, String descriptor, org.objectweb.asm.Handle bootstrapMethodHandle, Object... bootstrapMethodArguments) {
+                            collectLambdaTarget(bootstrapMethodArguments);
+                            super.visitInvokeDynamicInsn(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments);
+                        }
+
+                        @Override
+                        public void visitTypeInsn(int opcode, String type) {
+                            if (opcode == NEW && type != null) {
+                                String nestedClassName = type.replace("/", ".");
+                                if (nestedClassName.startsWith(className + "$")) {
+                                    addAllMethodsTarget(nestedClassName);
+                                }
+                            }
+                            super.visitTypeInsn(opcode, type);
+                        }
+                    };
+                }
+            }, ClassReader.SKIP_FRAMES);
+        } catch (Throwable e) {
+            Global.debug("outer watch collect nested targets error: " + rootClass.getName() + ", " + e.getMessage());
+        } finally {
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
+
+    private void collectLambdaTarget(Object[] bootstrapMethodArguments) {
+        if (bootstrapMethodArguments == null) {
+            return;
+        }
+        for (Object bootstrapMethodArgument : bootstrapMethodArguments) {
+            if (!(bootstrapMethodArgument instanceof org.objectweb.asm.Handle)) {
+                continue;
+            }
+            org.objectweb.asm.Handle handle = (org.objectweb.asm.Handle) bootstrapMethodArgument;
+            if (!handle.getName().startsWith("lambda$")) {
+                continue;
+            }
+            addTargetMethod(handle.getOwner().replace("/", "."), handle.getName());
+        }
+    }
+
+    private void addTargetMethod(String targetClassName, String targetMethod) {
+        targetMethods.computeIfAbsent(targetClassName, k -> new LinkedHashSet<>()).add(targetMethod);
+    }
+
+    private void addAllMethodsTarget(String targetClassName) {
+        targetMethods.computeIfAbsent(targetClassName, k -> new LinkedHashSet<>()).add("*");
+    }
+
+    public Map<String, Set<String>> getTargetMethods() {
+        Map<String, Set<String>> copy = new LinkedHashMap<>();
+        targetMethods.forEach((key, value) -> copy.put(key, new LinkedHashSet<>(value)));
+        return copy;
+    }
+
+    @Override
+    public List<String> getExtraClassNames() {
+        List<String> extraClassNames = new ArrayList<>(targetMethods.keySet());
+        extraClassNames.remove(className);
+        return extraClassNames;
+    }
+
+    private byte[] transform(byte[] origin, String currentClassName) throws Exception {
         ClassReader classReader = new ClassReader(origin);
         ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES) {
             @Override
@@ -67,9 +230,10 @@ public class OuterWatchTransformer extends BaseClassTransformer {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
                 MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
-                if (!name.equals(method)) {
+                if (!shouldWatchMethod(currentClassName, access, name)) {
                     return mv;
                 }
+                boolean outerMethod = currentClassName.equals(className) && name.equals(method);
                 return new WAdviceAdapter(ASM9, mv, access, name, descriptor) {
                     private int line;
                     private int startTimeVarIndex;
@@ -87,10 +251,35 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                     }
 
                     @Override
+                    protected void onMethodEnter() {
+                        if (outerMethod) {
+                            mv.visitLdcInsn(uuid.toString());
+                            mv.visitMethodInsn(INVOKESTATIC, "w/core/model/OuterWatchTransformer", "enterOuterWatch", "(Ljava/lang/String;)V", false);
+                        }
+                    }
+
+                    @Override
+                    protected void onMethodExit(int opcode) {
+                        if (outerMethod) {
+                            mv.visitLdcInsn(uuid.toString());
+                            mv.visitMethodInsn(INVOKESTATIC, "w/core/model/OuterWatchTransformer", "exitOuterWatch", "(Ljava/lang/String;)V", false);
+                        }
+                    }
+
+                    @Override
                     public void visitMethodInsn(int opcodeAndSource, String owner, String name, String descriptor, boolean isInterface) {
                         boolean hit = (owner.replace("/", ".").equals(innerClassName) || "*".equals(innerClassName))
                                 && name.equals(innerMethod);
                         if (hit) {
+                            Label recordStart = new Label();
+                            Label guardEnd = new Label();
+                            mv.visitLdcInsn(uuid.toString());
+                            mv.visitMethodInsn(INVOKESTATIC, "w/core/model/OuterWatchTransformer", "shouldRecord", "(Ljava/lang/String;)Z", false);
+                            mv.visitJumpInsn(IFNE, recordStart);
+                            mv.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
+                            mv.visitJumpInsn(GOTO, guardEnd);
+                            mv.visitLabel(recordStart);
+
                             // long start = System.currentTimeMillis();
                             startTimeVarIndex = asmStoreStartTime(mv);
                             // String params = Arrays.toString(paramArray);
@@ -112,6 +301,20 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
                             // long duration = System.currentTimeMillis() - start;
                             int durationVarIndex = asmCalculateCost(mv, startTimeVarIndex);
+                            push(printFormat);
+                            mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "getMdcContextMapString", "(I)Ljava/lang/String;", false);
+                            int mdcVarIndex = newLocal(Type.getType(String.class));
+                            mv.visitVarInsn(Opcodes.ASTORE, mdcVarIndex);
+
+                            int ognlVarIndex = -1;
+                            if (!isBlank(ognl)) {
+                                loadThisOrNull();
+                                push(ognl);
+                                push(printFormat);
+                                mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "getOgnlString", "(Ljava/lang/Object;Ljava/lang/String;I)Ljava/lang/String;", false);
+                                ognlVarIndex = newLocal(Type.getType(String.class));
+                                mv.visitVarInsn(Opcodes.ASTORE, ognlVarIndex);
+                            }
 
                             // return value duplication
                             int returnValueVarIndex = asmStoreRetString(mv, descriptor, printFormat);
@@ -124,6 +327,12 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             list.add(new SbNode(", cost: "));
                             list.add(new SbNode(LLOAD, durationVarIndex));
                             list.add(new SbNode("ms"));
+                            list.add(new SbNode(", mdc: "));
+                            list.add(new SbNode(ALOAD, mdcVarIndex));
+                            if (!isBlank(ognl)) {
+                                list.add(new SbNode(", ognl:"));
+                                list.add(new SbNode(ALOAD, ognlVarIndex));
+                            }
                             asmGenerateStringBuilder(mv, list);
 
                             /*---------------------counter: if reach the limitation will remove the transformer----------------*/
@@ -135,8 +344,8 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
 
                             mv.visitLabel(tryEnd);
-                            Label end = new Label();
-                            mv.visitJumpInsn(Opcodes.GOTO, end);
+                            Label invokeEnd = new Label();
+                            mv.visitJumpInsn(Opcodes.GOTO, invokeEnd);
 
                             mv.visitLabel(catchStart);
                             int exceptionIndex = newLocal(Type.getType(Throwable.class));
@@ -147,13 +356,15 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             mv.visitVarInsn(Opcodes.ASTORE, exceptionStringIndex);
 
                             postProcess(true);
+                            mv.visitMethodInsn(INVOKESTATIC, "w/util/RequestUtils", "clearRequestCtx", "()V", false);
                             mv.visitVarInsn(Opcodes.ALOAD, exceptionIndex);
                             mv.visitInsn(Opcodes.ATHROW);
                             Label catchEnd = new Label();
                             mv.visitLabel(catchEnd);
-                            mv.visitLabel(end);
+                            mv.visitLabel(invokeEnd);
 
                             mv.visitMethodInsn(INVOKESTATIC, "w/util/RequestUtils", "clearRequestCtx", "()V", false);
+                            mv.visitLabel(guardEnd);
                         } else {
                             mv.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
                         }
@@ -175,7 +386,18 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             mv.visitInsn(Opcodes.ACONST_NULL);
                         }
 
-                        mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "outerWatchPostProcess", "(IJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V", false);
+                        loadThisOrNull();
+                        push(ognl == null ? "" : ognl);
+                        push(printFormat);
+                        mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "outerWatchPostProcess", "(IJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/String;I)V", false);
+                    }
+
+                    private void loadThisOrNull() {
+                        if ((access & Opcodes.ACC_STATIC) == 0) {
+                            mv.visitVarInsn(Opcodes.ALOAD, 0);
+                        } else {
+                            mv.visitInsn(Opcodes.ACONST_NULL);
+                        }
                     }
 
                 };
@@ -184,6 +406,43 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         byte[] result = classWriter.toByteArray();
         status = 1;
         return result;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private boolean shouldWatchMethod(String currentClassName, int access, String name) {
+        Set<String> methods = targetMethods.get(currentClassName);
+        if (methods == null) {
+            return false;
+        }
+        if (methods.contains(name)) {
+            return true;
+        }
+        return methods.contains("*") && !name.equals("<init>") && !name.equals("<clinit>") && (access & ACC_SYNTHETIC) == 0;
+    }
+
+    public static void enterOuterWatch(String uuid) {
+        Map<String, Integer> map = outerWatchCtx.get();
+        map.put(uuid, map.getOrDefault(uuid, 0) + 1);
+    }
+
+    public static void exitOuterWatch(String uuid) {
+        Map<String, Integer> map = outerWatchCtx.get();
+        Integer count = map.get(uuid);
+        if (count == null || count <= 1) {
+            map.remove(uuid);
+        } else {
+            map.put(uuid, count - 1);
+        }
+        if (map.isEmpty()) {
+            outerWatchCtx.remove();
+        }
+    }
+
+    public static boolean shouldRecord(String uuid) {
+        return outerWatchCtx.get().containsKey(uuid);
     }
 
     public boolean equals(Object other) {
@@ -196,5 +455,14 @@ public class OuterWatchTransformer extends BaseClassTransformer {
     @Override
     public String desc() {
         return "OuterWatch_" + getClassName() + "#" + method;
+    }
+
+    @Override
+    public void clear() {
+        Map<String, Integer> map = outerWatchCtx.get();
+        map.remove(this.uuid.toString());
+        if (map.isEmpty()) {
+            outerWatchCtx.remove();
+        }
     }
 }

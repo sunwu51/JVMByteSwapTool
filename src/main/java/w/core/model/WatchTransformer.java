@@ -35,6 +35,8 @@ public class WatchTransformer extends BaseClassTransformer {
 
     int minCost;
 
+    String ognl;
+
     public WatchTransformer(WatchMessage watchMessage) {
         this.className = watchMessage.getSignature().split("#")[0];
         this.method = watchMessage.getSignature().split("#")[1];
@@ -42,6 +44,7 @@ public class WatchTransformer extends BaseClassTransformer {
         this.traceId = watchMessage.getId();
         this.printFormat = watchMessage.getPrintFormat();
         this.minCost = watchMessage.getMinCost();
+        this.ognl = watchMessage.getOgnl();
     }
 
     @Override
@@ -137,7 +140,18 @@ public class WatchTransformer extends BaseClassTransformer {
                             loadLocal(returnValueVarIndex, Type.getType(String.class));
                             mv.visitInsn(Opcodes.ACONST_NULL);
                         }
-                        mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "watchPostProcess", "(JILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V", false);
+                        loadThisOrNull();
+                        push(ognl == null ? "" : ognl);
+                        push(printFormat);
+                        mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "watchPostProcess", "(JILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/String;I)V", false);
+                    }
+
+                    private void loadThisOrNull() {
+                        if ((access & Opcodes.ACC_STATIC) == 0) {
+                            mv.visitVarInsn(Opcodes.ALOAD, 0);
+                        } else {
+                            mv.visitInsn(Opcodes.ACONST_NULL);
+                        }
                     }
 
                 };

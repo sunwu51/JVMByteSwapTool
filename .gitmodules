@@ -1,0 +1,3 @@
+[submodule "SwapperUI"]
+	path = SwapperUI
+	url = https://github.com/sunwu51/SwapperUI.git

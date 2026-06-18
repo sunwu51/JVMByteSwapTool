@@ -10,6 +10,10 @@ import w.core.model.TraceTransformer;
 import w.web.message.TraceMessage;
 
 import java.lang.instrument.Instrumentation;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * @author Frank
@@ -18,6 +22,8 @@ import java.lang.instrument.Instrumentation;
 public class TraceTest {
 
     WatchTarget target = new WatchTarget();
+
+    ChangeTarget changeTarget = new ChangeTarget();
 
     Swapper swapper = Swapper.getInstance();;
 
@@ -72,5 +78,61 @@ public class TraceTest {
         msg.setSignature("w.core.WatchTarget#ow1");
         swapper.swap(msg);
         target.ow1(1,1);
+    }
+
+    @Test
+    public void includeNestedShouldCollectLambdaAndAnonymousTargets() {
+        TraceMessage msg = new TraceMessage();
+        msg.setSignature("w.core.ChangeTarget#lambdaTest");
+        msg.setIncludeNested(true);
+        TraceTransformer transformer = new TraceTransformer(msg);
+
+        transformer.prepareNestedTargets(Collections.singleton(ChangeTarget.class));
+        Map<String, Set<String>> targetMethods = transformer.getTargetMethods();
+
+        Assertions.assertTrue(targetMethods.get("w.core.ChangeTarget").stream()
+                .anyMatch(method -> method.startsWith("lambda$lambdaTest$")));
+        Assertions.assertTrue(targetMethods.containsKey("w.core.ChangeTarget$1"));
+        Assertions.assertTrue(targetMethods.get("w.core.ChangeTarget$1").contains("*"));
+    }
+
+    @Test
+    public void includeNestedShouldTraceSynchronousLambdaRuntime() {
+        TraceMessage msg = new TraceMessage();
+        msg.setSignature("w.core.ChangeTarget#lambdaTest");
+        msg.setIncludeNested(true);
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertEquals("lambdaTest", changeTarget.lambdaTest());
+        Assertions.assertTrue(TraceTransformer.traceCtx.get().isEmpty());
+    }
+
+    @Test
+    public void duplicateTraceShouldKeepEachLogId() {
+        String firstLogId = "trace-dup-first-" + System.nanoTime();
+        String secondLogId = "trace-dup-second-" + System.nanoTime();
+        long since = System.currentTimeMillis();
+
+        TraceMessage first = new TraceMessage();
+        first.setId(firstLogId);
+        first.setSignature("w.core.WatchTarget#ow1");
+        Assertions.assertTrue(swapper.swap(first).isSuccess());
+
+        TraceMessage second = new TraceMessage();
+        second.setId(secondLogId);
+        second.setSignature("w.core.WatchTarget#ow1");
+        Assertions.assertTrue(swapper.swap(second).isSuccess());
+
+        target.ow1(1, 1);
+
+        List<Map<String, Object>> firstLogs = Global.readLogs(firstLogId, since, 20, 0);
+        List<Map<String, Object>> secondLogs = Global.readLogs(secondLogId, since, 20, 0);
+        Assertions.assertTrue(firstLogs.stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains("w.core.WatchTarget#ow1")));
+        Assertions.assertTrue(secondLogs.stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains("w.core.WatchTarget#ow1")));
+        Assertions.assertTrue(TraceTransformer.traceCtx.get().isEmpty());
     }
 }

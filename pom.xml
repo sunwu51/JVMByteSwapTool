@@ -20,22 +20,10 @@
 	</repositories>
 	<dependencies>
 		<dependency>
-			<groupId>org.nanohttpd</groupId> <!-- <groupId>com.nanohttpd</groupId> for 2.1.0 and earlier -->
+			<groupId>org.nanohttpd</groupId>
 			<artifactId>nanohttpd</artifactId>
 			<version>2.2.0</version>
 		</dependency>
-
-		<dependency>
-			<groupId>org.nanohttpd</groupId> <!-- <groupId>com.nanohttpd</groupId> for 2.1.0 and earlier -->
-			<artifactId>nanohttpd-websocket</artifactId>
-			<version>2.2.0</version>
-		</dependency>
-
-<!--		<dependency>-->
-<!--			<groupId>org.benf</groupId>-->
-<!--			<artifactId>cfr</artifactId>-->
-<!--			<version>0.152</version>-->
-<!--		</dependency>-->
 
 		<!-- https://mvnrepository.com/artifact/org.ow2.asm/asm-commons -->
 		<dependency>
@@ -179,6 +167,7 @@
 							<manifestEntries>
 								<Main-Class>w.Attach</Main-Class>
 								<Agent-Class>w.App</Agent-Class>
+								<Premain-Class>w.App</Premain-Class>
 								<Can-Retransform-Classes>true</Can-Retransform-Classes>
 							</manifestEntries>
 						</transformer>

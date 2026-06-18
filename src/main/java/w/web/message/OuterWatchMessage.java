@@ -21,4 +21,8 @@ public class OuterWatchMessage extends Message implements RequestMessage {
     String innerSignature;
 
     int printFormat = 1;
+
+    boolean includeNested = true;
+
+    String ognl;
 }

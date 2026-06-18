@@ -39,7 +39,7 @@ public class DecompileTest {
         new WatchTarget();
         DecompileMessage msg = new DecompileMessage();
         msg.setClassName("w.core.ChangeTarget");
-        Assertions.assertTrue(swapper.swap(msg));
-        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
     }
 }

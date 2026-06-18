@@ -41,7 +41,7 @@ public class ChangeBodyTest {
         msg.setMode(0);
         msg.setParamTypes(Arrays.asList());
         msg.setBody("{ return \"newName\";}");
-        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
         System.out.println(target.getName());
     }
 
@@ -53,7 +53,7 @@ public class ChangeBodyTest {
         msg.setMode(1);
         msg.setParamTypes(Arrays.asList());
         msg.setBody("{ try {w.Global.readFile(\"3.xml\");} catch(Exception e) {} return \"123\";}");
-        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
         System.out.println(target.getName());
     }
 
@@ -65,7 +65,7 @@ public class ChangeBodyTest {
         msg.setMode(1);
         msg.setParamTypes(Arrays.asList("int", "double"));
         msg.setBody("{return $1 + $2 + 100; }");
-        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
         System.out.println(target.add(1,1));
         Assertions.assertEquals(102.0, target.add(1, 1));
     }
@@ -78,7 +78,7 @@ public class ChangeBodyTest {
         msg.setMode(1);
         msg.setParamTypes(Arrays.asList());
         msg.setBody("{return 1; }");
-        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
         System.out.println(target.hashCode());
         Assertions.assertEquals(1, target.hashCode());
     }

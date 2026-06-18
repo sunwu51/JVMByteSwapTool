@@ -13,9 +13,11 @@ import java.lang.instrument.IllegalClassFormatException;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.objectweb.asm.Opcodes.ACONST_NULL;
 import static org.objectweb.asm.Opcodes.ALOAD;
@@ -49,6 +51,7 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
 
     protected int status;
 
+    private final Map<String, TransformApplyResult> applyResults = new ConcurrentHashMap<>();
 
 
     public abstract byte[] transform(byte[] origin) throws Exception;
@@ -64,9 +67,11 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
         if (Objects.equals(this.className, className)) {
             try{
                 byte[] r = transform(origin);
+                recordApplySuccess(loader, className);
                 Global.info(className + " transformer " + uuid +  " added success <(^-^)>");
                 return r;
-            } catch (Exception e) {
+            } catch (Throwable e) {
+                recordApplyFailure(loader, className, e);
                 Global.error(className + " transformer " + uuid + " added fail -(′д｀)-: ", e);
                 // async to delete, because current thread holds the class lock
                 CompletableFuture.runAsync(() -> Global.deleteTransformer(uuid));
@@ -75,9 +80,38 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
         return null;
     }
 
+    public void beginApply(Class<?> clazz) {
+        applyResults.put(applyKey(clazz), TransformApplyResult.pending(clazz, uuid));
+    }
+
+    public TransformApplyResult getApplyResult(Class<?> clazz) {
+        return applyResults.get(applyKey(clazz));
+    }
+
+    protected void recordApplySuccess(ClassLoader loader, String className) {
+        applyResults.put(applyKey(loader, className), TransformApplyResult.success(loader, className, uuid));
+    }
+
+    protected void recordApplyFailure(ClassLoader loader, String className, Throwable e) {
+        applyResults.put(applyKey(loader, className), TransformApplyResult.failure(loader, className, uuid, e));
+    }
+
+    private String applyKey(Class<?> clazz) {
+        return applyKey(clazz.getClassLoader(), clazz.getName());
+    }
+
+    private String applyKey(ClassLoader loader, String className) {
+        return className + "@" + System.identityHashCode(loader);
+    }
+
     public void clear() {
 
     }
+
+    public List<String> getExtraClassNames() {
+        return new ArrayList<>();
+    }
+
     protected String paramTypesToDescriptor(List<String> paramTypes) {
         StringBuilder s = new StringBuilder();
         for (String paramType : paramTypes) {
