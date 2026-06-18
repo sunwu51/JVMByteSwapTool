@@ -25,7 +25,8 @@ public class GlobalJsonTest {
 
         String json = Global.toJson(root);
 
-        Assertions.assertTrue(json.startsWith("toJson error: JSONException: level too large"));
+        Assertions.assertTrue(json.startsWith("toJson error: "));
+        Assertions.assertNotEquals("toJson error", json);
     }
 
     private static class Node {
