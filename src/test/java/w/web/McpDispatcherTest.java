@@ -29,6 +29,20 @@ public class McpDispatcherTest {
         Assertions.assertTrue(tools.stream().map(it -> ((JSONObject) it).getString("name")).anyMatch("watch"::equals));
         Assertions.assertTrue(tools.stream().map(it -> ((JSONObject) it).getString("name")).anyMatch("reset"::equals));
         Assertions.assertTrue(tools.stream().map(it -> ((JSONObject) it).getString("name")).anyMatch("list_transformers"::equals));
+        JSONObject watch = findTool(tools, "watch");
+        Assertions.assertNotNull(watch);
+        Assertions.assertTrue(watch.getString("description").contains("ognl"));
+        Assertions.assertTrue(watch.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("ognl")
+                .getString("description")
+                .contains("root bound to the current this object"));
+        Assertions.assertTrue(watch.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("ognl")
+                .getString("description")
+                .contains("@w.util.SpringUtils@getSpringBootApplicationContext().getBean(\"userController\").getUserById(1)"));
+
         JSONObject readLogs = findTool(tools, "read_logs");
         Assertions.assertNotNull(readLogs);
         Assertions.assertNotNull(readLogs.getJSONObject("inputSchema").getJSONObject("properties").getJSONObject("logId"));
@@ -38,11 +52,54 @@ public class McpDispatcherTest {
         JSONObject outerWatch = findTool(tools, "outer_watch");
         Assertions.assertNotNull(outerWatch);
         Assertions.assertTrue(outerWatch.getString("description").contains("*#methodName"));
+        Assertions.assertTrue(outerWatch.getString("description").contains("ognl"));
         Assertions.assertTrue(outerWatch.getJSONObject("inputSchema")
                 .getJSONObject("properties")
                 .getJSONObject("innerSignature")
                 .getString("description")
                 .contains("*#methodName"));
+        Assertions.assertTrue(outerWatch.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("ognl")
+                .getString("description")
+                .contains("root bound to the current this object"));
+        Assertions.assertTrue(outerWatch.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("ognl")
+                .getString("description")
+                .contains("@w.util.SpringUtils@getSpringBootApplicationContext().getBean(\"userController\").getUserById(1)"));
+
+        JSONObject changeResult = findTool(tools, "change_result");
+        Assertions.assertNotNull(changeResult);
+        Assertions.assertTrue(changeResult.getString("description").contains("$proceed()"));
+        Assertions.assertTrue(changeResult.getString("description").contains("$_ = xxx"));
+        Assertions.assertTrue(changeResult.getString("description").contains("w.Global.toJson"));
+        Assertions.assertTrue(changeResult.getString("description").contains("w.Global.ognl"));
+        Assertions.assertTrue(changeResult.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("body")
+                .getString("description")
+                .contains("$1 = newValue; $_ = $proceed();"));
+        Assertions.assertTrue(changeResult.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("body")
+                .getString("description")
+                .contains("w.Global.toJson"));
+        Assertions.assertTrue(changeResult.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("body")
+                .getString("description")
+                .contains("w.Global.ognl"));
+
+        JSONObject eval = findTool(tools, "eval");
+        Assertions.assertNotNull(eval);
+        Assertions.assertTrue(eval.getString("description").contains("ctx.getBean"));
+        Assertions.assertTrue(eval.getString("description").contains("interactive binding"));
+        Assertions.assertTrue(eval.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("body")
+                .getString("description")
+                .contains("variables assigned in one eval call remain available"));
     }
 
     @Test

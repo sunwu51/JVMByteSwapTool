@@ -40,6 +40,7 @@ public class OuterWatchTest {
     @BeforeEach
     public void reset() {
         Global.reset();
+        OuterWatchTransformer.outerWatchCtx.remove();
     }
 
     @Test
@@ -87,6 +88,44 @@ public class OuterWatchTest {
         Assertions.assertTrue(swapper.swap(msg).isSuccess());
         target.doubleMethodWithParams(0.1);
     }
+
+    @Test
+    public void watchShouldLogOgnlValueFromThisRoot() {
+        String logId = "watch-ognl-" + System.nanoTime();
+        long since = System.currentTimeMillis();
+        target.name = "watch-ognl-name";
+        WatchMessage msg = new WatchMessage();
+        msg.setId(logId);
+        msg.setSignature("w.core.WatchTarget#doubleMethodWithParams");
+        msg.setOgnl("name");
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        target.doubleMethodWithParams(0.1);
+
+        Assertions.assertTrue(Global.readLogs(logId, since, 20, 0).stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains("ognl:watch-ognl-name")));
+    }
+
+    @Test
+    public void outerWatchShouldLogOgnlValueFromThisRoot() {
+        String logId = "outer-watch-ognl-" + System.nanoTime();
+        long since = System.currentTimeMillis();
+        target.name = "outer-watch-ognl-name";
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setId(logId);
+        msg.setSignature("w.core.WatchTarget#ow1");
+        msg.setInnerSignature("*#add");
+        msg.setOgnl("name");
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        target.ow1(1, 2);
+
+        Assertions.assertTrue(Global.readLogs(logId, since, 20, 0).stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains("ognl:outer-watch-ognl-name")));
+    }
+
     @Test
     public void toStringTest() {
         WatchMessage msg = new WatchMessage();

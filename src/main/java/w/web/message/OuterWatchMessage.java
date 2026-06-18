@@ -23,4 +23,6 @@ public class OuterWatchMessage extends Message implements RequestMessage {
     int printFormat = 1;
 
     boolean includeNested = true;
+
+    String ognl;
 }

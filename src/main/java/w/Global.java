@@ -79,8 +79,8 @@ public class Global {
 
     private static Set<BlockingQueue<String>> logSubscribers = new CopyOnWriteArraySet<>();
     private static final Object logHistoryLock = new Object();
-    private static final int LOG_HISTORY_MAX_ENTRIES = 1000;
-    private static final long LOG_HISTORY_MAX_BYTES = 1024L * 1024L;
+    private static final int LOG_HISTORY_MAX_ENTRIES = 10000;
+    private static final long LOG_HISTORY_MAX_BYTES = 100L * 1024L * 1024L;
     private static final long LOG_READ_MAX_TIMEOUT_MS = 30000L;
     private static final int LOG_READ_DEFAULT_MAX_LINES = 100;
     private static final int LOG_READ_MAX_LINES = 500;

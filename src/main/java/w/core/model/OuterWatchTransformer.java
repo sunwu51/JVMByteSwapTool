@@ -62,6 +62,8 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
     boolean includeNested;
 
+    String ognl;
+
     private final Map<String, Set<String>> targetMethods = new LinkedHashMap<>();
 
 
@@ -74,6 +76,7 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         this.printFormat = watchMessage.getPrintFormat();
         this.traceId = watchMessage.getId();
         this.includeNested = watchMessage.isIncludeNested();
+        this.ognl = watchMessage.getOgnl();
         addTargetMethod(this.className, this.method);
     }
 
@@ -303,6 +306,16 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             int mdcVarIndex = newLocal(Type.getType(String.class));
                             mv.visitVarInsn(Opcodes.ASTORE, mdcVarIndex);
 
+                            int ognlVarIndex = -1;
+                            if (!isBlank(ognl)) {
+                                loadThisOrNull();
+                                push(ognl);
+                                push(printFormat);
+                                mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "getOgnlString", "(Ljava/lang/Object;Ljava/lang/String;I)Ljava/lang/String;", false);
+                                ognlVarIndex = newLocal(Type.getType(String.class));
+                                mv.visitVarInsn(Opcodes.ASTORE, ognlVarIndex);
+                            }
+
                             // return value duplication
                             int returnValueVarIndex = asmStoreRetString(mv, descriptor, printFormat);
                             // new StringBuilder().append("line:" + line + ", request: ").append(params).append(", response: ").append(returnValue).append(", cost: ").append(duration).append("ms");
@@ -316,6 +329,10 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             list.add(new SbNode("ms"));
                             list.add(new SbNode(", mdc: "));
                             list.add(new SbNode(ALOAD, mdcVarIndex));
+                            if (!isBlank(ognl)) {
+                                list.add(new SbNode(", ognl:"));
+                                list.add(new SbNode(ALOAD, ognlVarIndex));
+                            }
                             asmGenerateStringBuilder(mv, list);
 
                             /*---------------------counter: if reach the limitation will remove the transformer----------------*/
@@ -369,8 +386,18 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             mv.visitInsn(Opcodes.ACONST_NULL);
                         }
 
+                        loadThisOrNull();
+                        push(ognl == null ? "" : ognl);
                         push(printFormat);
-                        mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "outerWatchPostProcess", "(IJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V", false);
+                        mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "outerWatchPostProcess", "(IJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/String;I)V", false);
+                    }
+
+                    private void loadThisOrNull() {
+                        if ((access & Opcodes.ACC_STATIC) == 0) {
+                            mv.visitVarInsn(Opcodes.ALOAD, 0);
+                        } else {
+                            mv.visitInsn(Opcodes.ACONST_NULL);
+                        }
                     }
 
                 };
@@ -379,6 +406,10 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         byte[] result = classWriter.toByteArray();
         status = 1;
         return result;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private boolean shouldWatchMethod(String currentClassName, int access, String name) {

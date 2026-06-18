@@ -33,4 +33,16 @@ public class ToolTest {
     public void shouldReturnNullWhenMdcContextIsEmpty() {
         Assertions.assertEquals("null", Tool.getMdcContextMapString());
     }
+
+    @Test
+    public void shouldEvaluateOgnlWithRootObject() {
+        Root root = new Root();
+        root.name = "root-name";
+
+        Assertions.assertEquals("root-name", Tool.getOgnlString(root, "name", 1));
+    }
+
+    public static class Root {
+        public String name;
+    }
 }

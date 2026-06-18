@@ -38,6 +38,40 @@ public class HttpdTest {
     }
 
     @Test
+    public void rootShouldServeBundledUi() throws Exception {
+        int port = freePort();
+        Httpd httpd = new Httpd(port);
+        httpd.start();
+        try {
+            HttpURLConnection connection = get(port, "/");
+
+            Assertions.assertEquals(200, connection.getResponseCode());
+            Assertions.assertTrue(connection.getContentType().startsWith("text/html"));
+            String body = read(connection.getInputStream());
+            Assertions.assertTrue(body.contains("<div id=\"root\"></div>"));
+            Assertions.assertTrue(body.contains("./assets/index.js"));
+        } finally {
+            httpd.stop();
+        }
+    }
+
+    @Test
+    public void assetsShouldServeBundledUiFiles() throws Exception {
+        int port = freePort();
+        Httpd httpd = new Httpd(port);
+        httpd.start();
+        try {
+            HttpURLConnection connection = get(port, "/assets/index.css");
+
+            Assertions.assertEquals(200, connection.getResponseCode());
+            Assertions.assertTrue(connection.getContentType().startsWith("text/css"));
+            Assertions.assertTrue(read(connection.getInputStream()).contains("body"));
+        } finally {
+            httpd.stop();
+        }
+    }
+
+    @Test
     public void logShouldStreamGlobalLogs() throws Exception {
         int port = freePort();
         Httpd httpd = new Httpd(port);
@@ -71,6 +105,12 @@ public class HttpdTest {
             executor.shutdownNow();
             httpd.stop();
         }
+    }
+
+    private HttpURLConnection get(int port, String path) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL("http://127.0.0.1:" + port + path).openConnection();
+        connection.setRequestMethod("GET");
+        return connection;
     }
 
     private HttpURLConnection post(int port, String path, String body) throws Exception {

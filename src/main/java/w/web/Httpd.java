@@ -5,7 +5,9 @@ import fi.iki.elonen.NanoHTTPD;
 import w.Global;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -31,6 +33,7 @@ import static fi.iki.elonen.NanoHTTPD.Response.Status.OK;
 public class Httpd extends NanoHTTPD {
     private static final String MCP_PATH = "/mcp";
     private static final String LOG_PATH = "/log";
+    private static final String STATIC_ROOT = "/nanohttpd/";
     private static final String JSON_MIME = "application/json;charset=UTF-8";
     private static final String SSE_MIME = "text/event-stream;charset=UTF-8";
 
@@ -58,7 +61,7 @@ public class Httpd extends NanoHTTPD {
         if (LOG_PATH.equals(uri)) {
             return serveLog(session);
         }
-        return withCors(newFixedLengthResponse(NOT_FOUND, MIME_PLAINTEXT, "NOT FOUND"));
+        return serveStatic(session);
     }
 
     private Response serveMcp(IHTTPSession session) {
@@ -84,6 +87,90 @@ public class Httpd extends NanoHTTPD {
         }
 
         return new SseResponse();
+    }
+
+    private Response serveStatic(IHTTPSession session) {
+        if (session.getMethod() != Method.GET) {
+            return withCors(newFixedLengthResponse(METHOD_NOT_ALLOWED, MIME_PLAINTEXT, "METHOD NOT ALLOWED"));
+        }
+
+        String resourcePath = staticResourcePath(session.getUri());
+        byte[] bytes = readClasspathResource(resourcePath);
+        if (bytes == null && shouldFallbackToIndex(session.getUri())) {
+            resourcePath = STATIC_ROOT + "index.html";
+            bytes = readClasspathResource(resourcePath);
+        }
+        if (bytes == null) {
+            return withCors(newFixedLengthResponse(NOT_FOUND, MIME_PLAINTEXT, "NOT FOUND"));
+        }
+        Response response = newFixedLengthResponse(OK, mimeType(resourcePath), new ByteArrayInputStream(bytes), bytes.length);
+        response.addHeader("Cache-Control", resourcePath.endsWith("index.html") ? "no-cache" : "public, max-age=31536000");
+        return withCors(response);
+    }
+
+    private String staticResourcePath(String uri) {
+        String path = uri == null || uri.isEmpty() || "/".equals(uri) ? "index.html" : uri;
+        while (path.startsWith("/")) {
+            path = path.substring(1);
+        }
+        if (path.contains("..")) {
+            return STATIC_ROOT + "__not_found__";
+        }
+        return STATIC_ROOT + path;
+    }
+
+    private boolean shouldFallbackToIndex(String uri) {
+        if (uri == null || uri.isEmpty() || "/".equals(uri)) {
+            return true;
+        }
+        String path = uri.substring(uri.lastIndexOf('/') + 1);
+        return !path.contains(".");
+    }
+
+    private byte[] readClasspathResource(String resourcePath) {
+        try (InputStream input = Httpd.class.getResourceAsStream(resourcePath)) {
+            if (input == null) {
+                return null;
+            }
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            int len;
+            while ((len = input.read(buffer)) != -1) {
+                output.write(buffer, 0, len);
+            }
+            return output.toByteArray();
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private String mimeType(String resourcePath) {
+        String path = resourcePath.toLowerCase(Locale.ROOT);
+        if (path.endsWith(".html")) {
+            return "text/html;charset=UTF-8";
+        }
+        if (path.endsWith(".js")) {
+            return "application/javascript;charset=UTF-8";
+        }
+        if (path.endsWith(".css")) {
+            return "text/css;charset=UTF-8";
+        }
+        if (path.endsWith(".json")) {
+            return JSON_MIME;
+        }
+        if (path.endsWith(".svg")) {
+            return "image/svg+xml";
+        }
+        if (path.endsWith(".png")) {
+            return "image/png";
+        }
+        if (path.endsWith(".ico")) {
+            return "image/x-icon";
+        }
+        if (path.endsWith(".ttf")) {
+            return "font/ttf";
+        }
+        return "application/octet-stream";
     }
 
     private String toSseDataEvent(String message) {
