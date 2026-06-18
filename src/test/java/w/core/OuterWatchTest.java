@@ -39,20 +39,20 @@ public class OuterWatchTest {
         OuterWatchMessage msg = new OuterWatchMessage();
         msg.setSignature("w.core.WatchTarget#subMethodCall");
         msg.setInnerSignature("w.core.WatchTarget#getAge");
-        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
 
 
         OuterWatchMessage msg2 = new OuterWatchMessage();
         msg2.setSignature("w.core.WatchTarget#subMethodCall");
         msg2.setInnerSignature("*#add");
         msg2.setPrintFormat(2);
-        Assertions.assertTrue(swapper.swap(msg2));
+        Assertions.assertTrue(swapper.swap(msg2).isSuccess());
 
         OuterWatchMessage msg3 = new OuterWatchMessage();
         msg3.setSignature("w.core.WatchTarget#subMethodCall");
         msg3.setInnerSignature("*#div");
         msg3.setPrintFormat(2);
-        Assertions.assertTrue(swapper.swap(msg3));
+        Assertions.assertTrue(swapper.swap(msg3).isSuccess());
 
          try {
              target.subMethodCall();
@@ -66,7 +66,7 @@ public class OuterWatchTest {
         OuterWatchMessage msg = new OuterWatchMessage();
         msg.setSignature("w.core.WatchTarget#subMethodCallExp");
         msg.setInnerSignature("*#readFile");
-        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
         target.doubleMethodWithParams(0.1);
 
     }
@@ -76,14 +76,14 @@ public class OuterWatchTest {
         WatchMessage msg = new WatchMessage();
         msg.setSignature("w.core.WatchTarget#doubleMethodWithParams");
         msg.setPrintFormat(2);
-        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
         target.doubleMethodWithParams(0.1);
     }
     @Test
     public void toStringTest() {
         WatchMessage msg = new WatchMessage();
         msg.setSignature("w.core.WatchTarget#toString");
-        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
         System.out.println(new WatchTarget().toString());
     }
 
@@ -91,7 +91,7 @@ public class OuterWatchTest {
     public void runTest() {
         WatchMessage msg = new WatchMessage();
         msg.setSignature("w.core.WatchTarget#run");
-        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
         target.run();
     }
 }

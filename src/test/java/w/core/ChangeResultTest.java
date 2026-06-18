@@ -43,7 +43,7 @@ public class ChangeResultTest {
         msg.setInnerMethod("add");
         msg.setInnerClassName("*");
         msg.setBody("{try { $_ = 0;} catch (Exception e) {$_ = 1;}}");
-        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
         System.out.println(target.addWrapper(1,1));
     }
 
@@ -58,7 +58,7 @@ public class ChangeResultTest {
         msg.setInnerMethod("add");
         msg.setInnerClassName("*");
         msg.setBody("try { $_ = 100 /(int)$_; } catch (Exception e) {w.Global.error(\"error\", e);$_ = 33;}");
-        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
         System.out.println(target.addWrapper(1,1));
 
     }
@@ -73,7 +73,7 @@ public class ChangeResultTest {
         msg.setInnerMethod("getName");
         msg.setInnerClassName("*");
         msg.setBody("{$_= \"10086\";}");
-        Assertions.assertTrue(swapper.swap(msg));
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
         System.out.println(target.hello());
 
     }

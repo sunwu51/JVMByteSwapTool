@@ -42,7 +42,7 @@ public class ExecBundle {
         replaceClassMessage.setContent(Base64.getEncoder().encodeToString(byteCode));
         // remove the old transformer
         clear();
-        if (Swapper.getInstance().swap(replaceClassMessage)) {
+        if (Swapper.getInstance().swap(replaceClassMessage).isSuccess()) {
             invoke();
         }
     }
@@ -80,5 +80,4 @@ public class ExecBundle {
 
     }
 }
-
 

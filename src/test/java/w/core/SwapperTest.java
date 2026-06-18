@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import w.Global;
 import w.core.constant.Codes;
+import w.core.model.SwapResult;
 import w.web.message.*;
 
 import java.io.IOException;
@@ -48,25 +49,25 @@ class SwapperTest {
         WatchMessage watchMessage = new WatchMessage();
 
         watchMessage.setSignature("w.core.WatchTarget#voidMethodWithNoParams");
-        Assertions.assertTrue(swapper.swap(watchMessage));
+        Assertions.assertTrue(swapper.swap(watchMessage).isSuccess());
         target.voidMethodWithNoParams();
 
 //
 //        watchMessage.setSignature("w.core.MyInterface#interfaceMethod");
-//        Assertions.assertTrue(swapper.swap(watchMessage));
+//        Assertions.assertTrue(swapper.swap(watchMessage).isSuccess());
 //
 //        watchMessage = new WatchMessage();
 //        watchMessage.setSignature("w.core.R#interfaceMethod");
-//        Assertions.assertTrue(swapper.swap(watchMessage));
+//        Assertions.assertTrue(swapper.swap(watchMessage).isSuccess());
 //
 //
 ////        watchMessage = new WatchMessage();
 ////        watchMessage.setSignature("w.core.AbstractService#normalParentMethod");
-////        Assertions.assertTrue(swapper.swap(watchMessage));
+////        Assertions.assertTrue(swapper.swap(watchMessage).isSuccess());
 //
 ////        watchMessage = new WatchMessage();
 ////        watchMessage.setSignature("w.core.MyInterface#interfaceDefaultMethod");
-////        Assertions.assertTrue(swapper.swap(watchMessage));
+////        Assertions.assertTrue(swapper.swap(watchMessage).isSuccess());
 //
 //        r.abstractParentMethod();
 //        r.interfaceMethod();
@@ -77,7 +78,7 @@ class SwapperTest {
 //
 ////        WatchMessage watchMessage = new WatchMessage();
 ////        watchMessage.setSignature("w.core.TestClass#hello");
-////        Assertions.assertTrue(swapper.swap(watchMessage));
+////        Assertions.assertTrue(swapper.swap(watchMessage).isSuccess());
 ////        new TestClass().hello("frank", "david", "Smith");
 ////        new TestClass().hello("frank", "david", "Smith");
 ////        new TestClass().hello("frank", "david", "Smith");
@@ -86,8 +87,23 @@ class SwapperTest {
 //
 //        watchMessage = new WatchMessage();
 //        watchMessage.setSignature("w.core.TestClass#generateRandom");
-//        Assertions.assertTrue(swapper.swap(watchMessage));
+//        Assertions.assertTrue(swapper.swap(watchMessage).isSuccess());
 //        new TestClass().generateRandom();
+    }
+
+    @Test
+    public void watchMethodNotFoundShouldReturnApplyFailure() {
+        WatchMessage watchMessage = new WatchMessage();
+        watchMessage.setSignature("w.core.WatchTarget#methodNotFound");
+
+        SwapResult result = swapper.swap(watchMessage);
+
+        Assertions.assertFalse(result.isSuccess());
+        Assertions.assertEquals("retransform failed", result.getMessage());
+        Assertions.assertEquals(1, result.getApplyResults().size());
+        Assertions.assertTrue(result.getApplyResults().get(0).isCalled());
+        Assertions.assertEquals("java.lang.IllegalArgumentException", result.getApplyResults().get(0).getErrorClass());
+        Assertions.assertEquals("Method not declared here.", result.getApplyResults().get(0).getMessage());
     }
 
     @Test
@@ -95,7 +111,7 @@ class SwapperTest {
         OuterWatchMessage message = new OuterWatchMessage();
         message.setSignature("w.core.TestClass#wrapperHello");
         message.setInnerSignature("*#hello");
-        Assertions.assertTrue(swapper.swap(message));
+        Assertions.assertTrue(swapper.swap(message).isSuccess());
         t.wrapperHello("world");
         t.wrapperHello("world");
         t.wrapperHello("world");
@@ -107,7 +123,7 @@ class SwapperTest {
         TraceMessage message = new TraceMessage();
         message.setSignature("w.core.TestClass#wrapperHello");
         message.setIgnoreZero(false);
-        Assertions.assertTrue(swapper.swap(message));
+        Assertions.assertTrue(swapper.swap(message).isSuccess());
         t.wrapperHello("world");
     }
 
@@ -120,7 +136,7 @@ class SwapperTest {
         message.setMode(Codes.CHANGE_BODY_MODE_USE_JAVASSIST);
         message.setParamTypes(Arrays.asList("java.lang.String"));
         message.setBody("{return java.util.UUID.randomUUID().toString();}");
-        Assertions.assertTrue(swapper.swap(message));
+        Assertions.assertTrue(swapper.swap(message).isSuccess());
         Assertions.assertTrue(t.wrapperHello("world").length() > 30);
         System.out.println(t.wrapperHello("world"));
 
@@ -135,7 +151,7 @@ class SwapperTest {
         message.setMode(Codes.CHANGE_BODY_MODE_USE_ASM);
         message.setParamTypes(Arrays.asList("java.lang.String"));
         message.setBody("{return \"arg=\" + $1 + \", uuid=\" + java.util.UUID.randomUUID().toString();}");
-        Assertions.assertTrue(swapper.swap(message));
+        Assertions.assertTrue(swapper.swap(message).isSuccess());
         Assertions.assertTrue(t.wrapperHello("world").length() > 30);
         System.out.println(t.wrapperHello("world"));
     }
@@ -149,7 +165,7 @@ class SwapperTest {
         message.setInnerClassName("*");
         message.setInnerMethod("hello");
         message.setBody("{$_ = java.util.UUID.randomUUID().toString();}");
-        Assertions.assertTrue(swapper.swap(message));
+        Assertions.assertTrue(swapper.swap(message).isSuccess());
         Assertions.assertTrue(t.wrapperHello("world").length() > 30);
     }
 
@@ -167,7 +183,7 @@ class SwapperTest {
         TraceMessage message = new TraceMessage();
         message.setSignature("w.core.R#recursive");
         message.setIgnoreZero(false);
-        Assertions.assertTrue(swapper.swap(message));
+        Assertions.assertTrue(swapper.swap(message).isSuccess());
         for (int i = 0; i < 10; i++) {
             r.recursive(3);
         }

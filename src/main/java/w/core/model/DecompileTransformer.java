@@ -49,14 +49,17 @@ public class DecompileTransformer extends BaseClassTransformer {
         }
         className = className.replace("/", ".");
         if (className .startsWith(this.className + "$")){
+            recordApplySuccess(loader, className);
             Global.info(className + " transformer " + uuid +  " added success <(^-^)>");
             return relatedClassesCtx.get().put(className, origin);
         } else if (Objects.equals(className, this.className)) {
             try{
                 byte[] r = transform(relatedClassesCtx.get().put(className, origin));
+                recordApplySuccess(loader, className);
                 Global.info(className + " transformer " + uuid +  " added success <(^-^)>");
                 return r;
-            } catch (Exception e) {
+            } catch (Throwable e) {
+                recordApplyFailure(loader, className, e);
                 Global.error(className + " transformer " + uuid + " added fail -(′д｀)-: ", e);
                 // async to delete, because current thread holds the class lock
                 CompletableFuture.runAsync(() -> Global.deleteTransformer(uuid));

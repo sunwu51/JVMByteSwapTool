@@ -7,7 +7,9 @@ import w.core.model.ChangeResultTransformer;
 import w.core.model.DecompileTransformer;
 import w.core.model.OuterWatchTransformer;
 import w.core.model.ReplaceClassTransformer;
+import w.core.model.SwapResult;
 import w.core.model.TraceTransformer;
+import w.core.model.TransformApplyResult;
 import w.core.model.WatchTransformer;
 import w.web.message.ChangeBodyMessage;
 import w.web.message.ChangeResultMessage;
@@ -21,6 +23,8 @@ import w.web.message.WatchMessage;
 import java.lang.reflect.Modifier;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 
@@ -33,7 +37,7 @@ public class Swapper {
         return INSTANCE;
     }
 
-    public boolean swap(Message message) {
+    public SwapResult swap(Message message) {
         BaseClassTransformer transformer = null;
         try {
             switch (message.getType()) {
@@ -64,7 +68,7 @@ public class Swapper {
             }
         } catch (Throwable e) {
             Global.error("build transform error:", e);
-            return false;
+            return SwapResult.failure(message, "build transform error", e);
         }
 
         Set<Class<?>> classes = Global.allLoadedClasses.getOrDefault(transformer.getClassName(), new HashSet<>());
@@ -80,7 +84,8 @@ public class Swapper {
                 }
                 Global.error("!Error: Should use a simple pojo, but " + aClass.getName() +
                         " is a Interface or Abstract class or something wired, \nmaybe you should use: " + candidates);
-                return false;
+                return SwapResult.failure(message, "should use a simple pojo, but " + aClass.getName()
+                        + " is a Interface or Abstract class or something wired, maybe you should use: " + candidates);
             }
             classExists = true;
         }
@@ -90,7 +95,7 @@ public class Swapper {
                 classes.add(Class.forName(transformer.getClassName(), true, Global.getClassLoader()));
             } catch (ClassNotFoundException e) {
                 Global.error("Class not exist: " + transformer.getClassName());
-                return false;
+                return SwapResult.failure(message, "Class not exist: " + transformer.getClassName(), e);
             }
         }
 
@@ -108,18 +113,29 @@ public class Swapper {
         }
         finalClasses.addAll(classes);
 
+        List<TransformApplyResult> applyResults = new ArrayList<>();
         for (Class<?> aClass : finalClasses) {
+            transformer.beginApply(aClass);
             try {
                 Global.addActiveTransformer(aClass, transformer);
             } catch (Throwable e) {
                 Global.error("re transformer error:", e);
+                applyResults.add(TransformApplyResult.failure(aClass, transformer.getUuid(), e));
                 Global.deleteTransformer(transformer.getUuid());
-                return false;
+                return SwapResult.of(message, transformer, applyResults);
             }
+            TransformApplyResult applyResult = transformer.getApplyResult(aClass);
+            if (applyResult == null) {
+                applyResult = TransformApplyResult.failure(aClass, transformer.getUuid(), "transformer was not called");
+            }
+            applyResults.add(applyResult);
         }
 
-        return true;
+        SwapResult result = SwapResult.of(message, transformer, applyResults);
+        if (!result.isSuccess()) {
+            Global.deleteTransformer(transformer.getUuid());
+        }
+        return result;
     }
 }
-
 
