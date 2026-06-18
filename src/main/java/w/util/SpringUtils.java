@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author Frank
@@ -18,12 +19,14 @@ import java.util.Set;
  */
 public class SpringUtils {
     @Getter
-    static ClassLoader springBootClassLoader;
+    static volatile ClassLoader springBootClassLoader;
 
     @Getter
-    static Object springBootApplicationContext;
+    static volatile Object springBootApplicationContext;
+    static volatile int springBootApplicationContextBeanCount = -1;
 
     static final String APP_CTX_CLASS_NAME = "org.springframework.context.ApplicationContext";
+    private static final Set<ClassLoader> appendedClassLoaders = ConcurrentHashMap.newKeySet();
 
     public static boolean isSpring() {
         return springBootApplicationContext != null;
@@ -34,34 +37,44 @@ public class SpringUtils {
     }
 
 
-    public static void initFromLoadedClasses() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
+    public static boolean initFromLoadedClasses() throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         Class<?>[] loadedClasses = Global.instrumentation.getAllLoadedClasses();
         Set<ClassLoader> classLoaders = new HashSet<>();
+        Object leader = null;
+        ClassLoader leaderClassLoader = null;
+        int max = -1;
         for (Class<?> c : loadedClasses) {
             // if it is a spring boot fat jar, the class loader will be LaunchedURLClassLoader, for spring boot >1 and <3
             if (c.getClassLoader() == null) {
                 continue;
             }
-            if (classLoaders.add(c.getClassLoader())) {
+            if (classLoaders.add(c.getClassLoader()) && appendedClassLoaders.add(c.getClassLoader())) {
                 Global.classPool.appendClassPath(new LoaderClassPath(c.getClassLoader()));
             }
             if (c.getName().equals(SpringUtils.getAppCtxClassName())) {
                 Object[] instances = Global.getInstances(c);
-                int max = -1;
-                Object leader = null;
                 for (Object instance : instances) {
+                    if (!isContextReady(instance)) {
+                        continue;
+                    }
                     int count = (int) instance.getClass().getMethod("getBeanDefinitionCount").invoke(instance);
                     if (count > max) {
                         max = count;
                         leader = instance;
+                        leaderClassLoader = c.getClassLoader();
                     }
                 }
-                ClassLoader cl = c.getClassLoader();
-                System.out.println("find springboot application context is loaded by " + cl);
-                SpringUtils.springBootApplicationContext = leader;
-                SpringUtils.springBootClassLoader = c.getClassLoader();
-                break;
             }
+        }
+
+        boolean updated = false;
+        if (leader != null && shouldUpdateSpringContext(leader, max)) {
+            SpringUtils.springBootApplicationContext = leader;
+            SpringUtils.springBootClassLoader = leaderClassLoader;
+            SpringUtils.springBootApplicationContextBeanCount = max;
+            updated = true;
+            System.out.println("find springboot application context is loaded by " + leaderClassLoader
+                    + ", bean count: " + max);
         }
 
 
@@ -76,6 +89,28 @@ public class SpringUtils {
         }
         if (Objects.equals("none", xverifyValue)) {
             Global.nonVerifying = true;
+        }
+        return updated;
+    }
+
+    private static boolean shouldUpdateSpringContext(Object leader, int beanCount) {
+        Object current = SpringUtils.springBootApplicationContext;
+        if (current == null) {
+            return true;
+        }
+        if (!isContextReady(current)) {
+            return true;
+        }
+        return leader != current && beanCount > SpringUtils.springBootApplicationContextBeanCount;
+    }
+
+    private static boolean isContextReady(Object instance) {
+        try {
+            return (Boolean) instance.getClass().getMethod("isActive").invoke(instance);
+        } catch (NoSuchMethodException e) {
+            return true;
+        } catch (Exception e) {
+            return false;
         }
     }
 

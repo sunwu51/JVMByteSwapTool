@@ -14,24 +14,29 @@ import w.util.NativeUtils;
 import w.util.RequestUtils;
 import w.util.SpringUtils;
 import w.web.message.LogMessage;
-import fi.iki.elonen.NanoWSD;
 
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -53,11 +58,6 @@ public class Global {
     public static Map<String, Set<Class<?>>> allLoadedClasses = new ConcurrentHashMap<>();
 
     /**
-     * The WebSocket Server port, will set at start up, default to be 18000
-     */
-    public static int wsPort = 0;
-
-    /**
      * Whether set the java flag -Xverify:none
      */
     public static boolean nonVerifying;
@@ -77,10 +77,15 @@ public class Global {
      */
     public static ClassPool classPool = ClassPool.getDefault();
 
-    /**
-     * Connected websocket set, used to send broadcast message
-     */
-    private static Set<NanoWSD.WebSocket> webSockets = new HashSet<>();
+    private static Set<BlockingQueue<String>> logSubscribers = new CopyOnWriteArraySet<>();
+    private static final Object logHistoryLock = new Object();
+    private static final int LOG_HISTORY_MAX_ENTRIES = 1000;
+    private static final long LOG_HISTORY_MAX_BYTES = 1024L * 1024L;
+    private static final long LOG_READ_MAX_TIMEOUT_MS = 30000L;
+    private static final int LOG_READ_DEFAULT_MAX_LINES = 100;
+    private static final int LOG_READ_MAX_LINES = 500;
+    private static final Deque<StoredLog> logHistory = new ArrayDeque<>();
+    private static long logHistoryBytes = 0;
 
     /**
      * All transformers that added by this project, include all kinds of status
@@ -163,20 +168,44 @@ public class Global {
     public static native Object[] getInstances(Class<?> cls);
 
 
-    /**
-     * Add websocket client to set
-     * @param ws
-     */
-    public static void addWs(NanoWSD.WebSocket ws) {
-        webSockets.add(ws);
+    public static void addLogSubscriber(BlockingQueue<String> subscriber) {
+        logSubscribers.add(subscriber);
+        synchronized (logHistoryLock) {
+            for (StoredLog message : logHistory) {
+                subscriber.offer(message.json);
+            }
+        }
     }
 
-    /**
-     * Remove websocket
-     * @param ws
-     */
-    public static void removeWs(NanoWSD.WebSocket ws) {
-        webSockets.remove(ws);
+    public static void removeLogSubscriber(BlockingQueue<String> subscriber) {
+        logSubscribers.remove(subscriber);
+    }
+
+    public static int logSubscriberCount() {
+        return logSubscribers.size();
+    }
+
+    public static List<Map<String, Object>> readLogs(String id, long since, int maxLines, long timeoutMs) {
+        String normalizedId = id == null ? "" : id.trim();
+        long normalizedTimeout = Math.max(0, Math.min(timeoutMs, LOG_READ_MAX_TIMEOUT_MS));
+        long deadline = System.currentTimeMillis() + normalizedTimeout;
+        synchronized (logHistoryLock) {
+            List<Map<String, Object>> logs = filterLogs(normalizedId, since, maxLines);
+            while (logs.isEmpty() && normalizedTimeout > 0) {
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    break;
+                }
+                try {
+                    logHistoryLock.wait(remaining);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                logs = filterLogs(normalizedId, since, maxLines);
+            }
+            return logs;
+        }
     }
 
     /**
@@ -269,7 +298,7 @@ public class Global {
      * @param uuid
      */
     public static synchronized void deleteTransformer(UUID uuid) {
-        debug("Deleting transformer " + uuid);
+        info("Deleting transformer " + uuid);
         Set<String> delClass = new HashSet<>();
         transformers.removeIf(it -> {
             if (it.getUuid().equals(uuid)) {
@@ -315,7 +344,7 @@ public class Global {
         for (String aClass : delClass) {
             activeTransformers.remove(aClass);
         }
-        debug("Deleted transformer " + uuid);
+        info("Deleted transformer " + uuid);
     }
 
     /**
@@ -382,23 +411,81 @@ public class Global {
         send(level, content);
     }
 
-    private static synchronized void send(int level, String content) {
-        Iterator<NanoWSD.WebSocket> it = webSockets.iterator();
-        while (it.hasNext()) {
-            NanoWSD.WebSocket ws = it.next();
-            if (ws != null && ws.isOpen()) {
-                try {
-                    LogMessage message = new LogMessage();
-                    message.setId(RequestUtils.getCurTraceId());
-                    message.setContent(content);
-                    message.setLevel(level);
-                    ws.send(toJson(message));
-                } catch (IOException e) {
-                    System.err.println("send message error" + e);
-                }
-            } else {
-                it.remove();
+    private static void send(int level, String content) {
+        LogMessage message = new LogMessage();
+        message.setId(RequestUtils.getCurTraceId());
+        message.setContent(content);
+        message.setLevel(level);
+        String json = JSON.toJSONString(message);
+        StoredLog storedLog = new StoredLog(message, json);
+        synchronized (logHistoryLock) {
+            logHistory.addLast(storedLog);
+            logHistoryBytes += storedLog.bytes;
+            trimLogHistory();
+            logHistoryLock.notifyAll();
+        }
+        for (BlockingQueue<String> subscriber : logSubscribers) {
+            subscriber.offer(json);
+        }
+    }
+
+    private static List<Map<String, Object>> filterLogs(String id, long since, int maxLines) {
+        int limit = normalizeMaxLines(maxLines);
+        List<Map<String, Object>> logs = new ArrayList<>();
+        boolean readAll = "*".equals(id);
+        for (StoredLog storedLog : logHistory) {
+            LogMessage message = storedLog.message;
+            if (since > 0 && message.getTimestamp() < since) {
+                continue;
             }
+            if (!readAll && !id.equals(message.getId())) {
+                continue;
+            }
+            logs.add(logToMap(message));
+            if (logs.size() >= limit) {
+                break;
+            }
+        }
+        return logs;
+    }
+
+    private static int normalizeMaxLines(int maxLines) {
+        if (maxLines <= 0) {
+            return LOG_READ_DEFAULT_MAX_LINES;
+        }
+        return Math.min(maxLines, LOG_READ_MAX_LINES);
+    }
+
+    private static Map<String, Object> logToMap(LogMessage message) {
+        Map<String, Object> log = new LinkedHashMap<>();
+        log.put("id", message.getId());
+        log.put("level", message.getLevel());
+        log.put("timestamp", message.getTimestamp());
+        log.put("content", message.getContent());
+        log.put("type", message.getType());
+        return log;
+    }
+
+    private static void trimLogHistory() {
+        while (logHistory.size() > LOG_HISTORY_MAX_ENTRIES || logHistoryBytes > LOG_HISTORY_MAX_BYTES) {
+            StoredLog removed = logHistory.pollFirst();
+            if (removed == null) {
+                logHistoryBytes = 0;
+                break;
+            }
+            logHistoryBytes -= removed.bytes;
+        }
+    }
+
+    private static class StoredLog {
+        private final LogMessage message;
+        private final String json;
+        private final int bytes;
+
+        private StoredLog(LogMessage message, String json) {
+            this.message = message;
+            this.json = json;
+            this.bytes = json.getBytes(StandardCharsets.UTF_8).length;
         }
     }
 
