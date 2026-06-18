@@ -7,8 +7,11 @@ import javassist.Modifier;
 import lombok.Data;
 
 import org.codehaus.commons.compiler.CompileException;
-import org.objectweb.asm.*;
-import org.objectweb.asm.tree.*;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.MethodNode;
 import w.Global;
 import w.core.compiler.WCompiler;
 import w.core.constant.Codes;
@@ -148,7 +151,9 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
             m.append(Type.getReturnType(descriptor).getClassName()).append(" ").append(method).append("(");
             Type[] params = Type.getArgumentTypes(descriptor);
             for (int i = 0; i < params.length; i++) {
-                if (i != 0) m.append(", ");
+                if (i != 0) {
+                    m.append(", ");
+                }
                 m.append(params[i].getClassName()).append(" ").append("$").append(i + 1);
             }
             m.append(")");
@@ -156,7 +161,9 @@ public class ChangeBodyTransformer extends BaseClassTransformer {
             if (exceptions != null && !exceptions.isEmpty()) {
                 m.append("throws ");
                 for (int i = 0; i < exceptions.size(); i++) {
-                    if (i != 0) m.append(",");
+                    if (i != 0) {
+                        m.append(",");
+                    }
                     m.append(exceptions.get(i).replace("/", "."));
                 }
             }

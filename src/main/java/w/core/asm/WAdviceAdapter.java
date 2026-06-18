@@ -1,6 +1,8 @@
 package w.core.asm;
 
-import org.objectweb.asm.*;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.AdviceAdapter;
 
 import java.util.List;
@@ -171,47 +173,56 @@ public class WAdviceAdapter extends AdviceAdapter {
                 case Type.LONG:
                     int li = newLocal(Type.LONG_TYPE);
                     mv.visitVarInsn(LSTORE, li);
-                    index[i] = li; loads[i] = LLOAD;
+                    index[i] = li;
+                    loads[i] = LLOAD;
                     break;
                 case Type.DOUBLE:
                     int di = newLocal(Type.DOUBLE_TYPE);
                     mv.visitVarInsn(DSTORE, di);
-                    index[i] = di;loads[i] = DLOAD;
+                    index[i] = di;
+                    loads[i] = DLOAD;
                     break;
                 case Type.BOOLEAN:
                     int zi = newLocal(Type.BOOLEAN_TYPE);
                     mv.visitVarInsn(ISTORE, zi);
-                    index[i] = zi;loads[i] = ILOAD;
+                    index[i] = zi;
+                    loads[i] = ILOAD;
                     break;
                 case Type.BYTE:
                     int bi = newLocal(Type.BYTE_TYPE);
                     mv.visitVarInsn(ISTORE, bi);
-                    index[i] = bi;loads[i] = ILOAD;
+                    index[i] = bi;
+                    loads[i] = ILOAD;
                     break;
                 case Type.CHAR:
                     int ci = newLocal(Type.CHAR_TYPE);
                     mv.visitVarInsn(ISTORE, ci);
-                    index[i] = ci;loads[i] = ILOAD;
+                    index[i] = ci;
+                    loads[i] = ILOAD;
                     break;
                 case Type.SHORT:
                     int si = newLocal(Type.SHORT_TYPE);
                     mv.visitVarInsn(ISTORE, si);
-                    index[i] = si;loads[i] = ILOAD;
+                    index[i] = si;
+                    loads[i] = ILOAD;
                     break;
                 case Type.FLOAT:
                     int fi = newLocal(Type.FLOAT_TYPE);
                     mv.visitVarInsn(FSTORE, fi);
-                    index[i] = fi;loads[i] = FLOAD;
+                    index[i] = fi;
+                    loads[i] = FLOAD;
                     break;
                 case Type.INT:
                     int ii = newLocal(Type.INT_TYPE);
                     mv.visitVarInsn(ISTORE, ii);
-                    index[i] = ii;loads[i] = ILOAD;
+                    index[i] = ii;
+                    loads[i] = ILOAD;
                     break;
                 default:
                     int ai = newLocal(Type.getType(Object.class));
                     mv.visitVarInsn(ASTORE, ai);
-                    index[i] = ai;loads[i] = ALOAD;
+                    index[i] = ai;
+                    loads[i] = ALOAD;
                     break;
             }
         }

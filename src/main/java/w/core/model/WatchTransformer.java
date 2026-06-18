@@ -1,14 +1,23 @@
 package w.core.model;
 
 import lombok.Data;
-import org.objectweb.asm.*;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import w.Global;
 import w.core.asm.WAdviceAdapter;
 import w.web.message.WatchMessage;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.objectweb.asm.Opcodes.*;
+import static org.objectweb.asm.Opcodes.ASM9;
+import static org.objectweb.asm.Opcodes.ASTORE;
+import static org.objectweb.asm.Opcodes.ATHROW;
+import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 
 
 /**
@@ -50,7 +59,9 @@ public class WatchTransformer extends BaseClassTransformer {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
                 MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
-                if (!name.equals(method)) return mv;
+                if (!name.equals(method)) {
+                    return mv;
+                }
                 return new WAdviceAdapter(ASM9, mv, access, name, descriptor) {
                     private int startTimeVarIndex;
                     private int paramsVarIndex;

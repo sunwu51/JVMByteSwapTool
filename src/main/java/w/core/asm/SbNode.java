@@ -2,7 +2,9 @@ package w.core.asm;
 
 import org.objectweb.asm.MethodVisitor;
 
-import static org.objectweb.asm.Opcodes.*;
+import static org.objectweb.asm.Opcodes.ALOAD;
+import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
+import static org.objectweb.asm.Opcodes.LLOAD;
 
 /**
  * @author Frank

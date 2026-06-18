@@ -38,6 +38,13 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class Global {
+    private static final JSONWriter.Feature[] JSON_WRITER_FEATURES = {
+            JSONWriter.Feature.PrettyFormat,
+            JSONWriter.Feature.ReferenceDetection,
+            JSONWriter.Feature.IgnoreErrorGetter,
+            JSONWriter.Feature.LargeObject
+    };
+
     /**
      * JVM instrumentation, will set at start up, won't be null
      */
@@ -217,10 +224,11 @@ public class Global {
      */
     public static String toJson(Object obj) {
         try {
-            return JSON.toJSONString(obj, JSONWriter.Feature.PrettyFormat);
+            return JSON.toJSONString(obj, JSON_WRITER_FEATURES);
         } catch (Throwable e) {
-            Global.error("re transform error:", e);
-            return "toJson error";
+            Logger.getLogger(Global.class.getName())
+                    .log(Level.WARNING, "toJson error: {0}: {1}", new Object[]{e.getClass().getSimpleName(), e.getMessage()});
+            return "toJson error: " + e.getClass().getSimpleName() + ": " + e.getMessage();
         }
     }
 

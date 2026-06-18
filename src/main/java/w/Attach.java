@@ -72,7 +72,9 @@ public class Attach {
 
             while (true) {
                 int index = scanner.nextInt();
-                if (index < 0 || index > i) continue;
+                if (index < 0 || index > i) {
+                    continue;
+                }
                 if (index == i) {
                     System.out.println(">>>>>>>>>>>>Please enter the PID");
                     pid = String.valueOf(scanner.nextInt());
