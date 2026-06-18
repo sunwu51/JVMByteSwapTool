@@ -39,8 +39,12 @@ public class SpringUtils {
         Set<ClassLoader> classLoaders = new HashSet<>();
         for (Class<?> c : loadedClasses) {
             // if it is a spring boot fat jar, the class loader will be LaunchedURLClassLoader, for spring boot >1 and <3
-            if (c.getClassLoader() == null) continue;
-            if (classLoaders.add(c.getClassLoader())) Global.classPool.appendClassPath(new LoaderClassPath(c.getClassLoader()));
+            if (c.getClassLoader() == null) {
+                continue;
+            }
+            if (classLoaders.add(c.getClassLoader())) {
+                Global.classPool.appendClassPath(new LoaderClassPath(c.getClassLoader()));
+            }
             if (c.getName().equals(SpringUtils.getAppCtxClassName())) {
                 Object[] instances = Global.getInstances(c);
                 int max = -1;

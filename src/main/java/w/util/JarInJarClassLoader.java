@@ -188,7 +188,8 @@ public class JarInJarClassLoader extends URLClassLoader {
                             int size = (int) jarEntry.getSize();
                             if (size > 0) {
                                 cachedContent = new byte[size];
-                                int totalRead = 0, bytesRead;
+                                int totalRead = 0;
+                                int bytesRead;
                                 while (totalRead < size &&
                                         (bytesRead = is.read(cachedContent, totalRead, size - totalRead)) != -1) {
                                     totalRead += bytesRead;

@@ -44,7 +44,9 @@ public class DecompileTransformer extends BaseClassTransformer {
 
     @Override
     public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] origin) throws IllegalClassFormatException {
-        if (className == null) return origin;
+        if (className == null) {
+            return origin;
+        }
         className = className.replace("/", ".");
         if (className .startsWith(this.className + "$")){
             Global.info(className + " transformer " + uuid +  " added success <(^-^)>");

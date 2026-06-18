@@ -1,8 +1,14 @@
 package w.core.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.alibaba.fastjson2.annotation.JSONField;
 import lombok.Data;
-import org.objectweb.asm.*;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import w.Global;
 import w.core.asm.SbNode;
 import w.core.asm.WAdviceAdapter;
@@ -11,7 +17,11 @@ import w.web.message.OuterWatchMessage;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.objectweb.asm.Opcodes.*;
+import static org.objectweb.asm.Opcodes.ALOAD;
+import static org.objectweb.asm.Opcodes.ASM9;
+import static org.objectweb.asm.Opcodes.INVOKESTATIC;
+import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
+import static org.objectweb.asm.Opcodes.LLOAD;
 
 
 /**
@@ -21,7 +31,7 @@ import static org.objectweb.asm.Opcodes.*;
 @Data
 public class OuterWatchTransformer extends BaseClassTransformer {
 
-    @JsonIgnore
+    @JSONField(serialize = false, deserialize = false)
     transient OuterWatchMessage message;
 
     String method;
@@ -57,7 +67,9 @@ public class OuterWatchTransformer extends BaseClassTransformer {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
                 MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
-                if (!name.equals(method)) return mv;
+                if (!name.equals(method)) {
+                    return mv;
+                }
                 return new WAdviceAdapter(ASM9, mv, access, name, descriptor) {
                     private int line;
                     private int startTimeVarIndex;

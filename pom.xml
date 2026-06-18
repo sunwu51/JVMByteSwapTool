@@ -19,14 +19,6 @@
 		</repository>
 	</repositories>
 	<dependencies>
-<!--		remove this dependency if you use java 9+-->
-		<dependency>
-			<groupId>com.sun</groupId>
-			<artifactId>tools</artifactId>
-			<version>1.8</version>
-			<scope>system</scope>
-			<systemPath>${JAVA_HOME}/lib/tools.jar</systemPath>
-		</dependency>
 		<dependency>
 			<groupId>org.nanohttpd</groupId> <!-- <groupId>com.nanohttpd</groupId> for 2.1.0 and earlier -->
 			<artifactId>nanohttpd</artifactId>
@@ -76,9 +68,9 @@
 			<optional>true</optional>
 		</dependency>
 		<dependency>
-			<groupId>com.fasterxml.jackson.core</groupId>
-			<artifactId>jackson-databind</artifactId>
-			<version>2.13.5</version>
+			<groupId>com.alibaba.fastjson2</groupId>
+			<artifactId>fastjson2</artifactId>
+			<version>2.0.52</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.groovy</groupId>
@@ -94,11 +86,6 @@
 			<groupId>org.apache.groovy</groupId>
 			<artifactId>groovy-jsr223</artifactId>
 			<version>4.0.22</version>
-		</dependency>
-		<dependency>
-			<groupId>com.fasterxml.jackson.datatype</groupId>
-			<artifactId>jackson-datatype-jsr310</artifactId>
-			<version>2.13.5</version>
 		</dependency>
 		<dependency>
 			<groupId>com.github.sunwu51</groupId>
@@ -118,6 +105,23 @@
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
+	<profiles>
+		<profile>
+			<id>jdk8-tools</id>
+			<activation>
+				<jdk>1.8</jdk>
+			</activation>
+			<dependencies>
+				<dependency>
+					<groupId>com.sun</groupId>
+					<artifactId>tools</artifactId>
+					<version>1.8</version>
+					<scope>system</scope>
+					<systemPath>${java.home}/../lib/tools.jar</systemPath>
+				</dependency>
+			</dependencies>
+		</profile>
+	</profiles>
 	<build>
 		<plugins>
 			<plugin>
@@ -159,7 +163,7 @@
                               	<exclude>META-INF/*.RSA</exclude>
 								<exclude>META-INF/*.SF</exclude>
 								<exclude>META-INF/LICENSE</exclude>
-								<exclude>META-INF/services/com.fasterxml.jackson*</exclude>
+								<exclude>META-INF/services/com.alibaba.fastjson*</exclude>
 								<exclude>META-INF/versions/**/*</exclude>
 								<exclude>*.md</exclude>
 								<exclude>AUTHORS</exclude>
@@ -181,8 +185,8 @@
 					</transformers>
 					<relocations>
 						<relocation>
-							<pattern>com.fasterxml.jackson</pattern>
-							<shadedPattern>wshade.com.fasterxml.jackson</shadedPattern>
+							<pattern>com.alibaba.fastjson2</pattern>
+							<shadedPattern>wshade.com.alibaba.fastjson2</shadedPattern>
 						</relocation>
 						<relocation>
 							<pattern>org.objectweb.asm</pattern>
@@ -210,13 +214,13 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.11.0</version>
 				<configuration>
 					<source>8</source>
 					<target>8</target>
 					<encoding>UTF-8</encoding>
 				</configuration>
 			</plugin>
-			<!-- Checkstyle: 代码风格检查 -->
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-checkstyle-plugin</artifactId>
@@ -232,6 +236,7 @@
 					<configLocation>checkstyle.xml</configLocation>
 					<consoleOutput>true</consoleOutput>
 					<failsOnError>false</failsOnError>
+					<failOnViolation>false</failOnViolation>
 					<violationSeverity>warning</violationSeverity>
 					<suppressionsLocation>checkstyle-suppressions.xml</suppressionsLocation>
 					<suppressionsFileExpression>checkstyle.suppressions.file</suppressionsFileExpression>

@@ -6,12 +6,19 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import lombok.Data;
-import org.objectweb.asm.*;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
+import org.objectweb.asm.Type;
 import w.Global;
 import w.core.asm.WAdviceAdapter;
 import w.web.message.TraceMessage;
 
 import static org.objectweb.asm.Opcodes.ASM9;
+import static org.objectweb.asm.Opcodes.INVOKESTATIC;
+import static org.objectweb.asm.Opcodes.LLOAD;
 
 @Data
 public class TraceTransformer extends BaseClassTransformer {
@@ -49,7 +56,9 @@ public class TraceTransformer extends BaseClassTransformer {
             @Override
             public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
                 MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
-                if (!name.equals(method)) return mv;
+                if (!name.equals(method)) {
+                    return mv;
+                }
                 effect.set(true);
                 return new WAdviceAdapter(ASM9, mv, access, name, descriptor) {
                     private int startTimeVarIndex;

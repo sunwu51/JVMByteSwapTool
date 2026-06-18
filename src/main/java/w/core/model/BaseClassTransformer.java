@@ -7,6 +7,7 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
 import w.Global;
+
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.security.ProtectionDomain;
@@ -16,7 +17,22 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-import static org.objectweb.asm.Opcodes.*;
+import static org.objectweb.asm.Opcodes.ACONST_NULL;
+import static org.objectweb.asm.Opcodes.ALOAD;
+import static org.objectweb.asm.Opcodes.ASTORE;
+import static org.objectweb.asm.Opcodes.DCONST_0;
+import static org.objectweb.asm.Opcodes.DLOAD;
+import static org.objectweb.asm.Opcodes.DSTORE;
+import static org.objectweb.asm.Opcodes.FCONST_0;
+import static org.objectweb.asm.Opcodes.FLOAD;
+import static org.objectweb.asm.Opcodes.FSTORE;
+import static org.objectweb.asm.Opcodes.ICONST_0;
+import static org.objectweb.asm.Opcodes.ILOAD;
+import static org.objectweb.asm.Opcodes.ISTORE;
+import static org.objectweb.asm.Opcodes.LCONST_0;
+import static org.objectweb.asm.Opcodes.LLOAD;
+import static org.objectweb.asm.Opcodes.LSTORE;
+import static org.objectweb.asm.Opcodes.NOP;
 
 /**
  * @author Frank
@@ -41,7 +57,9 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
 
     @Override
     public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] origin) throws IllegalClassFormatException {
-        if (className == null) return origin;
+        if (className == null) {
+            return origin;
+        }
         className = className.replace("/", ".");
         if (Objects.equals(this.className, className)) {
             try{

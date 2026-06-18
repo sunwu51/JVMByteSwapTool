@@ -70,10 +70,13 @@ public class GroovyBundle {
         new Thread(() -> {
             BufferedReader reader1 = new BufferedReader(new InputStreamReader(process.getInputStream()));
             BufferedReader reader2 = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-            String line1, line2;
+            String line1;
+            String line2;
             while (true) {
                 try {
-                    if ((line1 = reader1.readLine()) == null) break;
+                    if ((line1 = reader1.readLine()) == null) {
+                        break;
+                    }
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -81,7 +84,9 @@ public class GroovyBundle {
             }
             while (true) {
                 try {
-                    if ((line2 = reader2.readLine()) == null) break;
+                    if ((line2 = reader2.readLine()) == null) {
+                        break;
+                    }
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -102,7 +107,9 @@ public class GroovyBundle {
             // For entrypoint class, must load it by self
             if (name.equals(GroovyBundle.class.getName())) {
                 Class<?> c = findLoadedClass(name);
-                if (c != null) return c;
+                if (c != null) {
+                    return c;
+                }
                 return findClass(name);
             }
             try {
@@ -115,4 +122,3 @@ public class GroovyBundle {
         }
     }
 }
-

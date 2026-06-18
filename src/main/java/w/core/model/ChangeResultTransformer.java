@@ -1,6 +1,6 @@
 package w.core.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.alibaba.fastjson2.annotation.JSONField;
 import javassist.CannotCompileException;
 import javassist.CtClass;
 import javassist.CtMethod;
@@ -9,8 +9,20 @@ import javassist.expr.ExprEditor;
 import javassist.expr.MethodCall;
 import lombok.Data;
 import org.codehaus.commons.compiler.CompileException;
-import org.objectweb.asm.*;
-import org.objectweb.asm.tree.*;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.IincInsnNode;
+import org.objectweb.asm.tree.InsnList;
+import org.objectweb.asm.tree.JumpInsnNode;
+import org.objectweb.asm.tree.LabelNode;
+import org.objectweb.asm.tree.LineNumberNode;
+import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.TryCatchBlockNode;
+import org.objectweb.asm.tree.VarInsnNode;
 import w.Global;
 import w.core.compiler.WCompiler;
 import w.core.constant.Codes;
@@ -34,7 +46,14 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-import static org.objectweb.asm.Opcodes.*;
+import static org.objectweb.asm.Opcodes.ASTORE;
+import static org.objectweb.asm.Opcodes.DSTORE;
+import static org.objectweb.asm.Opcodes.FSTORE;
+import static org.objectweb.asm.Opcodes.GOTO;
+import static org.objectweb.asm.Opcodes.INVOKESTATIC;
+import static org.objectweb.asm.Opcodes.ISTORE;
+import static org.objectweb.asm.Opcodes.LSTORE;
+import static org.objectweb.asm.Opcodes.RETURN;
 
 /**
  * @author Frank
@@ -43,7 +62,7 @@ import static org.objectweb.asm.Opcodes.*;
 @Data
 public class ChangeResultTransformer extends BaseClassTransformer {
 
-    @JsonIgnore
+    @JSONField(serialize = false, deserialize = false)
     transient ChangeResultMessage message;
 
     String method;
@@ -122,7 +141,8 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         ClassNode classNode = new ClassNode();
         cr.accept(classNode, ClassReader.EXPAND_FRAMES);
         MethodNode[] nodes  = getOuterAndReplacementMethodNode(classNode);
-        MethodNode outerNode = nodes[0], replacementNode = nodes[1];
+        MethodNode outerNode = nodes[0];
+        MethodNode replacementNode = nodes[1];
         // replace the innerMethod with the replacement
         InsnList list = new InsnList();
         int curMaxLocals = outerNode.maxLocals;
@@ -137,12 +157,16 @@ public class ChangeResultTransformer extends BaseClassTransformer {
                     Map<LabelNode, LabelNode> labels = new HashMap<>();
                     // clone all labels
                     for (AbstractInsnNode repInsn : replacementNode.instructions) {
-                        if (repInsn instanceof LabelNode) labels.put((LabelNode) repInsn, new LabelNode());
+                        if (repInsn instanceof LabelNode) {
+                            labels.put((LabelNode) repInsn, new LabelNode());
+                        }
                     }
                     LabelNode endLabel = new LabelNode();
                     // clone every node in replacement, ignore linenumber, return.
                     for (AbstractInsnNode repInsn : replacementNode.instructions) {
-                        if (repInsn instanceof LineNumberNode) continue;
+                        if (repInsn instanceof LineNumberNode) {
+                            continue;
+                        }
                         if (repInsn.getOpcode() == RETURN) {
                             list.add(new JumpInsnNode(GOTO, endLabel));
                             continue;
