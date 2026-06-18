@@ -17,5 +17,5 @@ public class TraceMessage extends Message {
 
     boolean ignoreZero;
 
-    boolean includeNested;
+    boolean includeNested = true;
 }

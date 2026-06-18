@@ -286,10 +286,19 @@ public class Global {
      * @throws UnmodifiableClassException
      */
     public static synchronized void addActiveTransformer(Class<?> c, BaseClassTransformer transformer) throws UnmodifiableClassException {
+        if (!isModifiableClass(c)) {
+            throw new UnmodifiableClassException(c.getName());
+        }
         String className = c.getName();
         String classLoader = c.getClassLoader().toString();
         activeTransformers.computeIfAbsent(className, k->new HashMap<>()).computeIfAbsent(classLoader, k->new ArrayList<>()).add(transformer);
         instrumentation.retransformClasses(c);
+    }
+
+    public static boolean isModifiableClass(Class<?> clazz) {
+        return clazz != null
+                && instrumentation != null
+                && instrumentation.isModifiableClass(clazz);
     }
 
 
@@ -317,6 +326,10 @@ public class Global {
                 }
 
                 for (Class<?> aClass : effectedClasses) {
+                    if (!isModifiableClass(aClass)) {
+                        debug("skip unmodifiable class on delete retransform: " + aClass.getName());
+                        continue;
+                    }
                     try {
                         instrumentation.retransformClasses(aClass);
                     } catch (Exception e) {

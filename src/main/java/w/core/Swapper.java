@@ -102,6 +102,9 @@ public class Swapper {
         if (transformer instanceof TraceTransformer) {
             classes.addAll(((TraceTransformer) transformer).prepareNestedTargets(classes));
         }
+        if (transformer instanceof OuterWatchTransformer) {
+            classes.addAll(((OuterWatchTransformer) transformer).prepareNestedTargets(classes));
+        }
 
         Global.addTransformer(transformer);
         Global.debug("add transformer" + transformer.getUuid() +" finish, will retrans class");
@@ -113,6 +116,7 @@ public class Swapper {
             Global.allLoadedClasses.entrySet().stream()
                     .filter(entry -> entry.getKey().startsWith(outerClassName + "$"))
                     .flatMap(entry -> entry.getValue().stream())
+                    .filter(Global::isModifiableClass)
                     .forEach(finalClasses::add);
         }
         finalClasses.addAll(classes);

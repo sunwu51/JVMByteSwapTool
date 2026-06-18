@@ -137,7 +137,8 @@ public class WatchTransformer extends BaseClassTransformer {
                             loadLocal(returnValueVarIndex, Type.getType(String.class));
                             mv.visitInsn(Opcodes.ACONST_NULL);
                         }
-                        mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "watchPostProcess", "(JILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V", false);
+                        push(printFormat);
+                        mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "watchPostProcess", "(JILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V", false);
                     }
 
                 };

@@ -1,15 +1,21 @@
 package w.core;
 
 import net.bytebuddy.agent.ByteBuddyAgent;
+import org.slf4j.MDC;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import w.Global;
+import w.core.model.OuterWatchTransformer;
 import w.web.message.OuterWatchMessage;
 import w.web.message.WatchMessage;
 
 import java.lang.instrument.Instrumentation;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * @author Frank
@@ -18,6 +24,8 @@ import java.lang.instrument.Instrumentation;
 public class OuterWatchTest {
 
     WatchTarget target = new WatchTarget();
+
+    ChangeTarget changeTarget = new ChangeTarget();
 
     Swapper swapper = Swapper.getInstance();;
 
@@ -93,5 +101,75 @@ public class OuterWatchTest {
         msg.setSignature("w.core.WatchTarget#run");
         Assertions.assertTrue(swapper.swap(msg).isSuccess());
         target.run();
+    }
+
+    @Test
+    public void includeNestedShouldCollectLambdaTargets() {
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setSignature("w.core.ChangeTarget#outerWatchLambdaTest");
+        msg.setInnerSignature("w.core.ChangeTarget#hello");
+        msg.setIncludeNested(true);
+        OuterWatchTransformer transformer = new OuterWatchTransformer(msg);
+
+        transformer.prepareNestedTargets(Collections.singleton(ChangeTarget.class));
+        Map<String, Set<String>> targetMethods = transformer.getTargetMethods();
+
+        Assertions.assertTrue(targetMethods.get("w.core.ChangeTarget").stream()
+                .anyMatch(method -> method.startsWith("lambda$outerWatchLambdaTest$")));
+    }
+
+    @Test
+    public void includeNestedShouldWatchSynchronousLambdaInnerCall() {
+        String logId = "outer-watch-nested-" + System.nanoTime();
+        long since = System.currentTimeMillis();
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setId(logId);
+        msg.setSignature("w.core.ChangeTarget#outerWatchLambdaTest");
+        msg.setInnerSignature("w.core.ChangeTarget#hello");
+        msg.setIncludeNested(true);
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        try {
+            MDC.put("outerWatchLogId", logId);
+            Assertions.assertEquals("outerWatchLambdaTest", changeTarget.outerWatchLambdaTest());
+        } finally {
+            MDC.clear();
+        }
+        List<Map<String, Object>> logs = Global.readLogs(logId, since, 20, 0);
+
+        Assertions.assertTrue(logs.stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains("user will save")));
+        Assertions.assertTrue(logs.stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains("outerWatchLogId=" + logId)));
+        Assertions.assertTrue(OuterWatchTransformer.outerWatchCtx.get().isEmpty());
+    }
+
+    @Test
+    public void duplicateOuterWatchShouldKeepEachLogId() {
+        String firstLogId = "outer-watch-dup-first-" + System.nanoTime();
+        String secondLogId = "outer-watch-dup-second-" + System.nanoTime();
+        long since = System.currentTimeMillis();
+
+        OuterWatchMessage first = new OuterWatchMessage();
+        first.setId(firstLogId);
+        first.setSignature("w.core.WatchTarget#subMethodCall");
+        first.setInnerSignature("w.core.WatchTarget#getAge");
+        Assertions.assertTrue(swapper.swap(first).isSuccess());
+
+        OuterWatchMessage second = new OuterWatchMessage();
+        second.setId(secondLogId);
+        second.setSignature("w.core.WatchTarget#subMethodCall");
+        second.setInnerSignature("w.core.WatchTarget#getAge");
+        Assertions.assertTrue(swapper.swap(second).isSuccess());
+
+        try {
+            target.subMethodCall();
+        } catch (Exception ignored) {
+        }
+
+        Assertions.assertFalse(Global.readLogs(firstLogId, since, 20, 0).isEmpty());
+        Assertions.assertFalse(Global.readLogs(secondLogId, since, 20, 0).isEmpty());
     }
 }

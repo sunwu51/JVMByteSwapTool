@@ -34,6 +34,15 @@ public class McpDispatcherTest {
         Assertions.assertNotNull(readLogs.getJSONObject("inputSchema").getJSONObject("properties").getJSONObject("logId"));
         Assertions.assertNull(readLogs.getJSONObject("inputSchema").getJSONObject("properties").getJSONObject("id"));
         Assertions.assertTrue(readLogs.getJSONObject("inputSchema").getJSONArray("required").contains("logId"));
+
+        JSONObject outerWatch = findTool(tools, "outer_watch");
+        Assertions.assertNotNull(outerWatch);
+        Assertions.assertTrue(outerWatch.getString("description").contains("*#methodName"));
+        Assertions.assertTrue(outerWatch.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("innerSignature")
+                .getString("description")
+                .contains("*#methodName"));
     }
 
     @Test

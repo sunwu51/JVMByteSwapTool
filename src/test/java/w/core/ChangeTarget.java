@@ -56,4 +56,10 @@ public class ChangeTarget implements Runnable {
         Arrays.asList(1,2,3).stream().map(it -> it * it).filter(it -> it > 2).forEach(System.out::println);
         return "lambdaTest";
     }
+
+    public String outerWatchLambdaTest() {
+        Runnable r = () -> hello();
+        r.run();
+        return "outerWatchLambdaTest";
+    }
 }

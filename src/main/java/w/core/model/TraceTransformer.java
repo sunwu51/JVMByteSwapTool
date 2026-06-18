@@ -332,16 +332,24 @@ public class TraceTransformer extends BaseClassTransformer {
             if (cost >= minCost) {
                 w.Global.checkCountAndUnload(uuid);
                 w.util.RequestUtils.fillCurThread(traceId);
-                sb.append(outerSig).append(", total cost:").append(cost).append("ms\n");
-                Map<String, int[]> map = ctx.traceContent;
-                map.forEach((k, v) -> {
-                    if (v[0] != 0 || !ignoreZero) {
-                        sb.append(">>").append(k).append(" hit:").append(v[1]).append("times, total cost:").append(v[0]).append("ms\n");
-                    }
-                });
-                w.Global.info(sb);
+                try {
+                    sb.append(outerSig).append(", total cost:").append(cost).append("ms\n");
+                    Map<String, int[]> map = ctx.traceContent;
+                    map.forEach((k, v) -> {
+                        if (v[0] != 0 || !ignoreZero) {
+                            sb.append(">>").append(k).append(" hit:").append(v[1]).append("times, total cost:").append(v[0]).append("ms\n");
+                        }
+                    });
+                    w.Global.info(sb);
+                } finally {
+                    w.util.RequestUtils.clearRequestCtx();
+                }
             }
-            traceCtx.remove();
+            Map<String, TraceCtx> ctxMap = traceCtx.get();
+            ctxMap.remove(uuid);
+            if (ctxMap.isEmpty()) {
+                traceCtx.remove();
+            }
         }
     }
 
