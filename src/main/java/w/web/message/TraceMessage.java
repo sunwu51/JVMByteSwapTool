@@ -16,4 +16,6 @@ public class TraceMessage extends Message {
     int minCost;
 
     boolean ignoreZero;
+
+    boolean includeNested;
 }

@@ -307,6 +307,9 @@ public class Global {
                 instrumentation.removeTransformer(it);
                 Set<Class<?>> effectedClasses = new HashSet<>();
                 effectedClasses.addAll(allLoadedClasses.getOrDefault(it.getClassName(), new HashSet<>()));
+                for (String extraClassName : it.getExtraClassNames()) {
+                    effectedClasses.addAll(allLoadedClasses.getOrDefault(extraClassName, new HashSet<>()));
+                }
                 if (it instanceof DecompileTransformer) {
                     allLoadedClasses.keySet().stream()
                             .filter(k -> k.startsWith(it.getClassName() + "$"))

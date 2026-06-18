@@ -71,7 +71,7 @@ public class Swapper {
             return SwapResult.failure(message, "build transform error", e);
         }
 
-        Set<Class<?>> classes = Global.allLoadedClasses.getOrDefault(transformer.getClassName(), new HashSet<>());
+        Set<Class<?>> classes = new LinkedHashSet<>(Global.allLoadedClasses.getOrDefault(transformer.getClassName(), new HashSet<>()));
 
         boolean classExists = false;
         for (Class<?> aClass : classes) {
@@ -97,6 +97,10 @@ public class Swapper {
                 Global.error("Class not exist: " + transformer.getClassName());
                 return SwapResult.failure(message, "Class not exist: " + transformer.getClassName(), e);
             }
+        }
+
+        if (transformer instanceof TraceTransformer) {
+            classes.addAll(((TraceTransformer) transformer).prepareNestedTargets(classes));
         }
 
         Global.addTransformer(transformer);
@@ -138,4 +142,3 @@ public class Swapper {
         return result;
     }
 }
-

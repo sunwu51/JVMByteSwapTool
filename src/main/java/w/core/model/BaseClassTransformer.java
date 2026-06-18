@@ -107,6 +107,11 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
     public void clear() {
 
     }
+
+    public List<String> getExtraClassNames() {
+        return new ArrayList<>();
+    }
+
     protected String paramTypesToDescriptor(List<String> paramTypes) {
         StringBuilder s = new StringBuilder();
         for (String paramType : paramTypes) {
