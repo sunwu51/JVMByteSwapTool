@@ -4,8 +4,9 @@ on:
   push:
     branches:
       - master
-    tags:
-      - 'v*'
+
+permissions:
+  contents: write
 
 jobs:
   build-java:
@@ -20,7 +21,9 @@ jobs:
           distribution: 'adopt'
       - name: Build Java with Maven
         run: |
-          mvn package && cp target/swapper-0.0.1-SNAPSHOT.jar swapper.jar
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          mvn package
+          cp "target/swapper-${VERSION}.jar" swapper.jar
         shell: bash
       - name: Upload Jar
         uses: actions/upload-artifact@v4
@@ -40,28 +43,60 @@ jobs:
       
 
   release:
-    if: startsWith(github.ref, 'refs/tags/')
     needs: ["build-java"]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up JDK 8
+        uses: actions/setup-java@v3
+        with:
+          java-version: '8'
+          distribution: 'adopt'
+      - name: Check Version Change
+        id: version
+        run: |
+          CURRENT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          PREVIOUS_VERSION=""
+          BEFORE_SHA="${{ github.event.before }}"
+
+          if [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ] && git show "${BEFORE_SHA}:pom.xml" > previous-pom.xml 2>/dev/null; then
+            PREVIOUS_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -f previous-pom.xml)
+          fi
+
+          echo "current=${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "previous=${PREVIOUS_VERSION}" >> "$GITHUB_OUTPUT"
+
+          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
       - name: Download Artifacts
+        if: steps.version.outputs.changed == 'true'
         uses: actions/download-artifact@v4
       - name: tree
+        if: steps.version.outputs.changed == 'true'
         run: |
           tree artifacts
       - name: Create Release
+        if: steps.version.outputs.changed == 'true'
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          tag_name: v${{ steps.version.outputs.current }}
+          release_name: Release v${{ steps.version.outputs.current }}
           draft: false
           prerelease: false
       - name: Upload Release Assets
+        if: steps.version.outputs.changed == 'true'
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: v${{ steps.version.outputs.current }}
           files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
