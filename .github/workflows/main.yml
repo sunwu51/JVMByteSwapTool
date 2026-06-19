@@ -74,29 +74,31 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
         shell: bash
-      - name: Download Artifacts
+      - name: Check Release Exists
         if: steps.version.outputs.changed == 'true'
-        uses: actions/download-artifact@v4
-      - name: tree
-        if: steps.version.outputs.changed == 'true'
-        run: |
-          tree artifacts
-      - name: Create Release
-        if: steps.version.outputs.changed == 'true'
-        id: create_release
-        uses: actions/create-release@v1
+        id: release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.version.outputs.current }}
-          release_name: Release v${{ steps.version.outputs.current }}
-          draft: false
-          prerelease: false
+        run: |
+          if gh release view "v${{ steps.version.outputs.current }}" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+        shell: bash
+      - name: Download Artifacts
+        if: steps.version.outputs.changed == 'true' && steps.release.outputs.exists == 'false'
+        uses: actions/download-artifact@v4
+      - name: tree
+        if: steps.version.outputs.changed == 'true' && steps.release.outputs.exists == 'false'
+        run: |
+          tree artifacts
       - name: Upload Release Assets
-        if: steps.version.outputs.changed == 'true'
+        if: steps.version.outputs.changed == 'true' && steps.release.outputs.exists == 'false'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.version.outputs.current }}
+          name: Release v${{ steps.version.outputs.current }}
           files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
