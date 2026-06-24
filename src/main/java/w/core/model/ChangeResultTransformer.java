@@ -301,13 +301,20 @@ public class ChangeResultTransformer extends BaseClassTransformer {
 
         String sourceCode = template.replace("{{fields_placeholder}}", fields_placeholder)
                 .replace("{{args_placeholder}}", args_placeholder)
-                .replace("{{body_placeholder}}", body)
+                .replace("{{body_placeholder}}", normalizeAsmBody(body))
                 .replace("{{package_placeholder}}", "package w;")
                 .replace("{{return_type}}", returnType.getClassName())
                 ;
 
         byte[] res = WCompiler.compileWholeClass(sourceCode);
         return res;
+    }
+
+    private static String normalizeAsmBody(String body) {
+        if (body == null) {
+            return "";
+        }
+        return body.replaceAll("\\$proceed\\s*\\(\\s*\\$\\$\\s*\\)", "\\$proceed()");
     }
 
     private static String getTemplate() {

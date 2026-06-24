@@ -49,12 +49,14 @@ public class DecompileTransformer extends BaseClassTransformer {
         }
         className = className.replace("/", ".");
         if (className .startsWith(this.className + "$")){
+            relatedClassesCtx.get().put(className, origin);
             recordApplySuccess(loader, className);
             Global.info(className + " transformer " + uuid +  " added success <(^-^)>");
-            return relatedClassesCtx.get().put(className, origin);
+            return origin;
         } else if (Objects.equals(className, this.className)) {
             try{
-                byte[] r = transform(relatedClassesCtx.get().put(className, origin));
+                relatedClassesCtx.get().put(className, origin);
+                byte[] r = transform(origin);
                 recordApplySuccess(loader, className);
                 Global.info(className + " transformer " + uuid +  " added success <(^-^)>");
                 return r;

@@ -1,13 +1,13 @@
 package w;
 
 import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONWriter;
 import javassist.ClassPool;
 import ognl.DefaultMemberAccess;
 import ognl.DefaultTypeConverter;
 import ognl.Ognl;
 import ognl.OgnlContext;
 import ognl.OgnlException;
+import w.core.JsonBridgeBundle;
 import w.core.model.BaseClassTransformer;
 import w.core.model.DecompileTransformer;
 import w.util.NativeUtils;
@@ -43,13 +43,6 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class Global {
-    private static final JSONWriter.Feature[] JSON_WRITER_FEATURES = {
-            JSONWriter.Feature.PrettyFormat,
-            JSONWriter.Feature.ReferenceDetection,
-            JSONWriter.Feature.IgnoreErrorGetter,
-            JSONWriter.Feature.LargeObject
-    };
-
     /**
      * JVM instrumentation, will set at start up, won't be null
      */
@@ -253,7 +246,7 @@ public class Global {
      */
     public static String toJson(Object obj) {
         try {
-            return JSON.toJSONString(obj, JSON_WRITER_FEATURES);
+            return JsonBridgeBundle.toJson(obj);
         } catch (Throwable e) {
             Logger.getLogger(Global.class.getName())
                     .log(Level.WARNING, "toJson error: {0}: {1}", new Object[]{e.getClass().getSimpleName(), e.getMessage()});
