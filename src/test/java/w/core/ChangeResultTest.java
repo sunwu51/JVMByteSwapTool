@@ -64,6 +64,21 @@ public class ChangeResultTest {
     }
 
     @Test
+    public void asmShouldSupportJavassistProceedAllArgsSyntax() throws IOException, InterruptedException {
+        ChangeResultMessage msg = new ChangeResultMessage();
+        msg.setClassName("w.core.ChangeTarget");
+        msg.setMethod("addWrapper");
+        msg.setMode(Codes.CHANGE_RESULT_MODE_USE_ASM);
+        msg.setParamTypes(Arrays.asList("int", "int"));
+        msg.setInnerMethod("add");
+        msg.setInnerClassName("*");
+        msg.setBody("$_ = $proceed($$) + 1;");
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertEquals(10003.0, target.addWrapper(1, 1));
+    }
+
+    @Test
     public void asmTest2() throws IOException, InterruptedException {
         ChangeResultMessage msg = new ChangeResultMessage();
         msg.setClassName("w.core.ChangeTarget");
