@@ -2,6 +2,8 @@ package w.web.message;
 
 import lombok.Data;
 
+import java.util.Map;
+
 /**
  * Watch method message
  * @author Frank
@@ -22,7 +24,11 @@ public class OuterWatchMessage extends Message implements RequestMessage {
 
     int printFormat = 1;
 
+    int depthForJson = 3;
+
     boolean includeNested = true;
 
     String ognl;
+
+    Map<String, String> variables;
 }

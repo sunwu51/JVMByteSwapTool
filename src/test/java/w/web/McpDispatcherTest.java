@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import w.Global;
 import w.util.RequestUtils;
 
+import java.util.HashSet;
+
 public class McpDispatcherTest {
     private final McpDispatcher dispatcher = new McpDispatcher();
 
@@ -29,6 +31,7 @@ public class McpDispatcherTest {
         Assertions.assertTrue(tools.stream().map(it -> ((JSONObject) it).getString("name")).anyMatch("watch"::equals));
         Assertions.assertTrue(tools.stream().map(it -> ((JSONObject) it).getString("name")).anyMatch("reset"::equals));
         Assertions.assertTrue(tools.stream().map(it -> ((JSONObject) it).getString("name")).anyMatch("list_transformers"::equals));
+        Assertions.assertTrue(tools.stream().map(it -> ((JSONObject) it).getString("name")).anyMatch("find_subclasses"::equals));
         JSONObject watch = findTool(tools, "watch");
         Assertions.assertNotNull(watch);
         Assertions.assertTrue(watch.getString("description").contains("ognl"));
@@ -37,6 +40,17 @@ public class McpDispatcherTest {
                 .getJSONObject("ognl")
                 .getString("description")
                 .contains("root bound to the current this object"));
+        Assertions.assertTrue(watch.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("ognl")
+                .getString("description")
+                .contains("#req"));
+        Assertions.assertNotNull(watch.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("depthForJson"));
+        Assertions.assertNotNull(watch.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("variables"));
         Assertions.assertTrue(watch.getJSONObject("inputSchema")
                 .getJSONObject("properties")
                 .getJSONObject("ognl")
@@ -63,6 +77,17 @@ public class McpDispatcherTest {
                 .getJSONObject("ognl")
                 .getString("description")
                 .contains("root bound to the current this object"));
+        Assertions.assertTrue(outerWatch.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("ognl")
+                .getString("description")
+                .contains("#req"));
+        Assertions.assertNotNull(outerWatch.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("depthForJson"));
+        Assertions.assertNotNull(outerWatch.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("variables"));
         Assertions.assertTrue(outerWatch.getJSONObject("inputSchema")
                 .getJSONObject("properties")
                 .getJSONObject("ognl")
@@ -100,6 +125,11 @@ public class McpDispatcherTest {
                 .getJSONObject("body")
                 .getString("description")
                 .contains("variables assigned in one eval call remain available"));
+
+        JSONObject findSubclasses = findTool(tools, "find_subclasses");
+        Assertions.assertNotNull(findSubclasses);
+        Assertions.assertNotNull(findSubclasses.getJSONObject("inputSchema").getJSONObject("properties").getJSONObject("className"));
+        Assertions.assertTrue(findSubclasses.getJSONObject("inputSchema").getJSONArray("required").contains("className"));
     }
 
     @Test
@@ -155,6 +185,28 @@ public class McpDispatcherTest {
     }
 
     @Test
+    public void findSubclassesShouldReturnLoadedAssignableClasses() throws Exception {
+        Global.allLoadedClasses.computeIfAbsent(TestParent.class.getName(), it -> new HashSet<>()).add(TestParent.class);
+        Global.allLoadedClasses.computeIfAbsent(TestChild.class.getName(), it -> new HashSet<>()).add(TestChild.class);
+        try {
+            String request = "{\"jsonrpc\":\"2.0\",\"id\":\"find-subclasses\",\"method\":\"tools/call\",\"params\":{\"name\":\"find_subclasses\",\"arguments\":{\"className\":\""
+                    + TestParent.class.getName() + "\"}}}";
+            JSONObject response = JSON.parseObject(globalJson(dispatcher.dispatch(request)));
+
+            JSONObject structuredContent = response.getJSONObject("result").getJSONObject("structuredContent");
+            Assertions.assertTrue(structuredContent.getBoolean("success"));
+            JSONArray data = structuredContent.getJSONArray("data");
+            Assertions.assertTrue(data.stream()
+                    .map(it -> (JSONObject) it)
+                    .anyMatch(it -> TestChild.class.getName().equals(it.getString("className"))
+                            && it.getString("classLoader") != null));
+        } finally {
+            Global.allLoadedClasses.getOrDefault(TestParent.class.getName(), new HashSet<>()).remove(TestParent.class);
+            Global.allLoadedClasses.getOrDefault(TestChild.class.getName(), new HashSet<>()).remove(TestChild.class);
+        }
+    }
+
+    @Test
     public void readLogsShouldWaitForFutureMatchingLogs() throws Exception {
         String traceId = "read-log-wait-test-" + System.nanoTime();
         long since = System.currentTimeMillis();
@@ -193,5 +245,11 @@ public class McpDispatcherTest {
 
     private String globalJson(Object obj) {
         return w.Global.toJson(obj);
+    }
+
+    private interface TestParent {
+    }
+
+    private static class TestChild implements TestParent {
     }
 }
