@@ -24,10 +24,7 @@ public class JsonBridge {
         }
         JSONWriter.Context context = JSONFactory.createWriteContext(FEATURES);
         applyMaxDepth(context, maxDepth);
-        try (JSONWriter writer = JSONWriter.of(context)) {
-            writer.writeAny(obj);
-            return writer.toString();
-        }
+        return JSON.toJSONString(obj, context);
     }
 
     private void applyMaxDepth(JSONWriter.Context context, int maxDepth) {

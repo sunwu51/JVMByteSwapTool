@@ -33,6 +33,14 @@ public class GlobalJsonTest {
     }
 
     @Test
+    public void toJsonWithDepthShouldSerializePrimitiveArrayArguments() {
+        String json = Global.toJson(new Object[]{new double[]{0.25}}, 3);
+
+        Assertions.assertFalse(json.startsWith("toJson error: "));
+        Assertions.assertTrue(json.contains("0.25"));
+    }
+
+    @Test
     public void stashShouldStoreAndRemoveDiagnosticObjects() {
         Global.clearStash();
 
