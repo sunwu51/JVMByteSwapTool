@@ -3,6 +3,9 @@ package w;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class GlobalJsonTest {
     @Test
     public void toJsonShouldWriteReferenceForCycle() {
@@ -27,6 +30,70 @@ public class GlobalJsonTest {
 
         Assertions.assertTrue(json.startsWith("toJson error: "));
         Assertions.assertNotEquals("toJson error", json);
+    }
+
+    @Test
+    public void toJsonWithDepthShouldSerializePrimitiveArrayArguments() {
+        String json = Global.toJson(new Object[]{new double[]{0.25}}, 3);
+
+        Assertions.assertFalse(json.startsWith("toJson error: "));
+        Assertions.assertTrue(json.contains("0.25"));
+    }
+
+    @Test
+    public void toJsonWithDepthOneShouldSerializeRootObjectFields() {
+        Node root = new Node("root");
+        root.child = new Node("child");
+
+        String json = Global.toJson(root, 1);
+
+        Assertions.assertFalse(json.startsWith("toJson error: "));
+        Assertions.assertTrue(json.contains("\"name\":\"root\""));
+    }
+
+    @Test
+    public void toJsonWithDepthShouldReplaceValuesBeyondMaxDepth() {
+        Node root = new Node("root");
+        root.child = new Node("child");
+        root.child.child = new Node("grandchild");
+
+        String json = Global.toJson(root, 1);
+
+        Assertions.assertFalse(json.startsWith("toJson error: "));
+        Assertions.assertTrue(json.contains("\"name\":\"root\""));
+        Assertions.assertTrue(json.contains("\"<max depth reached>\""));
+        Assertions.assertFalse(json.contains("grandchild"));
+    }
+
+    @Test
+    public void toJsonWithDepthShouldKeepReferenceDetection() {
+        Node node = new Node("root");
+        node.child = node;
+
+        String json = Global.toJson(node, 3);
+
+        Assertions.assertFalse(json.startsWith("toJson error: "));
+        Assertions.assertTrue(json.contains("\"$ref\""));
+    }
+
+    @Test
+    public void stashShouldStoreAndRemoveDiagnosticObjects() {
+        Global.clearStash();
+
+        Object value = new Object();
+        Assertions.assertSame(value, Global.stash("value", value));
+        Assertions.assertSame(value, Global.stash("value"));
+        Assertions.assertSame(value, Global.unstash("value"));
+        Assertions.assertNull(Global.stash("value"));
+    }
+
+    @Test
+    public void ognlShouldUseFreshContextWithVariables() throws Exception {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("value", "from-variable");
+
+        Assertions.assertEquals("from-variable", Global.ognl("#value", new Object(), variables));
+        Assertions.assertNull(Global.ognl("#value", new Object()));
     }
 
     private static class Node {

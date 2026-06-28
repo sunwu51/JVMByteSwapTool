@@ -40,7 +40,7 @@ $ npm i -g jbs-client
 $ jbs-client
 ```
 
-或者从 [jbs-client-opentui releases](https://github.com/sunwu51/jbs-client-opentui/releases) 下载对应平台的 TUI 二进制可执行文件，然后运行：
+或者从 [swapper-tui releases](https://github.com/sunwu51/swapper-tui/releases) 下载对应平台的 TUI 二进制可执行文件，然后运行：
 ```bash
 $ jbs-client
 ```

@@ -49,7 +49,7 @@ $ npm i -g jbs-client
 $ jbs-client
 ```
 
-Or download the standalone binary for your platform from the [jbs-client-opentui releases](https://github.com/sunwu51/jbs-client-opentui/releases), then run:
+Or download the standalone binary for your platform from the [swapper-tui releases](https://github.com/sunwu51/swapper-tui/releases), then run:
 ```bash
 $ jbs-client
 ```

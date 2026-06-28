@@ -96,6 +96,12 @@ public class Global {
      */
     public static Map<String, AtomicInteger> hitCounter = new ConcurrentHashMap<>();
 
+    /**
+     * A process-wide diagnostic stash for objects captured from watch/ognl/exec/eval.
+     * Values are strongly referenced until removed or cleared.
+     */
+    public static final Map<String, Object> stash = new ConcurrentHashMap<>();
+
 
     public static Set<String> ignoreTraceMethods = new HashSet<String>() {{
         add("<init>");
@@ -245,8 +251,12 @@ public class Global {
      * @return
      */
     public static String toJson(Object obj) {
+        return toJson(obj, -1);
+    }
+
+    public static String toJson(Object obj, int maxDepth) {
         try {
-            return JsonBridgeBundle.toJson(obj);
+            return JsonBridgeBundle.toJson(obj, maxDepth);
         } catch (Throwable e) {
             Logger.getLogger(Global.class.getName())
                     .log(Level.WARNING, "toJson error: {0}: {1}", new Object[]{e.getClass().getSimpleName(), e.getMessage()});
@@ -387,7 +397,87 @@ public class Global {
      * @throws OgnlException
      */
     public static Object ognl(String exp, Object root) throws OgnlException {
-        return Ognl.getValue(exp, ognlContext, root);
+        return ognl(exp, root, null);
+    }
+
+    public static Object ognl(String exp, Object root, Map<String, Object> variables) throws OgnlException {
+        OgnlContext context = newOgnlContext();
+        if (variables != null) {
+            context.putAll(variables);
+        }
+        return Ognl.getValue(exp, context, root);
+    }
+
+    public static Object stash(String key) {
+        return stash.get(key);
+    }
+
+    public static Object stash(String key, Object value) {
+        stash.put(key, value);
+        return value;
+    }
+
+    public static Object unstash(String key) {
+        return stash.remove(key);
+    }
+
+    public static void clearStash() {
+        stash.clear();
+    }
+
+    public static List<Map<String, Object>> findAssignableClasses(String className) {
+        if (instrumentation != null) {
+            fillLoadedClasses();
+        }
+        Set<Class<?>> targets = allLoadedClasses.getOrDefault(className, new HashSet<>());
+        List<Map<String, Object>> matches = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (Class<?> target : targets) {
+            for (Set<Class<?>> candidates : allLoadedClasses.values()) {
+                for (Class<?> candidate : candidates) {
+                    if (candidate == null || candidate.equals(target)) {
+                        continue;
+                    }
+                    try {
+                        if (!target.isAssignableFrom(candidate)) {
+                            continue;
+                        }
+                        String key = classLoaderName(target.getClassLoader()) + "|"
+                                + candidate.getName() + "|" + classLoaderName(candidate.getClassLoader());
+                        if (!seen.add(key)) {
+                            continue;
+                        }
+                        Map<String, Object> item = new LinkedHashMap<>();
+                        item.put("targetClassName", target.getName());
+                        item.put("targetClassLoader", classLoaderName(target.getClassLoader()));
+                        item.put("className", candidate.getName());
+                        item.put("classLoader", classLoaderName(candidate.getClassLoader()));
+                        matches.add(item);
+                    } catch (Throwable e) {
+                        debug("find assignable class skip " + candidate.getName() + ": " + e.getMessage());
+                    }
+                }
+            }
+        }
+        return matches;
+    }
+
+    private static String classLoaderName(ClassLoader loader) {
+        return loader == null ? "bootstrap" : loader.toString();
+    }
+
+    private static OgnlContext newOgnlContext() {
+        return new OgnlContext(
+                (s, map) -> {
+                    try {
+                        return Global.getClassLoader().loadClass(s);
+                    } catch (Exception e) {
+                        throw new ClassNotFoundException(s);
+                    }
+                },
+                new DefaultTypeConverter(),
+                new DefaultMemberAccess(true)
+        );
     }
 
     /**
