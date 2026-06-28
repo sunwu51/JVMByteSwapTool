@@ -15,6 +15,10 @@ public class JsonBridgeBundle {
     private static final Map<ClassLoader, BridgeHandle> BRIDGES = new ConcurrentHashMap<>();
 
     public static String toJson(Object obj) throws Throwable {
+        return toJson(obj, -1);
+    }
+
+    public static String toJson(Object obj, int maxDepth) throws Throwable {
         ClassLoader parent = chooseParentClassLoader(obj);
         BridgeHandle handle = BRIDGES.get(parent);
         if (handle == null) {
@@ -23,7 +27,7 @@ public class JsonBridgeBundle {
             handle = existing == null ? created : existing;
         }
         try {
-            return (String) handle.toJson.invoke(handle.instance, obj);
+            return (String) handle.toJson.invoke(handle.instance, obj, maxDepth);
         } catch (InvocationTargetException e) {
             throw e.getTargetException();
         }
@@ -41,7 +45,7 @@ public class JsonBridgeBundle {
         JsonBridgeClassLoader loader = new JsonBridgeClassLoader(parent);
         Class<?> bridgeClass = loader.loadClass(BRIDGE_CLASS);
         Object instance = bridgeClass.newInstance();
-        Method toJson = bridgeClass.getMethod("toJson", Object.class);
+        Method toJson = bridgeClass.getMethod("toJson", Object.class, int.class);
         return new BridgeHandle(instance, toJson);
     }
 

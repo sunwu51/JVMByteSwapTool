@@ -63,11 +63,36 @@ public class WAdviceAdapter extends AdviceAdapter {
      * @return the paramsVar index
      */
     protected int asmStoreParamsString(MethodVisitor mv, int printFormat) {
+        return asmStoreParamsString(mv, printFormat, -1);
+    }
+
+    protected int asmStoreParamsString(MethodVisitor mv, int printFormat, int depthForJson) {
+        int paramsArrayIndex = asmStoreArgArray();
+        return asmStoreObjectString(paramsArrayIndex, printFormat, depthForJson, true);
+    }
+
+    protected int asmStoreArgArray() {
         loadArgArray();
+        int paramsArrayIndex = newLocal(Type.getType(Object[].class));
+        mv.visitVarInsn(ASTORE, paramsArrayIndex);
+        return paramsArrayIndex;
+    }
+
+    protected int asmStoreObjectString(int objectVarIndex, int printFormat, int depthForJson) {
+        return asmStoreObjectString(objectVarIndex, printFormat, depthForJson, false);
+    }
+
+    protected int asmStoreObjectString(int objectVarIndex, int printFormat, int depthForJson, boolean objectArray) {
+        mv.visitVarInsn(ALOAD, objectVarIndex);
         if (printFormat == 1) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/util/Arrays", "toString", "([Ljava/lang/Object;)Ljava/lang/String;", false);
+            if (objectArray) {
+                mv.visitMethodInsn(INVOKESTATIC, "java/util/Arrays", "toString", "([Ljava/lang/Object;)Ljava/lang/String;", false);
+            } else {
+                mv.visitMethodInsn(INVOKESTATIC, "java/lang/String", "valueOf", "(Ljava/lang/Object;)Ljava/lang/String;", false);
+            }
         } else if (printFormat == 2) {
-            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toJson", "(Ljava/lang/Object;)Ljava/lang/String;", false);
+            push(depthForJson);
+            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toJson", "(Ljava/lang/Object;I)Ljava/lang/String;", false);
         } else {
             mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toString", "(Ljava/lang/Object;)Ljava/lang/String;", false);
         }
@@ -86,16 +111,12 @@ public class WAdviceAdapter extends AdviceAdapter {
      * @return
      */
     protected int asmSubCallStoreParamsString(MethodVisitor mv, int printFormat, String descriptor) {
-        int _i = subCallParamsToArray(descriptor);
-        mv.visitVarInsn(ALOAD, _i);
-        if (printFormat == 1) {
-            mv.visitMethodInsn(INVOKESTATIC, "java/util/Arrays", "toString", "([Ljava/lang/Object;)Ljava/lang/String;", false);
-        } else {
-            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toJson", "(Ljava/lang/Object;)Ljava/lang/String;", false);
-        }
-        int paramsVarIndex = newLocal(Type.getType(String.class));
-        mv.visitVarInsn(ASTORE, paramsVarIndex);
-        return paramsVarIndex;
+        return asmSubCallStoreParamsString(mv, printFormat, -1, descriptor);
+    }
+
+    protected int asmSubCallStoreParamsString(MethodVisitor mv, int printFormat, int depthForJson, String descriptor) {
+        int paramsArrayIndex = asmSubCallStoreParamsArray(descriptor);
+        return asmStoreObjectString(paramsArrayIndex, printFormat, depthForJson, true);
     }
 
     /**
@@ -120,13 +141,17 @@ public class WAdviceAdapter extends AdviceAdapter {
      * @return
      */
     protected int asmStoreRetString(MethodVisitor mv, String descriptor, int printFormat, int returnValueVarIndex) {
+        return asmStoreRetStringWithDepth(mv, descriptor, printFormat, -1, returnValueVarIndex);
+    }
+
+    protected int asmStoreRetStringWithDepth(MethodVisitor mv, String descriptor, int printFormat, int depthForJson, int returnValueVarIndex) {
         Type returnType = Type.getReturnType(descriptor);
         switch (returnType.getSort()) {
             case Type.DOUBLE:
             case Type.LONG:
                 mv.visitInsn(DUP2);
                 box(returnType);
-                formatResult(printFormat);
+                formatResult(printFormat, depthForJson);
                 break;
             case Type.BOOLEAN:
             case Type.CHAR:
@@ -136,12 +161,12 @@ public class WAdviceAdapter extends AdviceAdapter {
             case Type.BYTE:
                 mv.visitInsn(DUP);
                 box(returnType);
-                formatResult(printFormat);
+                formatResult(printFormat, depthForJson);
                 break;
             case Type.ARRAY:
             case Type.OBJECT:
                 mv.visitInsn(DUP);
-                formatResult(printFormat);
+                formatResult(printFormat, depthForJson);
                 break;
             case Type.VOID:
             default:
@@ -152,11 +177,46 @@ public class WAdviceAdapter extends AdviceAdapter {
     }
 
     private void formatResult(int printFormat) {
+        formatResult(printFormat, -1);
+    }
+
+    private void formatResult(int printFormat, int depthForJson) {
         if (printFormat == 1) {
             mv.visitMethodInsn(INVOKESTATIC, "java/lang/String", "valueOf", "(Ljava/lang/Object;)Ljava/lang/String;", false);
         } else {
-            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toJson",   "(Ljava/lang/Object;)Ljava/lang/String;", false);
+            push(depthForJson);
+            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "toJson",   "(Ljava/lang/Object;I)Ljava/lang/String;", false);
         }
+    }
+
+    protected int asmStoreRetObject(MethodVisitor mv, String descriptor) {
+        int returnValueVarIndex = newLocal(Type.getType(Object.class));
+        Type returnType = Type.getReturnType(descriptor);
+        switch (returnType.getSort()) {
+            case Type.DOUBLE:
+            case Type.LONG:
+                mv.visitInsn(DUP2);
+                box(returnType);
+                break;
+            case Type.BOOLEAN:
+            case Type.CHAR:
+            case Type.INT:
+            case Type.FLOAT:
+            case Type.SHORT:
+            case Type.BYTE:
+                mv.visitInsn(DUP);
+                box(returnType);
+                break;
+            case Type.ARRAY:
+            case Type.OBJECT:
+                mv.visitInsn(DUP);
+                break;
+            case Type.VOID:
+            default:
+                mv.visitInsn(Opcodes.ACONST_NULL);
+        }
+        mv.visitVarInsn(ASTORE, returnValueVarIndex);
+        return returnValueVarIndex;
     }
 
     /**
@@ -164,7 +224,7 @@ public class WAdviceAdapter extends AdviceAdapter {
      * @param descriptor
      * @return
      */
-    private int subCallParamsToArray(String descriptor) {
+    protected int asmSubCallStoreParamsArray(String descriptor) {
         Type[] argumentTypes = Type.getArgumentTypes(descriptor);
         int[] loads = new int[argumentTypes.length];
         int[] index = new int[argumentTypes.length];

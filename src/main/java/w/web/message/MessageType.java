@@ -33,6 +33,8 @@ public enum MessageType {
 
     DECOMPILE,
 
+    FIND_SUBCLASSES,
+
     RESET,
 
     EVAL,

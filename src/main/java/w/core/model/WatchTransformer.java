@@ -9,9 +9,11 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import w.Global;
+import w.core.asm.Tool;
 import w.core.asm.WAdviceAdapter;
 import w.web.message.WatchMessage;
 
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.objectweb.asm.Opcodes.ASM9;
@@ -37,6 +39,10 @@ public class WatchTransformer extends BaseClassTransformer {
 
     String ognl;
 
+    int depthForJson;
+
+    Map<String, String> variables;
+
     public WatchTransformer(WatchMessage watchMessage) {
         this.className = watchMessage.getSignature().split("#")[0];
         this.method = watchMessage.getSignature().split("#")[1];
@@ -45,6 +51,9 @@ public class WatchTransformer extends BaseClassTransformer {
         this.printFormat = watchMessage.getPrintFormat();
         this.minCost = watchMessage.getMinCost();
         this.ognl = watchMessage.getOgnl();
+        this.depthForJson = watchMessage.getDepthForJson() <= 0 ? 3 : watchMessage.getDepthForJson();
+        this.variables = watchMessage.getVariables();
+        Tool.registerOgnlVariables(uuid.toString(), variables);
     }
 
     @Override
@@ -69,10 +78,15 @@ public class WatchTransformer extends BaseClassTransformer {
                     private int startTimeVarIndex;
                     private int paramsVarIndex;
 
+                    private int paramsArrayVarIndex;
+
                     private int returnValueVarIndex = -1;
+
+                    private int returnObjectVarIndex = -1;
 
                     private int exceptionStringIndex = -1;
 
+                    private int exceptionObjectIndex = -1;
 
                     private int methodSignatureVarIndex;
                     private final Label startTry = new Label();
@@ -85,7 +99,8 @@ public class WatchTransformer extends BaseClassTransformer {
                         /*---------------------startTime:long start = System.currentTimeMillis();-----------------*/
                         startTimeVarIndex = asmStoreStartTime(mv);
                         /*---------------------param: String params = Arrays.toString(paramsArray);-----------------*/
-                        paramsVarIndex = asmStoreParamsString(mv, printFormat);
+                        paramsArrayVarIndex = asmStoreArgArray();
+                        paramsVarIndex = asmStoreObjectString(paramsArrayVarIndex, printFormat, depthForJson, true);
                         methodSignatureVarIndex = newLocal(Type.getType(String.class));
                         String methodSignature = className.substring(1 + className.lastIndexOf('.')) +"#" + method;
                         mv.visitLdcInsn(methodSignature);
@@ -100,7 +115,8 @@ public class WatchTransformer extends BaseClassTransformer {
                     protected void onMethodExit(int opcode) {
                         /*---------------------returnValue: return object tostring, return the variable index------------*/
                         if (opcode != ATHROW) {
-                            returnValueVarIndex = asmStoreRetString(mv, descriptor, printFormat);
+                            returnObjectVarIndex = asmStoreRetObject(mv, descriptor);
+                            returnValueVarIndex = asmStoreObjectString(returnObjectVarIndex, printFormat, depthForJson);
                             postProcess(false);
                         }
                     }
@@ -109,15 +125,15 @@ public class WatchTransformer extends BaseClassTransformer {
                     public void visitMaxs(int maxStack, int maxLocals) {
                         mv.visitLabel(endTry);
                         mv.visitLabel(startCatch);
-                        int exceptionIndex = newLocal(Type.getType(Throwable.class));
-                        mv.visitVarInsn(Opcodes.ASTORE, exceptionIndex);
-                        mv.visitVarInsn(Opcodes.ALOAD, exceptionIndex);
+                        exceptionObjectIndex = newLocal(Type.getType(Throwable.class));
+                        mv.visitVarInsn(Opcodes.ASTORE, exceptionObjectIndex);
+                        mv.visitVarInsn(Opcodes.ALOAD, exceptionObjectIndex);
                         exceptionStringIndex = newLocal(Type.getType(String.class));
                         mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "toString", "()Ljava/lang/String;", false);
                         mv.visitVarInsn(Opcodes.ASTORE, exceptionStringIndex);
 
                         postProcess(true);
-                        mv.visitVarInsn(Opcodes.ALOAD, exceptionIndex);
+                        mv.visitVarInsn(Opcodes.ALOAD, exceptionObjectIndex);
                         mv.visitInsn(Opcodes.ATHROW);
                         mv.visitLabel(endCatch);
                         mv.visitTryCatchBlock(startTry, endTry, startCatch, "java/lang/Throwable");
@@ -143,7 +159,16 @@ public class WatchTransformer extends BaseClassTransformer {
                         loadThisOrNull();
                         push(ognl == null ? "" : ognl);
                         push(printFormat);
-                        mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "watchPostProcess", "(JILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/String;I)V", false);
+                        loadLocal(paramsArrayVarIndex, Type.getType(Object[].class));
+                        if (whenThrow) {
+                            mv.visitInsn(Opcodes.ACONST_NULL);
+                            loadLocal(exceptionObjectIndex, Type.getType(Throwable.class));
+                        } else {
+                            loadLocal(returnObjectVarIndex, Type.getType(Object.class));
+                            mv.visitInsn(Opcodes.ACONST_NULL);
+                        }
+                        push(depthForJson);
+                        mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "watchPostProcess", "(JILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/String;I[Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Throwable;I)V", false);
                     }
 
                     private void loadThisOrNull() {
@@ -177,6 +202,9 @@ public class WatchTransformer extends BaseClassTransformer {
         return "Watch_" + getClassName() + "#" + method;
     }
 
-
+    @Override
+    public void clear() {
+        Tool.unregisterOgnlVariables(uuid.toString());
+    }
 
 }

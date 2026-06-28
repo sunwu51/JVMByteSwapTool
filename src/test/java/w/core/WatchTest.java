@@ -12,6 +12,8 @@ import w.web.message.WatchMessage;
 
 import java.lang.instrument.Instrumentation;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * @author Frank
@@ -34,6 +36,7 @@ public class WatchTest {
     @BeforeEach
     public void reset() {
         Global.reset();
+        Global.clearStash();
     }
 
     @Test
@@ -116,5 +119,37 @@ public class WatchTest {
         msg.setSignature("w.core.WatchTarget#run");
         Assertions.assertTrue(swapper.swap(msg).isSuccess());
         target.run();
+    }
+
+    @Test
+    public void watchShouldExposeDefaultAndCustomOgnlVariables() {
+        WatchMessage msg = new WatchMessage();
+        msg.setSignature("w.core.WatchTarget#doubleMethodWithParams");
+        Map<String, String> variables = new LinkedHashMap<>();
+        variables.put("firstArg", "@w.Global@stash(\"watch-first\", #req[0][0])");
+        variables.put("returnValue", "@w.Global@stash(\"watch-res\", #res)");
+        msg.setVariables(variables);
+        msg.setOgnl("#returnValue");
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        target.doubleMethodWithParams(0.25);
+
+        Assertions.assertEquals(0.25, (Double) Global.stash("watch-first"), 0.0001);
+        Assertions.assertEquals(0.25, (Double) Global.stash("watch-res"), 0.0001);
+    }
+
+    @Test
+    public void watchShouldExposeExceptionOgnlVariable() {
+        WatchMessage msg = new WatchMessage();
+        msg.setSignature("w.core.WatchTarget#readFile");
+        msg.setOgnl("@w.Global@stash(\"watch-exp\", #exp.getClass().getName())");
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        try {
+            WatchTarget.readFile("missing-watch-exp-file");
+        } catch (Exception ignored) {
+        }
+
+        Assertions.assertEquals("java.nio.file.NoSuchFileException", Global.stash("watch-exp"));
     }
 }

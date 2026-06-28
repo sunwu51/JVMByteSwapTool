@@ -10,7 +10,7 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import w.Global;
-import w.core.asm.SbNode;
+import w.core.asm.Tool;
 import w.core.asm.WAdviceAdapter;
 import w.web.message.OuterWatchMessage;
 
@@ -36,7 +36,6 @@ import static org.objectweb.asm.Opcodes.GOTO;
 import static org.objectweb.asm.Opcodes.IFNE;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
-import static org.objectweb.asm.Opcodes.LLOAD;
 import static org.objectweb.asm.Opcodes.NEW;
 
 
@@ -64,6 +63,10 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
     String ognl;
 
+    int depthForJson;
+
+    Map<String, String> variables;
+
     private final Map<String, Set<String>> targetMethods = new LinkedHashMap<>();
 
 
@@ -77,6 +80,9 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         this.traceId = watchMessage.getId();
         this.includeNested = watchMessage.isIncludeNested();
         this.ognl = watchMessage.getOgnl();
+        this.depthForJson = watchMessage.getDepthForJson() <= 0 ? 3 : watchMessage.getDepthForJson();
+        this.variables = watchMessage.getVariables();
+        Tool.registerOgnlVariables(uuid.toString(), variables);
         addTargetMethod(this.className, this.method);
     }
 
@@ -240,9 +246,15 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
                     private int paramsVarIndex;
 
+                    private int paramsArrayVarIndex;
+
                     private int returnValueVarIndex;
 
+                    private int returnObjectVarIndex;
+
                     private int exceptionStringIndex;
+
+                    private int exceptionObjectIndex;
 
                     @Override
                     public void visitLineNumber(int line, Label start) {
@@ -283,7 +295,8 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             // long start = System.currentTimeMillis();
                             startTimeVarIndex = asmStoreStartTime(mv);
                             // String params = Arrays.toString(paramArray);
-                            paramsVarIndex = asmSubCallStoreParamsString(mv, printFormat, descriptor);
+                            paramsArrayVarIndex = asmSubCallStoreParamsArray(descriptor);
+                            paramsVarIndex = asmStoreObjectString(paramsArrayVarIndex, printFormat, depthForJson, true);
 
                             mv.visitLdcInsn(traceId);
                             mv.visitMethodInsn(INVOKESTATIC, "w/util/RequestUtils", "fillCurThread", "(Ljava/lang/String;)V", false);
@@ -297,67 +310,25 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             // execute original method
                             mv.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
 
-                            returnValueVarIndex = asmStoreRetString(mv, descriptor, printFormat);
-
-                            // long duration = System.currentTimeMillis() - start;
-                            int durationVarIndex = asmCalculateCost(mv, startTimeVarIndex);
-                            push(printFormat);
-                            mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "getMdcContextMapString", "(I)Ljava/lang/String;", false);
-                            int mdcVarIndex = newLocal(Type.getType(String.class));
-                            mv.visitVarInsn(Opcodes.ASTORE, mdcVarIndex);
-
-                            int ognlVarIndex = -1;
-                            if (!isBlank(ognl)) {
-                                loadThisOrNull();
-                                push(ognl);
-                                push(printFormat);
-                                mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "getOgnlString", "(Ljava/lang/Object;Ljava/lang/String;I)Ljava/lang/String;", false);
-                                ognlVarIndex = newLocal(Type.getType(String.class));
-                                mv.visitVarInsn(Opcodes.ASTORE, ognlVarIndex);
-                            }
-
-                            // return value duplication
-                            int returnValueVarIndex = asmStoreRetString(mv, descriptor, printFormat);
-                            // new StringBuilder().append("line:" + line + ", request: ").append(params).append(", response: ").append(returnValue).append(", cost: ").append(duration).append("ms");
-                            List<SbNode> list = new ArrayList<SbNode>();
-                            list.add(new SbNode("line:" + line + ", req: "));
-                            list.add(new SbNode(ALOAD, paramsVarIndex));
-                            list.add(new SbNode(", response: "));
-                            list.add(new SbNode(ALOAD, returnValueVarIndex));
-                            list.add(new SbNode(", cost: "));
-                            list.add(new SbNode(LLOAD, durationVarIndex));
-                            list.add(new SbNode("ms"));
-                            list.add(new SbNode(", mdc: "));
-                            list.add(new SbNode(ALOAD, mdcVarIndex));
-                            if (!isBlank(ognl)) {
-                                list.add(new SbNode(", ognl:"));
-                                list.add(new SbNode(ALOAD, ognlVarIndex));
-                            }
-                            asmGenerateStringBuilder(mv, list);
-
-                            /*---------------------counter: if reach the limitation will remove the transformer----------------*/
-                            mv.visitLdcInsn(uuid.toString());
-                            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "checkCountAndUnload", "(Ljava/lang/String;)V", false);
-
-                            // info the string builder
-                            mv.visitMethodInsn(INVOKESTATIC, "w/Global", "info", "(Ljava/lang/Object;)V", false);
-
+                            returnObjectVarIndex = asmStoreRetObject(mv, descriptor);
+                            returnValueVarIndex = asmStoreObjectString(returnObjectVarIndex, printFormat, depthForJson);
+                            postProcess(false);
 
                             mv.visitLabel(tryEnd);
                             Label invokeEnd = new Label();
                             mv.visitJumpInsn(Opcodes.GOTO, invokeEnd);
 
                             mv.visitLabel(catchStart);
-                            int exceptionIndex = newLocal(Type.getType(Throwable.class));
-                            mv.visitVarInsn(Opcodes.ASTORE, exceptionIndex);
-                            mv.visitVarInsn(Opcodes.ALOAD, exceptionIndex);
+                            exceptionObjectIndex = newLocal(Type.getType(Throwable.class));
+                            mv.visitVarInsn(Opcodes.ASTORE, exceptionObjectIndex);
+                            mv.visitVarInsn(Opcodes.ALOAD, exceptionObjectIndex);
                             exceptionStringIndex = newLocal(Type.getType(String.class));
                             mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "toString", "()Ljava/lang/String;", false);
                             mv.visitVarInsn(Opcodes.ASTORE, exceptionStringIndex);
 
                             postProcess(true);
                             mv.visitMethodInsn(INVOKESTATIC, "w/util/RequestUtils", "clearRequestCtx", "()V", false);
-                            mv.visitVarInsn(Opcodes.ALOAD, exceptionIndex);
+                            mv.visitVarInsn(Opcodes.ALOAD, exceptionObjectIndex);
                             mv.visitInsn(Opcodes.ATHROW);
                             Label catchEnd = new Label();
                             mv.visitLabel(catchEnd);
@@ -389,7 +360,16 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                         loadThisOrNull();
                         push(ognl == null ? "" : ognl);
                         push(printFormat);
-                        mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "outerWatchPostProcess", "(IJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/String;I)V", false);
+                        loadLocal(paramsArrayVarIndex, Type.getType(Object[].class));
+                        if (whenThrow) {
+                            mv.visitInsn(Opcodes.ACONST_NULL);
+                            loadLocal(exceptionObjectIndex, Type.getType(Throwable.class));
+                        } else {
+                            loadLocal(returnObjectVarIndex, Type.getType(Object.class));
+                            mv.visitInsn(Opcodes.ACONST_NULL);
+                        }
+                        push(depthForJson);
+                        mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "outerWatchPostProcess", "(IJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/String;I[Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Throwable;I)V", false);
                     }
 
                     private void loadThisOrNull() {
@@ -464,5 +444,6 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         if (map.isEmpty()) {
             outerWatchCtx.remove();
         }
+        Tool.unregisterOgnlVariables(uuid.toString());
     }
 }

@@ -13,6 +13,7 @@ import w.web.message.WatchMessage;
 
 import java.lang.instrument.Instrumentation;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +41,7 @@ public class OuterWatchTest {
     @BeforeEach
     public void reset() {
         Global.reset();
+        Global.clearStash();
         OuterWatchTransformer.outerWatchCtx.remove();
     }
 
@@ -124,6 +126,24 @@ public class OuterWatchTest {
         Assertions.assertTrue(Global.readLogs(logId, since, 20, 0).stream()
                 .map(log -> String.valueOf(log.get("content")))
                 .anyMatch(content -> content.contains("ognl:outer-watch-ognl-name")));
+    }
+
+    @Test
+    public void outerWatchShouldExposeDefaultAndCustomOgnlVariables() {
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setSignature("w.core.WatchTarget#ow1");
+        msg.setInnerSignature("*#add");
+        Map<String, String> variables = new LinkedHashMap<>();
+        variables.put("sum", "@w.Global@stash(\"outer-res\", #res)");
+        variables.put("firstArg", "@w.Global@stash(\"outer-first\", #req[0])");
+        msg.setVariables(variables);
+        msg.setOgnl("#sum");
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        target.ow1(1, 2);
+
+        Assertions.assertEquals(4.0, (Double) Global.stash("outer-res"), 0.0001);
+        Assertions.assertEquals(3L, Global.stash("outer-first"));
     }
 
     @Test
