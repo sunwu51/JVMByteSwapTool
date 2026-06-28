@@ -4,6 +4,16 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Version to release, defaults to pom.xml version'
+        required: false
+      force_release:
+        description: 'Create release even when pom.xml version did not change'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -56,10 +66,15 @@ jobs:
           distribution: 'adopt'
       - name: Check Version Change
         id: version
+        env:
+          REQUESTED_VERSION: ${{ github.event.inputs.release_version }}
+          FORCE_RELEASE: ${{ github.event.inputs.force_release }}
         run: |
           CURRENT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           PREVIOUS_VERSION=""
           BEFORE_SHA="${{ github.event.before }}"
+          REQUESTED_VERSION="${REQUESTED_VERSION:-$CURRENT_VERSION}"
+          FORCE_RELEASE="${FORCE_RELEASE:-false}"
 
           if [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ] && git show "${BEFORE_SHA}:pom.xml" > previous-pom.xml 2>/dev/null; then
             PREVIOUS_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout -f previous-pom.xml)
@@ -68,7 +83,9 @@ jobs:
           echo "current=${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"
           echo "previous=${PREVIOUS_VERSION}" >> "$GITHUB_OUTPUT"
 
-          if [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
+          if [ "$FORCE_RELEASE" = "true" ] && [ "$REQUESTED_VERSION" = "$CURRENT_VERSION" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif [ "$CURRENT_VERSION" != "$PREVIOUS_VERSION" ]; then
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "changed=false" >> "$GITHUB_OUTPUT"
