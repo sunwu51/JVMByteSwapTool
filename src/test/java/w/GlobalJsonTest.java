@@ -1,12 +1,19 @@
 package w;
 
+import net.bytebuddy.agent.ByteBuddyAgent;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
 
 public class GlobalJsonTest {
+    @BeforeAll
+    public static void setUp() {
+        Global.instrumentation = ByteBuddyAgent.install();
+    }
+
     @Test
     public void toJsonShouldWriteReferenceForCycle() {
         Node node = new Node("root");
@@ -94,6 +101,78 @@ public class GlobalJsonTest {
 
         Assertions.assertEquals("from-variable", Global.ognl("#value", new Object(), variables));
         Assertions.assertNull(Global.ognl("#value", new Object()));
+    }
+
+    @Test
+    public void threadLocalsShouldDumpCurrentThreadValues() {
+        ThreadLocal<String> local = new ThreadLocal<>();
+        InheritableThreadLocal<String> inheritable = new InheritableThreadLocal<>();
+        local.set("local-value");
+        inheritable.set("inheritable-value");
+
+        try {
+            Map<String, Object> dump = Global.threadLocals();
+
+            Assertions.assertEquals(Thread.currentThread().getName(), dump.get("thread"));
+            Assertions.assertTrue(dumpContainsValue(dump, "threadLocal", "local-value"));
+            Assertions.assertTrue(dumpContainsValue(dump, "inheritableThreadLocal", "inheritable-value"));
+        } finally {
+            local.remove();
+            inheritable.remove();
+        }
+    }
+
+    @Test
+    public void threadLocalsShouldBeCallableFromOgnl() throws Exception {
+        ThreadLocal<String> local = new ThreadLocal<>();
+        local.set("ognl-local-value");
+
+        try {
+            Object dump = Global.ognl("@w.Global@threadLocals()", new Object());
+
+            Assertions.assertTrue(dump instanceof Map);
+            Assertions.assertTrue(dumpContainsValue((Map<String, Object>) dump, "threadLocal", "ognl-local-value"));
+        } finally {
+            local.remove();
+        }
+    }
+
+    @Test
+    public void threadLocalsShouldBeSafeToJson() {
+        ThreadLocal<Object> local = new ThreadLocal<>();
+        local.set(new Object() {
+            @Override
+            public String toString() {
+                return "json-local-value";
+            }
+        });
+
+        try {
+            String json = Global.toJson(Global.threadLocals(), 3);
+
+            Assertions.assertFalse(json.startsWith("toJson error: "));
+            Assertions.assertTrue(json.contains("json-local-value"));
+            Assertions.assertTrue(json.contains("\"valueClass\""));
+            Assertions.assertFalse(json.contains("\"value\":"));
+        } finally {
+            local.remove();
+        }
+    }
+
+    private static boolean dumpContainsValue(Map<String, Object> dump, String group, Object expectedValue) {
+        Object entries = dump.get(group);
+        if (!(entries instanceof Iterable)) {
+            return false;
+        }
+        for (Object entry : (Iterable<?>) entries) {
+            if (!(entry instanceof Map)) {
+                continue;
+            }
+            if (expectedValue.equals(((Map<?, ?>) entry).get("valueString"))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static class Node {

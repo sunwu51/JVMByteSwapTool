@@ -18,11 +18,15 @@ import w.web.message.LogMessage;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.ref.Reference;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.UnmodifiableClassException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -425,6 +429,25 @@ public class Global {
         stash.clear();
     }
 
+    /**
+     * Dump ThreadLocal value summaries from the current thread for watch/ognl diagnostics.
+     * On JDK 9+, this tries to open java.lang to this module before reflective access.
+     * Example OGNL: @w.Global@threadLocals()
+     * @return ThreadLocal entries grouped by threadLocal and inheritableThreadLocal
+     */
+    public static Map<String, Object> threadLocals() {
+        return threadLocals(Thread.currentThread());
+    }
+
+    public static Map<String, Object> threadLocals(Thread thread) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("thread", thread == null ? null : thread.getName());
+        result.put("threadId", thread == null ? null : thread.getId());
+        result.put("threadLocal", dumpThreadLocalMap(thread, "threadLocals"));
+        result.put("inheritableThreadLocal", dumpThreadLocalMap(thread, "inheritableThreadLocals"));
+        return result;
+    }
+
     public static List<Map<String, Object>> findAssignableClasses(String className) {
         if (instrumentation != null) {
             fillLoadedClasses();
@@ -464,6 +487,114 @@ public class Global {
 
     private static String classLoaderName(ClassLoader loader) {
         return loader == null ? "bootstrap" : loader.toString();
+    }
+
+    private static List<Map<String, Object>> dumpThreadLocalMap(Thread thread, String fieldName) {
+        List<Map<String, Object>> entries = new ArrayList<>();
+        if (thread == null) {
+            return entries;
+        }
+        try {
+            openJavaLangToThisModule();
+            Field threadLocalsField = Thread.class.getDeclaredField(fieldName);
+            threadLocalsField.setAccessible(true);
+            Object threadLocalMap = threadLocalsField.get(thread);
+            if (threadLocalMap == null) {
+                return entries;
+            }
+
+            Field tableField = threadLocalMap.getClass().getDeclaredField("table");
+            tableField.setAccessible(true);
+            Object[] table = (Object[]) tableField.get(threadLocalMap);
+            if (table == null) {
+                return entries;
+            }
+
+            for (Object entry : table) {
+                if (entry == null) {
+                    continue;
+                }
+                entries.add(threadLocalEntryToMap(entry));
+            }
+        } catch (Throwable e) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("error", e.getClass().getName() + ": " + e.getMessage());
+            entries.add(error);
+        }
+        return entries;
+    }
+
+    private static Map<String, Object> threadLocalEntryToMap(Object entry) throws IllegalAccessException, NoSuchFieldException {
+        Object key = ((Reference<?>) entry).get();
+        Field valueField = entry.getClass().getDeclaredField("value");
+        valueField.setAccessible(true);
+        Object value = valueField.get(entry);
+
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("keyClass", key == null ? null : key.getClass().getName());
+        item.put("keyIdentity", key == null ? null : System.identityHashCode(key));
+        item.put("keyString", safeToString(key));
+        item.put("valueClass", value == null ? null : value.getClass().getName());
+        item.put("valueIdentity", value == null ? null : System.identityHashCode(value));
+        item.put("valueString", safeToString(value));
+        item.put("stale", key == null);
+        return item;
+    }
+
+    private static String safeToString(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return String.valueOf(value);
+        } catch (Throwable e) {
+            return value.getClass().getName() + "@" + Integer.toHexString(System.identityHashCode(value))
+                    + " toString error: " + e.getClass().getSimpleName() + ": " + e.getMessage();
+        }
+    }
+
+    private static void openJavaLangToThisModule() {
+        if (instrumentation == null) {
+            return;
+        }
+        try {
+            Class<?> moduleClass = Class.forName("java.lang.Module");
+            Method getModule = Class.class.getMethod("getModule");
+            Object javaBaseModule = getModule.invoke(Object.class);
+            Object thisModule = getModule.invoke(Global.class);
+            Method isOpen = moduleClass.getMethod("isOpen", String.class, moduleClass);
+            if ((Boolean) isOpen.invoke(javaBaseModule, "java.lang", thisModule)) {
+                return;
+            }
+            Method redefineModule = Instrumentation.class.getMethod(
+                    "redefineModule",
+                    moduleClass,
+                    Set.class,
+                    Map.class,
+                    Map.class,
+                    Set.class,
+                    Map.class
+            );
+            Map<String, Set<Object>> extraOpens = new HashMap<>();
+            extraOpens.put("java.lang", Collections.singleton(thisModule));
+            redefineModule.invoke(
+                    instrumentation,
+                    javaBaseModule,
+                    Collections.emptySet(),
+                    Collections.emptyMap(),
+                    extraOpens,
+                    Collections.emptySet(),
+                    Collections.emptyMap()
+            );
+        } catch (ClassNotFoundException ignored) {
+            // JDK 8 has no module system.
+        } catch (NoSuchMethodException ignored) {
+            // Running on a JDK without Instrumentation.redefineModule.
+        } catch (Throwable e) {
+            Logger.getLogger(Global.class.getName())
+                    .log(Level.FINE, "open java.lang module error: {0}: {1}",
+                            new Object[]{e.getClass().getSimpleName(), e.getMessage()});
+        }
     }
 
     private static OgnlContext newOgnlContext() {
