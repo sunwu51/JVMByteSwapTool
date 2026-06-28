@@ -1,12 +1,14 @@
 package w.core;
 
 import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONFactory;
 import com.alibaba.fastjson2.JSONWriter;
-
-import java.lang.reflect.Field;
+import com.alibaba.fastjson2.filter.Filter;
+import com.alibaba.fastjson2.filter.PropertyPreFilter;
+import com.alibaba.fastjson2.filter.ValueFilter;
 
 public class JsonBridge {
+    private static final String MAX_DEPTH_REACHED = "<max depth reached>";
+
     private static final JSONWriter.Feature[] FEATURES = {
             JSONWriter.Feature.PrettyFormat,
             JSONWriter.Feature.ReferenceDetection,
@@ -22,18 +24,13 @@ public class JsonBridge {
         if (maxDepth <= 0) {
             return JSON.toJSONString(obj, FEATURES);
         }
-        JSONWriter.Context context = JSONFactory.createWriteContext(FEATURES);
-        applyMaxDepth(context, maxDepth);
-        return JSON.toJSONString(obj, context);
-    }
-
-    private void applyMaxDepth(JSONWriter.Context context, int maxDepth) {
-        try {
-            Field field = JSONWriter.Context.class.getDeclaredField("maxLevel");
-            field.setAccessible(true);
-            field.setInt(context, maxDepth);
-        } catch (Throwable ignored) {
-            // Some fastjson2 versions do not expose maxLevel; keep default behavior.
-        }
+        final int[] currentLevel = {-1};
+        PropertyPreFilter levelTracker = (writer, object, name) -> {
+            currentLevel[0] = writer.level();
+            return true;
+        };
+        ValueFilter depthLimiter = (object, name, value) ->
+                currentLevel[0] > maxDepth ? MAX_DEPTH_REACHED : value;
+        return JSON.toJSONString(obj, new Filter[]{levelTracker, depthLimiter}, FEATURES);
     }
 }

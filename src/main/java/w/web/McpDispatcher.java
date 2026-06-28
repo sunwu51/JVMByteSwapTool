@@ -355,8 +355,11 @@ public class McpDispatcher {
         if (message.getClassName() == null || message.getClassName().trim().isEmpty()) {
             return toolResult(false, "className is required", null);
         }
-        List<Map<String, Object>> matches = Global.findAssignableClasses(message.getClassName().trim());
-        return toolResult(true, matches.isEmpty() ? "no subclasses found" : "subclasses found", matches);
+        String className = message.getClassName().trim();
+        List<Map<String, Object>> matches = Global.findAssignableClasses(className);
+        String resultMessage = matches.isEmpty() ? "no subclasses found" : "subclasses found";
+        Global.info("find_subclasses " + className + ": " + resultMessage + "\n" + Global.toJson(matches));
+        return toolResult(true, resultMessage, matches);
     }
 
     private Map<String, Object> eval(EvalMessage message, String traceId) {

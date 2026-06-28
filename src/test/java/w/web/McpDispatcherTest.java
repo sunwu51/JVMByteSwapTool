@@ -189,6 +189,7 @@ public class McpDispatcherTest {
         Global.allLoadedClasses.computeIfAbsent(TestParent.class.getName(), it -> new HashSet<>()).add(TestParent.class);
         Global.allLoadedClasses.computeIfAbsent(TestChild.class.getName(), it -> new HashSet<>()).add(TestChild.class);
         try {
+            long since = System.currentTimeMillis() - 1;
             String request = "{\"jsonrpc\":\"2.0\",\"id\":\"find-subclasses\",\"method\":\"tools/call\",\"params\":{\"name\":\"find_subclasses\",\"arguments\":{\"className\":\""
                     + TestParent.class.getName() + "\"}}}";
             JSONObject response = JSON.parseObject(globalJson(dispatcher.dispatch(request)));
@@ -200,6 +201,15 @@ public class McpDispatcherTest {
                     .map(it -> (JSONObject) it)
                     .anyMatch(it -> TestChild.class.getName().equals(it.getString("className"))
                             && it.getString("classLoader") != null));
+
+            String readLogsRequest = "{\"jsonrpc\":\"2.0\",\"id\":\"reader\",\"method\":\"tools/call\",\"params\":{\"name\":\"read_logs\",\"arguments\":{\"logId\":\"find-subclasses\",\"since\":"
+                    + since + ",\"maxLines\":10}}}";
+            JSONObject readLogsResponse = JSON.parseObject(globalJson(dispatcher.dispatch(readLogsRequest)));
+            JSONArray logs = readLogsResponse.getJSONObject("result").getJSONObject("structuredContent").getJSONArray("data");
+            Assertions.assertTrue(logs.stream()
+                    .map(it -> ((JSONObject) it).getString("content"))
+                    .anyMatch(content -> content.contains("find_subclasses " + TestParent.class.getName())
+                            && content.contains(TestChild.class.getName())));
         } finally {
             Global.allLoadedClasses.getOrDefault(TestParent.class.getName(), new HashSet<>()).remove(TestParent.class);
             Global.allLoadedClasses.getOrDefault(TestChild.class.getName(), new HashSet<>()).remove(TestChild.class);

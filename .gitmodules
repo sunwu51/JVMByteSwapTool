@@ -1,5 +1,5 @@
-[submodule "jbs-client-opentui"]
-	path = jbs-client-opentui
+[submodule "swapper-tui"]
+	path = swapper-tui
 	url = https://github.com/sunwu51/swapper-tui.git
 [submodule "swapper-ui"]
 	path = swapper-ui

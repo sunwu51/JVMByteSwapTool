@@ -41,6 +41,42 @@ public class GlobalJsonTest {
     }
 
     @Test
+    public void toJsonWithDepthOneShouldSerializeRootObjectFields() {
+        Node root = new Node("root");
+        root.child = new Node("child");
+
+        String json = Global.toJson(root, 1);
+
+        Assertions.assertFalse(json.startsWith("toJson error: "));
+        Assertions.assertTrue(json.contains("\"name\":\"root\""));
+    }
+
+    @Test
+    public void toJsonWithDepthShouldReplaceValuesBeyondMaxDepth() {
+        Node root = new Node("root");
+        root.child = new Node("child");
+        root.child.child = new Node("grandchild");
+
+        String json = Global.toJson(root, 1);
+
+        Assertions.assertFalse(json.startsWith("toJson error: "));
+        Assertions.assertTrue(json.contains("\"name\":\"root\""));
+        Assertions.assertTrue(json.contains("\"<max depth reached>\""));
+        Assertions.assertFalse(json.contains("grandchild"));
+    }
+
+    @Test
+    public void toJsonWithDepthShouldKeepReferenceDetection() {
+        Node node = new Node("root");
+        node.child = node;
+
+        String json = Global.toJson(node, 3);
+
+        Assertions.assertFalse(json.startsWith("toJson error: "));
+        Assertions.assertTrue(json.contains("\"$ref\""));
+    }
+
+    @Test
     public void stashShouldStoreAndRemoveDiagnosticObjects() {
         Global.clearStash();
 
