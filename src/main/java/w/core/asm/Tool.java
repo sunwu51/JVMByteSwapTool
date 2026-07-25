@@ -64,15 +64,22 @@ public class Tool {
     }
 
     public static String getOgnlString(Object root, String ognl, int printFormat) {
-        return getOgnlString(root, ognl, printFormat, null, null, null, -1, null);
+        return getOgnlString(root, ognl, printFormat, null, null, null, -1, (String) null);
     }
 
     public static String getOgnlString(Object root, String ognl, int printFormat, Object[] req, Object res, Throwable exp, int depthForJson, String uuid) {
+        Map<String, String> expressions = uuid == null ? null : OGNL_VARIABLES.get(uuid);
+        return getOgnlString(root, ognl, printFormat, req, res, exp, depthForJson, expressions);
+    }
+
+    public static String getOgnlString(Object root, String ognl, int printFormat, Object[] req,
+                                       Object res, Throwable exp, int depthForJson,
+                                       Map<String, String> expressions) {
         if (isBlank(ognl)) {
             return null;
         }
         try {
-            Map<String, Object> variables = buildVariables(root, req, res, exp, uuid);
+            Map<String, Object> variables = buildVariables(root, req, res, exp, expressions);
             return formatValue(Global.ognl(ognl, root, variables), printFormat, depthForJson);
         } catch (Throwable e) {
             return "ognl error: " + e.getClass().getSimpleName() + ": " + e.getMessage();
@@ -110,11 +117,16 @@ public class Tool {
     }
 
     private static Map<String, Object> buildVariables(Object root, Object[] req, Object res, Throwable exp, String uuid) {
+        Map<String, String> expressions = uuid == null ? null : OGNL_VARIABLES.get(uuid);
+        return buildVariables(root, req, res, exp, expressions);
+    }
+
+    private static Map<String, Object> buildVariables(Object root, Object[] req, Object res,
+                                                       Throwable exp, Map<String, String> expressions) {
         Map<String, Object> variables = new LinkedHashMap<>();
         variables.put("req", req);
         variables.put("res", res);
         variables.put("exp", exp);
-        Map<String, String> expressions = uuid == null ? null : OGNL_VARIABLES.get(uuid);
         if (expressions == null || expressions.isEmpty()) {
             return variables;
         }

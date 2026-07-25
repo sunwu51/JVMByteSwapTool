@@ -6,6 +6,7 @@ import w.web.message.MessageType;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Data
@@ -16,6 +17,7 @@ public class SwapResult {
     private MessageType type;
     private UUID transformerId;
     private List<TransformApplyResult> applyResults = new ArrayList<>();
+    private List<Map<String, Object>> candidates = new ArrayList<>();
 
     public static SwapResult failure(Message request, String message) {
         SwapResult result = new SwapResult();
@@ -27,6 +29,12 @@ public class SwapResult {
 
     public static SwapResult failure(Message request, String message, Throwable e) {
         SwapResult result = failure(request, message + ": " + e.getMessage());
+        return result;
+    }
+
+    public static SwapResult failure(Message request, String message, List<Map<String, Object>> candidates) {
+        SwapResult result = failure(request, message);
+        result.setCandidates(candidates);
         return result;
     }
 

@@ -5,10 +5,12 @@ import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import net.bytebuddy.agent.ByteBuddyAgent;
 import w.Global;
 import w.util.RequestUtils;
 
 import java.util.HashSet;
+import java.lang.instrument.Instrumentation;
 
 public class McpDispatcherTest {
     private final McpDispatcher dispatcher = new McpDispatcher();
@@ -32,6 +34,7 @@ public class McpDispatcherTest {
         Assertions.assertTrue(tools.stream().map(it -> ((JSONObject) it).getString("name")).anyMatch("reset"::equals));
         Assertions.assertTrue(tools.stream().map(it -> ((JSONObject) it).getString("name")).anyMatch("list_transformers"::equals));
         Assertions.assertTrue(tools.stream().map(it -> ((JSONObject) it).getString("name")).anyMatch("find_subclasses"::equals));
+        Assertions.assertTrue(tools.stream().map(it -> ((JSONObject) it).getString("name")).anyMatch("list_classloaders"::equals));
         JSONObject watch = findTool(tools, "watch");
         Assertions.assertNotNull(watch);
         Assertions.assertTrue(watch.getString("description").contains("ognl"));
@@ -51,6 +54,9 @@ public class McpDispatcherTest {
         Assertions.assertNotNull(watch.getJSONObject("inputSchema")
                 .getJSONObject("properties")
                 .getJSONObject("variables"));
+        Assertions.assertNotNull(watch.getJSONObject("inputSchema")
+                .getJSONObject("properties")
+                .getJSONObject("classLoaderHash"));
         Assertions.assertTrue(watch.getJSONObject("inputSchema")
                 .getJSONObject("properties")
                 .getJSONObject("ognl")
@@ -130,6 +136,11 @@ public class McpDispatcherTest {
         Assertions.assertNotNull(findSubclasses);
         Assertions.assertNotNull(findSubclasses.getJSONObject("inputSchema").getJSONObject("properties").getJSONObject("className"));
         Assertions.assertTrue(findSubclasses.getJSONObject("inputSchema").getJSONArray("required").contains("className"));
+
+        JSONObject listClassloaders = findTool(tools, "list_classloaders");
+        Assertions.assertNotNull(listClassloaders);
+        Assertions.assertTrue(listClassloaders.getJSONObject("inputSchema")
+                .getJSONArray("required").contains("className"));
     }
 
     @Test
@@ -213,6 +224,30 @@ public class McpDispatcherTest {
         } finally {
             Global.allLoadedClasses.getOrDefault(TestParent.class.getName(), new HashSet<>()).remove(TestParent.class);
             Global.allLoadedClasses.getOrDefault(TestChild.class.getName(), new HashSet<>()).remove(TestChild.class);
+        }
+    }
+
+    @Test
+    public void listClassloadersShouldReturnStructuredLoaderDetails() throws Exception {
+        Instrumentation previous = Global.instrumentation;
+        Global.instrumentation = ByteBuddyAgent.install();
+        try {
+            String request = "{\"jsonrpc\":\"2.0\",\"id\":\"loaders\",\"method\":\"tools/call\","
+                    + "\"params\":{\"name\":\"list_classloaders\",\"arguments\":"
+                    + "{\"className\":\"java.lang.String\"}}}";
+            JSONObject response = JSON.parseObject(globalJson(dispatcher.dispatch(request)));
+            JSONObject structuredContent =
+                    response.getJSONObject("result").getJSONObject("structuredContent");
+            Assertions.assertTrue(structuredContent.getBoolean("success"));
+            JSONObject target = structuredContent.getJSONArray("data").getJSONObject(0);
+            Assertions.assertEquals("java.lang.String", target.getString("className"));
+            Assertions.assertEquals("0", target.getString("classLoaderHash"));
+            Assertions.assertEquals("bootstrap", target.getString("classLoaderName"));
+            Assertions.assertNotNull(target.get("modifiable"));
+            Assertions.assertTrue(target.containsKey("parentClassLoader"));
+            Assertions.assertTrue(target.containsKey("codeSource"));
+        } finally {
+            Global.instrumentation = previous;
         }
     }
 

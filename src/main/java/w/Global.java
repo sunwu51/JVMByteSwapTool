@@ -9,7 +9,6 @@ import ognl.OgnlContext;
 import ognl.OgnlException;
 import w.core.JsonBridgeBundle;
 import w.core.model.BaseClassTransformer;
-import w.core.model.DecompileTransformer;
 import w.util.NativeUtils;
 import w.util.RequestUtils;
 import w.util.SpringUtils;
@@ -44,7 +43,6 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 public class Global {
     /**
@@ -297,7 +295,8 @@ public class Global {
             throw new UnmodifiableClassException(c.getName());
         }
         String className = c.getName();
-        String classLoader = c.getClassLoader().toString();
+        String classLoader = classLoaderName(c.getClassLoader()) + "@"
+                + Integer.toHexString(System.identityHashCode(c.getClassLoader()));
         activeTransformers.computeIfAbsent(className, k->new HashMap<>()).computeIfAbsent(classLoader, k->new ArrayList<>()).add(transformer);
         instrumentation.retransformClasses(c);
     }
@@ -322,14 +321,14 @@ public class Global {
                 it.clear();
                 instrumentation.removeTransformer(it);
                 Set<Class<?>> effectedClasses = new HashSet<>();
-                effectedClasses.addAll(allLoadedClasses.getOrDefault(it.getClassName(), new HashSet<>()));
-                for (String extraClassName : it.getExtraClassNames()) {
-                    effectedClasses.addAll(allLoadedClasses.getOrDefault(extraClassName, new HashSet<>()));
-                }
-                if (it instanceof DecompileTransformer) {
-                    allLoadedClasses.keySet().stream()
-                            .filter(k -> k.startsWith(it.getClassName() + "$"))
-                            .forEach(k -> effectedClasses.addAll(allLoadedClasses.getOrDefault(k, new HashSet<>())));
+                if (it.requiresRetransformOnDelete()) {
+                    effectedClasses.addAll(it.appliedClassesSnapshot());
+                    allLoadedClasses.getOrDefault(it.getClassName(), new HashSet<>()).stream()
+                            .filter(it::matchesTargetClass)
+                            .forEach(effectedClasses::add);
+                    for (String extraClassName : it.getExtraClassNames()) {
+                        effectedClasses.addAll(allLoadedClasses.getOrDefault(extraClassName, new HashSet<>()));
+                    }
                 }
 
                 for (Class<?> aClass : effectedClasses) {
@@ -339,7 +338,7 @@ public class Global {
                     }
                     try {
                         instrumentation.retransformClasses(aClass);
-                    } catch (Exception e) {
+                    } catch (Throwable e) {
                         Global.error("delete re transform error:", e);
                     }
                 }
@@ -367,6 +366,7 @@ public class Global {
         for (String aClass : delClass) {
             activeTransformers.remove(aClass);
         }
+        hitCounter.remove(uuid.toString());
         info("Deleted transformer " + uuid);
     }
 
@@ -374,22 +374,32 @@ public class Global {
      * Remove all transformer
      */
     public static synchronized void reset() {
-        Set<String> cls = transformers.stream().map(BaseClassTransformer::getClassName).collect(Collectors.toSet());
+        Set<Class<?>> effectedClasses = new HashSet<>();
         for (BaseClassTransformer transformer : transformers) {
+            transformer.setStatus(-1);
+            transformer.clear();
             instrumentation.removeTransformer(transformer);
-        }
-        for (String cl : cls) {
-            for (Class<?> aClass : Global.allLoadedClasses.getOrDefault(cl, new HashSet<>())) {
-                try {
-                    instrumentation.retransformClasses(aClass);
-                } catch (Exception e) {
-                    Global.error("reset re transform error: ", e);
-                }
+            if (transformer.requiresRetransformOnDelete()) {
+                effectedClasses.addAll(transformer.appliedClassesSnapshot());
+                allLoadedClasses.getOrDefault(transformer.getClassName(), new HashSet<>()).stream()
+                        .filter(transformer::matchesTargetClass)
+                        .forEach(effectedClasses::add);
             }
-
+        }
+        for (Class<?> aClass : effectedClasses) {
+            if (!isModifiableClass(aClass)) {
+                debug("skip unmodifiable class on reset retransform: " + aClass.getName());
+                continue;
+            }
+            try {
+                instrumentation.retransformClasses(aClass);
+            } catch (Throwable e) {
+                Global.error("reset re transform error: ", e);
+            }
         }
         transformers.clear();
         activeTransformers.clear();
+        hitCounter.clear();
         Global.info("uninstall all transformer finished");
     }
 
@@ -719,11 +729,16 @@ public class Global {
         }
     }
 
-    public static void checkCountAndUnload(String uuid) {
+    public static synchronized void checkCountAndUnload(String uuid) {
+        boolean active = transformers.stream()
+                .anyMatch(transformer -> transformer.getUuid().toString().equals(uuid));
+        if (!active) {
+            hitCounter.remove(uuid);
+            return;
+        }
         if (hitCounter.computeIfAbsent(uuid, k -> new AtomicInteger()).incrementAndGet() >= getMaxHit()) {
             info("Watch or trace hit counter exceeded maximum, deleted");
             deleteTransformer(UUID.fromString(uuid));
-            hitCounter.remove(uuid);
         }
     }
 

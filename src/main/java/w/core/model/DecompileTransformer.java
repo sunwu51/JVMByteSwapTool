@@ -10,7 +10,6 @@ import java.security.ProtectionDomain;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 
 
 /**
@@ -36,7 +35,6 @@ public class DecompileTransformer extends BaseClassTransformer {
             String sourceCode = WCompiler.decompile(relatedClassesCtx.get(), className);
             Global.info("/* " + className + " source code: */\n" + sourceCode);
         } finally {
-            CompletableFuture.runAsync(() -> Global.deleteTransformer(uuid));
             relatedClassesCtx.remove();
         }
         return origin;
@@ -63,8 +61,6 @@ public class DecompileTransformer extends BaseClassTransformer {
             } catch (Throwable e) {
                 recordApplyFailure(loader, className, e);
                 Global.error(className + " transformer " + uuid + " added fail -(′д｀)-: ", e);
-                // async to delete, because current thread holds the class lock
-                CompletableFuture.runAsync(() -> Global.deleteTransformer(uuid));
             }
         }
         return null;
@@ -81,5 +77,10 @@ public class DecompileTransformer extends BaseClassTransformer {
     @Override
     public String desc() {
         return "Decompile_" + getClassName();
+    }
+
+    @Override
+    public boolean requiresRetransformOnDelete() {
+        return false;
     }
 }

@@ -20,6 +20,8 @@ public class WatchMessage extends Message implements RequestMessage {
      */
     String signature;
 
+    String classLoaderHash;
+
     int printFormat = 1;
 
     int depthForJson = 3;

@@ -6,6 +6,7 @@ import w.Global;
 import w.core.ExecBundle;
 import w.core.GroovyBundle;
 import w.core.Swapper;
+import w.core.ClassTargetResolver;
 import w.core.model.SwapResult;
 import w.util.RequestUtils;
 import w.web.message.ChangeBodyMessage;
@@ -94,6 +95,7 @@ public class McpDispatcher {
         tools.add(tool("replace_class", "Replace a loaded class in the host JVM from base64-encoded bytecode. Use this for live class replacement when source has already been compiled externally. Arguments include the target class name and base64 class bytes. The result reports whether the class transformer was installed and whether retransformation succeeded for each affected loaded class/classloader."));
         tools.add(tool("decompile", "Decompile a class currently loaded in the host JVM. Use this to inspect the actual bytecode/source shape of a class from the running process, including classes loaded by different classloaders. Arguments identify the loaded class to decompile. The synchronous result reports transformer/retransform status; generated decompile output is emitted through the normal logging/output path."));
         tools.add(tool("find_subclasses", "Find loaded subclasses or interface implementations in the host JVM. The tool first locates already-loaded target Class objects by fully qualified className, including multiple classloaders, then scans all loaded classes with target.isAssignableFrom(candidate). The result lists matching candidate class names and classloader identities, along with the target classloader they matched."));
+        tools.add(tool("list_classloaders", "List every loaded Class object matching className. Returns exact ClassLoader identity hash, loader name, parent loader, code source, and modifiable status. Pass a returned classLoaderHash to watch when duplicate class names exist."));
         tools.add(tool("exec", "Compile, hot-swap, and invoke the built-in w.Exec class inside the host JVM. Use this for imperative diagnostic code that can call agent APIs such as Global.info, SpringUtils, or OGNL helpers. This tool is effectively void: the synchronous result is only success/failure such as 'exec success'. Any diagnostic output from the executed code should be written with Global.info/Global.error and consumed from /log."));
         tools.add(tool("eval", "Evaluate Groovy code in an interactive host-JVM context using the target application's classloader. If the current process is a Spring application and its ApplicationContext has been detected, the built-in variable ctx is that Spring ApplicationContext, so agents can call ctx.getBean(SomeClass.class) or ctx.getBean(\"beanName\") to inspect and use live beans. The Groovy engine keeps an interactive binding across eval calls: variables assigned in one eval call can be reused by later eval calls. Prefix the body with '!' to run a shell command instead of Groovy. The synchronous result returns a safe string representation of the expression result; complex host objects are not serialized as JSON. The same result is also logged to /log."));
         tools.add(tool("read_logs", "Read recent JVMByteSwapTool logs captured inside the host JVM. Use this after installing asynchronous diagnostics such as watch, outer_watch, trace, exec, reset, or decompile to retrieve runtime output that was not part of the original tool response. The required logId argument is the same logId you passed in the previous diagnostic tool's arguments, for example the logId supplied to watch. Logs are filtered by this logId to avoid returning unrelated host JVM noise. Pass logId='*' only when you intentionally want all recent logs. When timeoutMs is greater than 0, this call waits briefly for matching future logs, which lets an agent call watch and then wait for the method-hit logs produced when the application later handles traffic."));
@@ -121,12 +123,17 @@ public class McpDispatcher {
             case "watch":
                 add(properties, "logId", stringProp("Optional correlation id for runtime logs emitted by this watch. Reuse this same value as read_logs.logId to fetch method-hit logs later."));
                 add(properties, "signature", stringProp("Target method in the host JVM, formatted as fully.qualified.ClassName#methodName. Example: com.example.UserService#getUser."));
+                add(properties, "classLoaderHash", stringProp("Optional hexadecimal ClassLoader identity hash returned by list_classloaders. Required when multiple loaded classes have the same name."));
                 add(properties, "minCost", integerProp("Only emit runtime watch logs when invocation cost is at least this many milliseconds. Use 0 to log every hit."));
                 add(properties, "printFormat", integerProp("Runtime value rendering format. 1 means toString, 2 means JSON serialization."));
                 add(properties, "depthForJson", integerProp("Maximum JSON serialization depth when printFormat is 2. Defaults to 3 when omitted or non-positive."));
                 add(properties, "variables", stringMapProp("Optional custom OGNL variables. Keys become #key in the main ognl expression. Values are OGNL expressions evaluated first with default variables #req, #res, and #exp available."));
                 add(properties, "ognl", stringProp("Optional OGNL expression evaluated at method-hit time with root bound to the current this object. Default variables are #req for method arguments as Object[], #res for return value or null, and #exp for Throwable or null. Custom variables from variables are also available. The result is appended to the runtime log as ognl:<value>. Use only when extra context is needed, such as reading a field, a ThreadLocal value, stashing a live object via @w.Global@stash(\"key\", #req[0]), or triggering a controlled diagnostic action. Spring bean example: @w.util.SpringUtils@getSpringBootApplicationContext().getBean(\"userController\").getUserById(1)."));
                 required.add("signature");
+                break;
+            case "list_classloaders":
+                add(properties, "className", stringProp("Fully qualified loaded class name to inspect."));
+                required.add("className");
                 break;
             case "outer_watch":
                 add(properties, "logId", stringProp("Optional correlation id for runtime logs emitted by this outer watch. Reuse this same value as read_logs.logId."));
@@ -320,6 +327,8 @@ public class McpDispatcher {
                 return swapResult(args.toJavaObject(DecompileMessage.class), traceId);
             case "find_subclasses":
                 return findSubclasses(args.toJavaObject(FindSubclassesMessage.class));
+            case "list_classloaders":
+                return listClassLoaders(args.getString("className"));
             case "exec":
                 return exec(args.toJavaObject(ExecMessage.class), traceId);
             case "eval":
@@ -360,6 +369,22 @@ public class McpDispatcher {
         String resultMessage = matches.isEmpty() ? "no subclasses found" : "subclasses found";
         Global.info("find_subclasses " + className + ": " + resultMessage + "\n" + Global.toJson(matches));
         return toolResult(true, resultMessage, matches);
+    }
+
+    private Map<String, Object> listClassLoaders(String className) {
+        if (className == null || className.trim().isEmpty()) {
+            return toolResult(false, "className is required", null);
+        }
+        try {
+            List<ClassTargetResolver.ClassTarget> targets =
+                    new ClassTargetResolver(Global.instrumentation).list(className.trim());
+            List<Map<String, Object>> data = targets.stream()
+                    .map(ClassTargetResolver.ClassTarget::toMap)
+                    .collect(Collectors.toList());
+            return toolResult(true, data.isEmpty() ? "class not loaded" : "classloaders found", data);
+        } catch (Throwable e) {
+            return toolResult(false, e.getMessage(), null);
+        }
     }
 
     private Map<String, Object> eval(EvalMessage message, String traceId) {
