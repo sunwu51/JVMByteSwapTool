@@ -10,7 +10,7 @@ import java.util.Map;
  * @date 2023/11/26 19:49
  */
 @Data
-public class WatchMessage extends Message implements RequestMessage {
+public class WatchMessage extends ClassTargetMessage implements RequestMessage {
     {
         type = MessageType.WATCH;
     }

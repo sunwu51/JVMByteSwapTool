@@ -26,11 +26,15 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 import w.Global;
 import w.core.asm.WAdviceAdapter;
+import w.core.diagnostic.DiagnosticRuntime;
+import w.core.diagnostic.TraceConfig;
 import w.web.message.TraceMessage;
 
 import static org.objectweb.asm.Opcodes.ASM9;
 import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
+import static org.objectweb.asm.Opcodes.ALOAD;
+import static org.objectweb.asm.Opcodes.ASTORE;
 import static org.objectweb.asm.Opcodes.LLOAD;
 import static org.objectweb.asm.Opcodes.NEW;
 
@@ -62,6 +66,11 @@ public class TraceTransformer extends BaseClassTransformer {
         addTargetMethod(this.className, this.method);
     }
 
+    public TraceConfig config() {
+        return new TraceConfig(uuid.toString(), traceId, className + "#" + method,
+                minCost, ignoreZero);
+    }
+
     @Override
     public byte[] transform(byte[] origin) throws Exception {
         return transform(origin, className);
@@ -73,7 +82,7 @@ public class TraceTransformer extends BaseClassTransformer {
             return origin;
         }
         className = className.replace("/", ".");
-        if (targetMethods.containsKey(className)) {
+        if (targetMethods.containsKey(className) && matchesTargetLoader(loader)) {
             try {
                 byte[] r = transform(origin, className);
                 recordApplySuccess(loader, className);
@@ -89,6 +98,7 @@ public class TraceTransformer extends BaseClassTransformer {
     }
 
     public Set<Class<?>> prepareNestedTargets(Set<Class<?>> rootClasses) {
+        // Include lambda and anonymous-class methods compiled outside the root method.
         if (!includeNested) {
             return Collections.emptySet();
         }
@@ -194,6 +204,7 @@ public class TraceTransformer extends BaseClassTransformer {
 
     @Override
     public List<String> getExtraClassNames() {
+        // These classes are also targets and must be considered when removing the transformer.
         List<String> extraClassNames = new ArrayList<>(targetMethods.keySet());
         extraClassNames.remove(className);
         return extraClassNames;
@@ -204,7 +215,7 @@ public class TraceTransformer extends BaseClassTransformer {
         ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES) {
             @Override
             protected ClassLoader getClassLoader() {
-                return Global.getClassLoader();
+                return getTargetClassLoader();
             }
         };
         AtomicBoolean effect = new AtomicBoolean();
@@ -219,6 +230,7 @@ public class TraceTransformer extends BaseClassTransformer {
                 effect.set(true);
                 return new WAdviceAdapter(ASM9, mv, access, name, descriptor) {
                     private int startTimeVarIndex;
+                    private int traceTokenVarIndex;
 
                     private int line;
                     @Override
@@ -232,40 +244,37 @@ public class TraceTransformer extends BaseClassTransformer {
                         startTimeVarIndex = asmStoreStartTime(mv);
                         if (outerMethod) {
                             mv.visitLdcInsn(uuid.toString());
-                            mv.visitMethodInsn(INVOKESTATIC, "w/core/model/TraceTransformer", "enterTrace", "(Ljava/lang/String;)V", false);
+                            mv.visitMethodInsn(INVOKESTATIC, "w/bridge/DiagnosticBridge",
+                                    "traceEnter", "(Ljava/lang/String;)Ljava/lang/Object;", false);
+                            traceTokenVarIndex = newLocal(Type.getType(Object.class));
+                            mv.visitVarInsn(ASTORE, traceTokenVarIndex);
                         }
                     }
                     @Override
                     protected void onMethodExit(int opcode) {
                         if (outerMethod) {
+                            mv.visitVarInsn(ALOAD, traceTokenVarIndex);
                             mv.visitVarInsn(LLOAD, startTimeVarIndex);
-                            mv.visitLdcInsn((long) minCost);
-                            mv.visitLdcInsn(uuid.toString());
-                            mv.visitLdcInsn(traceId);
-                            mv.visitLdcInsn(className + "#" + method);
-                            mv.visitLdcInsn(ignoreZero);
-                            mv.visitMethodInsn(INVOKESTATIC, "w/core/model/TraceTransformer", "traceSummary", "(JJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V", false);
+                            mv.visitMethodInsn(INVOKESTATIC, "w/bridge/DiagnosticBridge",
+                                    "traceExit", "(Ljava/lang/Object;J)V", false);
                         } else {
                             int localDurationIndex = asmCalculateCost(mv, startTimeVarIndex);
                             mv.visitLdcInsn(uuid.toString());
                             mv.visitLdcInsn("line" + line + "," + currentClassName + "#" + name);
                             mv.visitVarInsn(LLOAD, localDurationIndex);
-                            mv.visitMethodInsn(INVOKESTATIC, "w/core/model/TraceTransformer", "subTrace", "(Ljava/lang/String;Ljava/lang/String;J)V", false);
+                            mv.visitMethodInsn(INVOKESTATIC, "w/bridge/DiagnosticBridge",
+                                    "traceSubCall", "(Ljava/lang/String;Ljava/lang/String;J)V", false);
                         }
                     }
 
                     @Override
                     public void visitMethodInsn(int opcodeAndSource, String owner, String name, String descriptor, boolean isInterface) {
                         // by default ignore the <init>, append, toString methods
-                        if (Global.ignoreTraceMethods.contains(name) ||
+                        if (owner.equals("w/bridge/DiagnosticBridge")
+                                || Global.ignoreTraceMethods.contains(name) ||
                             (owner.startsWith("java/lang") && !owner.startsWith("java/lang/Thread"))) {
                             super.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
                             return;
-                        }
-
-                        if (owner.replace("/",".").equals(className) && method.equals(name)) {
-                            mv.visitLdcInsn(uuid.toString());
-                            mv.visitMethodInsn(INVOKESTATIC, "w/core/model/TraceTransformer", "recursiveRecord", "(Ljava/lang/String;)V", false);
                         }
 
                         // long start = System.currentTimeMillis();
@@ -280,7 +289,8 @@ public class TraceTransformer extends BaseClassTransformer {
                         mv.visitLdcInsn(uuid.toString());
                         mv.visitLdcInsn("line" + line + "," + owner.replace("/", ".") + "#" + name);
                         mv.visitVarInsn(LLOAD, localDurationIndex);
-                        mv.visitMethodInsn(INVOKESTATIC, "w/core/model/TraceTransformer", "subTrace", "(Ljava/lang/String;Ljava/lang/String;J)V", false);
+                        mv.visitMethodInsn(INVOKESTATIC, "w/bridge/DiagnosticBridge",
+                                "traceSubCall", "(Ljava/lang/String;Ljava/lang/String;J)V", false);
                     }
                 };
             }
@@ -305,7 +315,13 @@ public class TraceTransformer extends BaseClassTransformer {
     }
 
     public static void enterTrace(String uuid) {
-        traceCtx.get().computeIfAbsent(uuid, k -> new TraceCtx());
+        Map<String, TraceCtx> contexts = traceCtx.get();
+        TraceCtx existing = contexts.get(uuid);
+        if (existing == null) {
+            contexts.put(uuid, new TraceCtx());
+        } else {
+            existing.stackDeep++;
+        }
     }
 
     public static void subTrace(String uuid, String key, long duration) {
@@ -320,19 +336,22 @@ public class TraceTransformer extends BaseClassTransformer {
     }
 
 
-    public static void traceSummary(long start, long minCost, String uuid, String traceId, String outerSig, boolean ignoreZero) {
+    public static boolean traceSummary(long start, long minCost, String uuid, String traceId,
+                                       String outerSig, boolean ignoreZero) {
         TraceCtx ctx = traceCtx.get().get(uuid);
         if (ctx == null) {
-            return;
+            return true;
         }
         int deep = --ctx.stackDeep;
         StringBuilder sb = new StringBuilder();
         if (deep <= 0) {
-            long cost = System.currentTimeMillis() - start;
-            if (cost >= minCost) {
-                w.Global.checkCountAndUnload(uuid);
-                w.util.RequestUtils.fillCurThread(traceId);
-                try {
+            boolean requestContextFilled = false;
+            try {
+                long cost = System.currentTimeMillis() - start;
+                if (cost >= minCost) {
+                    w.Global.checkCountAndUnload(uuid);
+                    w.util.RequestUtils.fillCurThread(traceId);
+                    requestContextFilled = true;
                     sb.append(outerSig).append(", total cost:").append(cost).append("ms\n");
                     Map<String, int[]> map = ctx.traceContent;
                     map.forEach((k, v) -> {
@@ -341,25 +360,36 @@ public class TraceTransformer extends BaseClassTransformer {
                         }
                     });
                     w.Global.info(sb);
+                }
+            } finally {
+                try {
+                    if (requestContextFilled) {
+                        w.util.RequestUtils.clearRequestCtx();
+                    }
                 } finally {
-                    w.util.RequestUtils.clearRequestCtx();
+                    Map<String, TraceCtx> ctxMap = traceCtx.get();
+                    ctxMap.remove(uuid);
+                    if (ctxMap.isEmpty()) {
+                        traceCtx.remove();
+                    }
                 }
             }
-            Map<String, TraceCtx> ctxMap = traceCtx.get();
-            ctxMap.remove(uuid);
-            if (ctxMap.isEmpty()) {
-                traceCtx.remove();
-            }
+            return true;
         }
+        return false;
+    }
+
+    public static boolean hasTraceContext(String uuid) {
+        return traceCtx.get().containsKey(uuid);
     }
 
     public static void recursiveRecord(String uuid) {
-        traceCtx.get().computeIfAbsent(uuid, k -> new TraceCtx()).stackDeep++;
+        // Retained for compatibility with already transformed methods. Entry owns depth accounting.
     }
 
     public boolean equals(Object other) {
-        if (other instanceof OuterWatchTransformer) {
-            return this.uuid.equals(((OuterWatchTransformer) other).getUuid());
+        if (other instanceof TraceTransformer) {
+            return this.uuid.equals(((TraceTransformer) other).getUuid());
         }
         return false;
     }
@@ -372,6 +402,7 @@ public class TraceTransformer extends BaseClassTransformer {
     @Override
     public void clear() {
         traceCtx.get().remove(this.uuid.toString());
+        DiagnosticRuntime.unregister(uuid.toString());
     }
 
     public static class TraceCtx {

@@ -8,7 +8,7 @@ import lombok.Data;
  * @date 2023/11/25 22:08
  */
 @Data
-public class ReplaceClassMessage extends Message implements RequestMessage {
+public class ReplaceClassMessage extends ClassTargetMessage implements RequestMessage {
     {
         type = MessageType.REPLACE_CLASS;
     }

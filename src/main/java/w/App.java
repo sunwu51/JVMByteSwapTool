@@ -7,6 +7,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import w.core.BootstrapBridgeInstaller;
+import w.core.diagnostic.DiagnosticRuntime;
 import w.util.SpringUtils;
 import w.web.Httpd;
 
@@ -34,6 +36,8 @@ public class App {
             System.setProperty(STARTED_PROPERTY, "true");
             applyArgs(arg);
             Global.instrumentation = instrumentation;
+            BootstrapBridgeInstaller.install(instrumentation);
+            DiagnosticRuntime.initialize();
             Global.fillLoadedClasses();
 
             // In premain, Spring is usually not ready yet. Try once now, then keep probing in background.

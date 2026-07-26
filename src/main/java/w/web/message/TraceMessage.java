@@ -3,7 +3,7 @@ package w.web.message;
 import lombok.Data;
 
 @Data
-public class TraceMessage extends Message {
+public class TraceMessage extends ClassTargetMessage {
     {
         type = MessageType.TRACE;
     }

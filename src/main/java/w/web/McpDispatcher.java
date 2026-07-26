@@ -6,16 +6,17 @@ import w.Global;
 import w.core.ExecBundle;
 import w.core.GroovyBundle;
 import w.core.Swapper;
+import w.core.ClassTargetResolver;
 import w.core.model.SwapResult;
 import w.util.RequestUtils;
 import w.web.message.ChangeBodyMessage;
 import w.web.message.ChangeResultMessage;
+import w.web.message.ClassTargetMessage;
 import w.web.message.DecompileMessage;
 import w.web.message.DeleteMessage;
 import w.web.message.EvalMessage;
 import w.web.message.ExecMessage;
 import w.web.message.FindSubclassesMessage;
-import w.web.message.Message;
 import w.web.message.OuterWatchMessage;
 import w.web.message.ReplaceClassMessage;
 import w.web.message.TraceMessage;
@@ -89,11 +90,12 @@ public class McpDispatcher {
         tools.add(tool("watch", "Attach a diagnostic watch transformer to a method in the host JVM. Use this to observe method calls in the already-running Java process without restarting it. Arguments identify the target class, method, parameter types, and watch expression/options. Runtime logs include req, res, exception, mdc, and optionally an ognl value when the ognl argument is provided. The ognl expression is evaluated by w.Global.ognl with root bound to the current this object, so it is useful for printing extra context such as a ThreadLocal value or triggering a carefully chosen diagnostic action. The synchronous result reports whether transformer installation and class retransformation succeeded, including per class/classloader apply results. Runtime method-hit output is asynchronous and is delivered through the /log event stream, not as this call's return value."));
         tools.add(tool("outer_watch", "Attach a diagnostic transformer in the host JVM to observe a caller/outer method relationship. Use this when debugging how a target method is reached from surrounding application code. Arguments identify the concrete outer method and the inner/callee method to observe. Runtime logs include req, res, exception, mdc, and optionally an ognl value when the ognl argument is provided. The ognl expression is evaluated by w.Global.ognl with root bound to the current this object of the method containing the matched inner call, so it can print contextual fields, ThreadLocal values, or trigger a controlled diagnostic action. The synchronous result reports transformer installation and retransformation status; later hit logs are streamed through /log. By default, outer_watch is call-site based and observes matching inner method calls directly present in the outer method bytecode. The inner callee owner is matched from bytecode call-sites, so interfaces or parent classes often do not match when the compiled call targets an implementation/anonymous/lambda class. For that case, use innerSignature like *#methodName to match the method name regardless of owner class. includeNested defaults to true so it also scans lambda implementation methods and anonymous inner classes referenced by the outer method. Matching inner calls inside synchronously executed lambda/body methods can be observed. Set includeNested=false to restrict observation to direct outer-method bytecode only. Async/thread context propagation is not supported."));
         tools.add(tool("trace", "Attach a trace transformer to a method in the host JVM. Use this for runtime call tracing and lightweight execution diagnostics inside the attached Java process. Arguments identify the class, method, parameter types, and trace options. The call returns only installation/retransform success or failure. Trace hits and runtime observations are pushed asynchronously to /log. Trace is call-site based: it records method-call bytecode executed inside the traced method, so lines with no method invocation, such as local assignments or simple arithmetic like int a = 10, do not produce separate trace entries. By default, trace records normal method-call bytecode inside the target method but intentionally skips constructors (<init>), toString, StringBuilder append, and most java.lang calls except java.lang.Thread to reduce noise and bytecode risk. includeNested defaults to true, so the tool also instruments lambda implementation methods and anonymous inner classes referenced by the traced method and synchronous lambda/body calls are included in the same trace summary. Set includeNested=false to restrict tracing to the target method itself. Asynchronous context propagation is not supported."));
-        tools.add(tool("change_body", "Hot-swap a method body in the host JVM by installing a bytecode transformer and retransformation. Use only when intentionally changing live behavior for diagnosis or emergency patching. Arguments identify the class/method/signature and replacement body definition. The synchronous result is a SwapResult that reports transformer UUID and per class/classloader retransformation success or failure."));
-        tools.add(tool("change_result", "Hot-swap the result of an inner method call inside an outer method in the host JVM. Use this to alter a callee return value for controlled diagnosis without restarting the Java process. Arguments identify the concrete outer method, the inner/callee method call, and replacement Java logic. In replacement code, $1, $2, ... refer to the original innerMethod arguments; $_ is the final return value to provide to the outer method. Assigning $_ directly, for example $_ = xxx;, can skip running the original innerMethod. $proceed() calls the original innerMethod using the current $1, $2, ... values, so code can mutate arguments first, then call $_ = $proceed();. Diagnostic helpers under w.Global are available: w.Global.info(...) writes logs to /log/read_logs, w.Global.toJson(obj) renders complex objects as JSON text when possible, and w.Global.ognl(\"expr\", root) evaluates an OGNL expression against a root object for nested field/property access. The synchronous response reports transformer installation and retransformation outcome; later runtime effects are logged through /log if the transformer emits logs."));
+        tools.add(tool("change_body", "Hot-swap a method body in the host JVM by installing a bytecode transformer and retransformation. Use only when intentionally changing live behavior for diagnosis or emergency patching. Arguments identify the class/method/signature and replacement body definition. Replacement code can call w.bridge.DiagnosticBridge.info(...) or error(...) to emit logs even when the target uses an isolated ClassLoader. The synchronous result is a SwapResult that reports transformer UUID and per class/classloader retransformation success or failure."));
+        tools.add(tool("change_result", "Hot-swap the result of an inner method call inside an outer method in the host JVM. Use this to alter a callee return value for controlled diagnosis without restarting the Java process. Arguments identify the concrete outer method, the inner/callee method call, and replacement Java logic. In replacement code, $1, $2, ... refer to the original innerMethod arguments; $_ is the final return value to provide to the outer method. Assigning $_ directly, for example $_ = xxx;, can skip running the original innerMethod. $proceed() calls the original innerMethod using the current $1, $2, ... values, so code can mutate arguments first, then call $_ = $proceed();. Use w.bridge.DiagnosticBridge.info(...) or error(...) for logs; the Bootstrap-visible bridge also works for targets loaded by isolated ClassLoaders. The synchronous response reports transformer installation and retransformation outcome; later runtime effects are logged through /log if the transformer emits logs."));
         tools.add(tool("replace_class", "Replace a loaded class in the host JVM from base64-encoded bytecode. Use this for live class replacement when source has already been compiled externally. Arguments include the target class name and base64 class bytes. The result reports whether the class transformer was installed and whether retransformation succeeded for each affected loaded class/classloader."));
         tools.add(tool("decompile", "Decompile a class currently loaded in the host JVM. Use this to inspect the actual bytecode/source shape of a class from the running process, including classes loaded by different classloaders. Arguments identify the loaded class to decompile. The synchronous result reports transformer/retransform status; generated decompile output is emitted through the normal logging/output path."));
         tools.add(tool("find_subclasses", "Find loaded subclasses or interface implementations in the host JVM. The tool first locates already-loaded target Class objects by fully qualified className, including multiple classloaders, then scans all loaded classes with target.isAssignableFrom(candidate). The result lists matching candidate class names and classloader identities, along with the target classloader they matched."));
+        tools.add(tool("list_classloaders", "List ClassLoaders in the host JVM. With className, returns every loaded Class object matching that name. Without className, returns every current ClassLoader with its identity hash and loaded-class counts. Pass a returned classLoaderHash to any class-targeting transformation when duplicate class names exist."));
         tools.add(tool("exec", "Compile, hot-swap, and invoke the built-in w.Exec class inside the host JVM. Use this for imperative diagnostic code that can call agent APIs such as Global.info, SpringUtils, or OGNL helpers. This tool is effectively void: the synchronous result is only success/failure such as 'exec success'. Any diagnostic output from the executed code should be written with Global.info/Global.error and consumed from /log."));
         tools.add(tool("eval", "Evaluate Groovy code in an interactive host-JVM context using the target application's classloader. If the current process is a Spring application and its ApplicationContext has been detected, the built-in variable ctx is that Spring ApplicationContext, so agents can call ctx.getBean(SomeClass.class) or ctx.getBean(\"beanName\") to inspect and use live beans. The Groovy engine keeps an interactive binding across eval calls: variables assigned in one eval call can be reused by later eval calls. Prefix the body with '!' to run a shell command instead of Groovy. The synchronous result returns a safe string representation of the expression result; complex host objects are not serialized as JSON. The same result is also logged to /log."));
         tools.add(tool("read_logs", "Read recent JVMByteSwapTool logs captured inside the host JVM. Use this after installing asynchronous diagnostics such as watch, outer_watch, trace, exec, reset, or decompile to retrieve runtime output that was not part of the original tool response. The required logId argument is the same logId you passed in the previous diagnostic tool's arguments, for example the logId supplied to watch. Logs are filtered by this logId to avoid returning unrelated host JVM noise. Pass logId='*' only when you intentionally want all recent logs. When timeoutMs is greater than 0, this call waits briefly for matching future logs, which lets an agent call watch and then wait for the method-hit logs produced when the application later handles traffic."));
@@ -121,6 +123,7 @@ public class McpDispatcher {
             case "watch":
                 add(properties, "logId", stringProp("Optional correlation id for runtime logs emitted by this watch. Reuse this same value as read_logs.logId to fetch method-hit logs later."));
                 add(properties, "signature", stringProp("Target method in the host JVM, formatted as fully.qualified.ClassName#methodName. Example: com.example.UserService#getUser."));
+                addClassLoaderHash(properties);
                 add(properties, "minCost", integerProp("Only emit runtime watch logs when invocation cost is at least this many milliseconds. Use 0 to log every hit."));
                 add(properties, "printFormat", integerProp("Runtime value rendering format. 1 means toString, 2 means JSON serialization."));
                 add(properties, "depthForJson", integerProp("Maximum JSON serialization depth when printFormat is 2. Defaults to 3 when omitted or non-positive."));
@@ -128,9 +131,13 @@ public class McpDispatcher {
                 add(properties, "ognl", stringProp("Optional OGNL expression evaluated at method-hit time with root bound to the current this object. Default variables are #req for method arguments as Object[], #res for return value or null, and #exp for Throwable or null. Custom variables from variables are also available. The result is appended to the runtime log as ognl:<value>. Use only when extra context is needed, such as reading a field, a ThreadLocal value, stashing a live object via @w.Global@stash(\"key\", #req[0]), or triggering a controlled diagnostic action. Spring bean example: @w.util.SpringUtils@getSpringBootApplicationContext().getBean(\"userController\").getUserById(1)."));
                 required.add("signature");
                 break;
+            case "list_classloaders":
+                add(properties, "className", stringProp("Optional fully qualified loaded class name. Omit it to enumerate all current JVM ClassLoaders."));
+                break;
             case "outer_watch":
                 add(properties, "logId", stringProp("Optional correlation id for runtime logs emitted by this outer watch. Reuse this same value as read_logs.logId."));
                 add(properties, "signature", stringProp("Outer/caller method in the host JVM, formatted as fully.qualified.ClassName#methodName."));
+                addClassLoaderHash(properties);
                 add(properties, "innerSignature", stringProp("Inner/callee method to observe inside the outer method, formatted as fully.qualified.ClassName#methodName or *#methodName. Use *#methodName when the callee may be compiled as an implementation class, anonymous inner class, or lambda target and an interface/parent-class name would not match the actual bytecode owner."));
                 add(properties, "printFormat", integerProp("Runtime value rendering format. 1 means toString, 2 means JSON serialization."));
                 add(properties, "depthForJson", integerProp("Maximum JSON serialization depth when printFormat is 2. Defaults to 3 when omitted or non-positive."));
@@ -143,6 +150,7 @@ public class McpDispatcher {
             case "trace":
                 add(properties, "logId", stringProp("Optional correlation id for runtime logs emitted by this trace. Reuse this same value as read_logs.logId to fetch trace-hit logs later."));
                 add(properties, "signature", stringProp("Target method to trace in the host JVM, formatted as fully.qualified.ClassName#methodName."));
+                addClassLoaderHash(properties);
                 add(properties, "minCost", integerProp("Only emit trace summaries when total invocation cost is at least this many milliseconds. Use 0 to include every invocation."));
                 add(properties, "ignoreZero", booleanProp("When true, omit traced sub-method entries whose measured cost is 0ms."));
                 add(properties, "includeNested", booleanProp("Defaults to true. When true, also trace synchronous lambda implementation methods and anonymous inner classes referenced by the target method. Without this, calls inside lambda bodies are usually invisible because the JVM compiles them into separate synthetic methods. This does not propagate trace context across threads or async executors. Constructors, toString, StringBuilder append, and most java.lang calls are still skipped by trace filtering. Set false to trace only the target method itself."));
@@ -151,7 +159,7 @@ public class McpDispatcher {
             case "change_body":
                 add(properties, "logId", stringProp("Optional correlation id for install/retransform logs emitted by this change. Reuse this same value as read_logs.logId when needed."));
                 addChangeTargetProperties(properties);
-                add(properties, "body", stringProp("Replacement Java method body. For Javassist mode this is a code block such as { return \"patched\"; }."));
+                add(properties, "body", stringProp("Replacement Java method body. For Javassist mode this is a code block such as { return \"patched\"; }. Use w.bridge.DiagnosticBridge.info(...) or error(...) for diagnostic logs; unlike w.Global, the bridge is visible to isolated ClassLoaders."));
                 add(properties, "mode", integerProp("Replacement engine. 0 means Javassist body replacement, 1 means ASM-style method replacement where supported."));
                 required.add("className");
                 required.add("method");
@@ -163,7 +171,7 @@ public class McpDispatcher {
                 addChangeTargetProperties(properties);
                 add(properties, "innerClassName", stringProp("Class name of the inner method call to intercept. Use * to match by innerMethod regardless of owner where supported."));
                 add(properties, "innerMethod", stringProp("Name of the inner method call whose result should be replaced."));
-                add(properties, "body", stringProp("Replacement Java code for the intercepted innerMethod call. $1, $2, ... are the original innerMethod arguments. $_ is the final return value; assign $_ = xxx; to return xxx without invoking the original innerMethod. $proceed() invokes the original innerMethod with the current $1, $2, ... values, so you can rewrite arguments before proceeding, for example: $1 = newValue; $_ = $proceed(); w.Global.info(\"[mylog] the return value is \" + $_);. You may call helper APIs such as w.Global.info(...) to emit logs retrievable through /log/read_logs, w.Global.toJson(obj) to serialize diagnostic objects, and w.Global.ognl(\"field.nested\", rootObj) to read nested properties from an argument or return object."));
+                add(properties, "body", stringProp("Replacement Java code for the intercepted innerMethod call. $1, $2, ... are the original innerMethod arguments. $_ is the final return value; assign $_ = xxx; to return xxx without invoking the original innerMethod. $proceed() invokes the original innerMethod with the current $1, $2, ... values, so you can rewrite arguments before proceeding, for example: $1 = newValue; $_ = $proceed(); w.bridge.DiagnosticBridge.info(\"[mylog] the return value is \" + $_);. Use w.bridge.DiagnosticBridge.info(...) or error(...) for logs retrievable through /log/read_logs; unlike w.Global, the bridge is visible to isolated ClassLoaders."));
                 add(properties, "mode", integerProp("Replacement engine. 0 means Javassist MethodCall.replace syntax, 1 means ASM-style replacement. Both support $1, $2, ..., $_, and $proceed() for the intercepted inner call where supported by the target bytecode."));
                 required.add("className");
                 required.add("method");
@@ -175,6 +183,7 @@ public class McpDispatcher {
             case "replace_class":
                 add(properties, "logId", stringProp("Optional correlation id for logs emitted while replacing the class. Reuse this same value as read_logs.logId when needed."));
                 add(properties, "className", stringProp("Fully qualified class name in the host JVM to replace. Example: com.example.UserService."));
+                addClassLoaderHash(properties);
                 add(properties, "content", stringProp("Base64-encoded .class file bytes to install into the already-loaded target class."));
                 required.add("className");
                 required.add("content");
@@ -182,6 +191,7 @@ public class McpDispatcher {
             case "decompile":
                 add(properties, "logId", stringProp("Optional correlation id for decompile output logs. Reuse this same value as read_logs.logId to fetch generated output."));
                 add(properties, "className", stringProp("Fully qualified class name currently loaded in the host JVM to decompile. Example: com.example.UserService."));
+                addClassLoaderHash(properties);
                 required.add("className");
                 break;
             case "find_subclasses":
@@ -230,8 +240,13 @@ public class McpDispatcher {
 
     private void addChangeTargetProperties(Map<String, Object> properties) {
         add(properties, "className", stringProp("Fully qualified class name in the host JVM. Example: com.example.UserService."));
+        addClassLoaderHash(properties);
         add(properties, "method", stringProp("Target method name declared on className. Example: getUser."));
         add(properties, "paramTypes", arrayProp("Ordered Java parameter type names used to disambiguate overloaded methods. Use [] for no-arg methods. Examples: [\"java.lang.String\"], [\"int\", \"java.util.List\"]."));
+    }
+
+    private void addClassLoaderHash(Map<String, Object> properties) {
+        add(properties, "classLoaderHash", stringProp("Optional hexadecimal ClassLoader identity hash returned by list_classloaders. Required when multiple loaded classes have the same name; the operation affects only the selected loaded class."));
     }
 
     private Map<String, Object> objectSchema() {
@@ -320,6 +335,8 @@ public class McpDispatcher {
                 return swapResult(args.toJavaObject(DecompileMessage.class), traceId);
             case "find_subclasses":
                 return findSubclasses(args.toJavaObject(FindSubclassesMessage.class));
+            case "list_classloaders":
+                return listClassLoaders(args.getString("className"));
             case "exec":
                 return exec(args.toJavaObject(ExecMessage.class), traceId);
             case "eval":
@@ -339,7 +356,7 @@ public class McpDispatcher {
         }
     }
 
-    private Map<String, Object> swapResult(Message message, String traceId) {
+    private Map<String, Object> swapResult(ClassTargetMessage message, String traceId) {
         message.setId(traceId);
         SwapResult result = swapper.swap(message);
         return toolResult(result.isSuccess(), result.getMessage(), result);
@@ -360,6 +377,24 @@ public class McpDispatcher {
         String resultMessage = matches.isEmpty() ? "no subclasses found" : "subclasses found";
         Global.info("find_subclasses " + className + ": " + resultMessage + "\n" + Global.toJson(matches));
         return toolResult(true, resultMessage, matches);
+    }
+
+    private Map<String, Object> listClassLoaders(String className) {
+        try {
+            ClassTargetResolver resolver = new ClassTargetResolver(Global.instrumentation);
+            if (className == null || className.trim().isEmpty()) {
+                List<Map<String, Object>> data = resolver.listClassLoaders().stream()
+                        .map(ClassTargetResolver.ClassLoaderTarget::toMap)
+                        .collect(Collectors.toList());
+                return toolResult(true, data.isEmpty() ? "no classloaders found" : "classloaders found", data);
+            }
+            List<Map<String, Object>> data = resolver.list(className.trim()).stream()
+                    .map(ClassTargetResolver.ClassTarget::toMap)
+                    .collect(Collectors.toList());
+            return toolResult(true, data.isEmpty() ? "class not loaded" : "classloaders found", data);
+        } catch (Throwable e) {
+            return toolResult(false, e.getMessage(), null);
+        }
     }
 
     private Map<String, Object> eval(EvalMessage message, String traceId) {

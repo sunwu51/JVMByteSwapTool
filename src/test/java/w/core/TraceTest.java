@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import w.Global;
+import w.core.diagnostic.DiagnosticRuntime;
 import w.core.model.TraceTransformer;
 import w.web.message.TraceMessage;
 
@@ -31,6 +32,8 @@ public class TraceTest {
     public static void setUp() throws Exception {
         Instrumentation instrumentation = ByteBuddyAgent.install();
         Global.instrumentation = instrumentation;
+        BootstrapBridgeInstaller.install(instrumentation);
+        DiagnosticRuntime.initialize();
         Global.fillLoadedClasses();
     }
 

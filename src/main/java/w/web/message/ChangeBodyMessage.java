@@ -11,7 +11,7 @@ import java.util.List;
  * @date 2023/11/25 22:08
  */
 @Data
-public class ChangeBodyMessage extends Message implements RequestMessage {
+public class ChangeBodyMessage extends ClassTargetMessage implements RequestMessage {
     String className;
     String method;
     List<String> paramTypes;

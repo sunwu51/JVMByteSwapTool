@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import w.Global;
 import w.core.constant.Codes;
+import w.core.diagnostic.DiagnosticRuntime;
 import w.core.model.SwapResult;
 import w.web.message.*;
 
@@ -34,6 +35,8 @@ class SwapperTest {
     public static void setUp() throws Exception {
         Instrumentation instrumentation = ByteBuddyAgent.install();
         Global.instrumentation = instrumentation;
+        BootstrapBridgeInstaller.install(instrumentation);
+        DiagnosticRuntime.initialize();
         Global.fillLoadedClasses();
         System.setProperty("maxHit", "3");
 
@@ -99,11 +102,21 @@ class SwapperTest {
         SwapResult result = swapper.swap(watchMessage);
 
         Assertions.assertFalse(result.isSuccess());
-        Assertions.assertEquals("retransform failed", result.getMessage());
-        Assertions.assertEquals(1, result.getApplyResults().size());
-        Assertions.assertTrue(result.getApplyResults().get(0).isCalled());
-        Assertions.assertEquals("java.lang.IllegalArgumentException", result.getApplyResults().get(0).getErrorClass());
-        Assertions.assertEquals("Method not declared here.", result.getApplyResults().get(0).getMessage());
+        Assertions.assertTrue(result.getMessage().contains("Method not declared here"));
+        Assertions.assertTrue(result.getApplyResults().isEmpty());
+    }
+
+    @Test
+    public void watchShouldResolveTargetFromDefaultClassLoader() throws Exception {
+        String className = "w.core.LazyWatchTarget";
+        WatchMessage watchMessage = new WatchMessage();
+        watchMessage.setSignature(className + "#ping");
+
+        SwapResult result = swapper.swap(watchMessage);
+
+        Assertions.assertTrue(result.isSuccess(), result.getMessage());
+        Object target = Class.forName(className, true, Global.getClassLoader()).newInstance();
+        Assertions.assertEquals("pong", target.getClass().getMethod("ping").invoke(target));
     }
 
     @Test

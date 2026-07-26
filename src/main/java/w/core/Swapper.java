@@ -11,19 +11,21 @@ import w.core.model.SwapResult;
 import w.core.model.TraceTransformer;
 import w.core.model.TransformApplyResult;
 import w.core.model.WatchTransformer;
+import w.core.diagnostic.DiagnosticRuntime;
 import w.web.message.ChangeBodyMessage;
 import w.web.message.ChangeResultMessage;
+import w.web.message.ClassTargetMessage;
 import w.web.message.DecompileMessage;
-import w.web.message.Message;
 import w.web.message.OuterWatchMessage;
 import w.web.message.ReplaceClassMessage;
 import w.web.message.TraceMessage;
 import w.web.message.WatchMessage;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -37,7 +39,7 @@ public class Swapper {
         return INSTANCE;
     }
 
-    public SwapResult swap(Message message) {
+    public SwapResult swap(ClassTargetMessage message) {
         BaseClassTransformer transformer = null;
         try {
             switch (message.getType()) {
@@ -71,7 +73,43 @@ public class Swapper {
             return SwapResult.failure(message, "build transform error", e);
         }
 
-        Set<Class<?>> classes = new LinkedHashSet<>(Global.allLoadedClasses.getOrDefault(transformer.getClassName(), new HashSet<>()));
+        ClassTargetResolver.Resolution resolution;
+        try {
+            ClassTargetResolver resolver = new ClassTargetResolver(Global.instrumentation);
+            resolution = resolver.resolve(transformer.getClassName(), message.getClassLoaderHash());
+            if (!resolution.isSuccess()
+                    && !resolution.hasCandidates()
+                    && isBlank(message.getClassLoaderHash())) {
+                try {
+                    Class.forName(transformer.getClassName(), true, Global.getClassLoader());
+                    resolution = resolver.resolve(transformer.getClassName(), null);
+                } catch (ClassNotFoundException ignored) {
+                    // Preserve the resolver's structured "not loaded" failure.
+                }
+            }
+        } catch (Throwable e) {
+            Global.error("target preflight error:", e);
+            return SwapResult.failure(message, "target preflight failed", e);
+        }
+        if (!resolution.isSuccess()) {
+            return SwapResult.failure(message, resolution.getError(), resolution.candidateMaps());
+        }
+        Class<?> target = resolution.getTarget().getType();
+        transformer.targetClassLoader(target.getClassLoader());
+        if (isDiagnosticTransformer(transformer)) {
+            String preflightError = diagnosticPreflight(target);
+            if (preflightError != null) {
+                return SwapResult.failure(message, preflightError, resolution.candidateMaps());
+            }
+        }
+        if (transformer instanceof WatchTransformer) {
+            String preflightError = watchPreflight(target, (WatchTransformer) transformer);
+            if (preflightError != null) {
+                return SwapResult.failure(message, preflightError, resolution.candidateMaps());
+            }
+        }
+        Set<Class<?>> classes = new LinkedHashSet<>();
+        classes.add(target);
 
         boolean classExists = false;
         for (Class<?> aClass : classes) {
@@ -106,7 +144,26 @@ public class Swapper {
             classes.addAll(((OuterWatchTransformer) transformer).prepareNestedTargets(classes));
         }
 
-        Global.addTransformer(transformer);
+        boolean diagnosticRegistered = false;
+        try {
+            if (transformer instanceof WatchTransformer) {
+                DiagnosticRuntime.register(((WatchTransformer) transformer).config());
+                diagnosticRegistered = true;
+            } else if (transformer instanceof OuterWatchTransformer) {
+                DiagnosticRuntime.register(((OuterWatchTransformer) transformer).config());
+                diagnosticRegistered = true;
+            } else if (transformer instanceof TraceTransformer) {
+                DiagnosticRuntime.register(((TraceTransformer) transformer).config());
+                diagnosticRegistered = true;
+            }
+            Global.addTransformer(transformer);
+        } catch (Throwable e) {
+            if (diagnosticRegistered) {
+                transformer.clear();
+            }
+            Global.error("add transformer error:", e);
+            return SwapResult.failure(message, "add transformer error", e);
+        }
         Global.debug("add transformer" + transformer.getUuid() +" finish, will retrans class");
 
         LinkedHashSet<Class<?>> finalClasses = new LinkedHashSet<>();
@@ -114,8 +171,9 @@ public class Swapper {
         if (transformer instanceof DecompileTransformer) {
             String outerClassName = transformer.getClassName();
             Global.allLoadedClasses.entrySet().stream()
-                    .filter(entry -> entry.getKey().startsWith(outerClassName + "$"))
+                    .filter(entry -> isDecompileRelatedClass(outerClassName, entry.getKey()))
                     .flatMap(entry -> entry.getValue().stream())
+                    .filter(transformer::matchesTargetClassLoader)
                     .filter(Global::isModifiableClass)
                     .forEach(finalClasses::add);
         }
@@ -140,9 +198,67 @@ public class Swapper {
         }
 
         SwapResult result = SwapResult.of(message, transformer, applyResults);
-        if (!result.isSuccess()) {
+        if (!result.isSuccess() || transformer instanceof DecompileTransformer) {
             Global.deleteTransformer(transformer.getUuid());
         }
         return result;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private boolean isDiagnosticTransformer(BaseClassTransformer transformer) {
+        return transformer instanceof WatchTransformer
+                || transformer instanceof OuterWatchTransformer
+                || transformer instanceof TraceTransformer;
+    }
+
+    private boolean isDecompileRelatedClass(String outerClassName, String candidateClassName) {
+        return candidateClassName.startsWith(outerClassName + "$")
+                && !candidateClassName.contains("$$Lambda$");
+    }
+
+    private String watchPreflight(Class<?> target, WatchTransformer transformer) {
+        try {
+            if (!Global.isModifiableClass(target)) {
+                return "Target class is not modifiable: " + target.getName();
+            }
+            if (target.isInterface() || Modifier.isAbstract(target.getModifiers())) {
+                return "should use a simple pojo, but " + target.getName()
+                        + " is a Interface or Abstract class or something wired";
+            }
+            boolean methodFound = false;
+            for (Method declaredMethod : target.getDeclaredMethods()) {
+                if (declaredMethod.getName().equals(transformer.getMethod())) {
+                    methodFound = true;
+                    break;
+                }
+            }
+            if (!methodFound) {
+                return "Method not declared here: " + target.getName() + "#" + transformer.getMethod();
+            }
+        } catch (Throwable e) {
+            return "watch preflight failed: " + e.getClass().getSimpleName() + ": " + e.getMessage();
+        }
+        return null;
+    }
+
+    private String diagnosticPreflight(Class<?> target) {
+        try {
+            Class<?> bootstrapBridge = Class.forName("w.bridge.DiagnosticBridge", false, null);
+            if (bootstrapBridge.getClassLoader() != null) {
+                return "DiagnosticBridge is not bootstrap-loaded";
+            }
+            Class<?> visibleBridge = Class.forName(
+                    "w.bridge.DiagnosticBridge", false, target.getClassLoader());
+            if (visibleBridge != bootstrapBridge) {
+                return "Target ClassLoader resolves a different DiagnosticBridge";
+            }
+        } catch (Throwable e) {
+            return "Target ClassLoader cannot resolve bootstrap DiagnosticBridge: "
+                    + e.getClass().getSimpleName() + ": " + e.getMessage();
+        }
+        return null;
     }
 }

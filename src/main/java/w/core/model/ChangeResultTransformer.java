@@ -229,7 +229,7 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS) {
             @Override
             protected ClassLoader getClassLoader() {
-                return Global.getClassLoader();
+                return getTargetClassLoader();
             }
         };
 

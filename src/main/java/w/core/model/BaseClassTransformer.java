@@ -1,5 +1,6 @@
 package w.core.model;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import org.objectweb.asm.Type;
@@ -12,9 +13,12 @@ import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,8 +55,15 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
 
     protected int status;
 
+    private ClassLoader targetClassLoader;
+
+    private boolean targetClassLoaderSet;
+
     private final Map<String, TransformApplyResult> applyResults = new ConcurrentHashMap<>();
 
+    @Getter(AccessLevel.NONE)
+    private final Set<Class<?>> appliedClasses =
+            Collections.newSetFromMap(new ConcurrentHashMap<Class<?>, Boolean>());
 
     public abstract byte[] transform(byte[] origin) throws Exception;
 
@@ -64,9 +75,12 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
             return origin;
         }
         className = className.replace("/", ".");
-        if (Objects.equals(this.className, className)) {
+        if (Objects.equals(this.className, className) && matchesTargetLoader(loader)) {
             try{
                 byte[] r = transform(origin);
+                if (classBeingRedefined != null) {
+                    appliedClasses.add(classBeingRedefined);
+                }
                 recordApplySuccess(loader, className);
                 Global.info(className + " transformer " + uuid +  " added success <(^-^)>");
                 return r;
@@ -80,8 +94,36 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
         return null;
     }
 
+    public void targetClassLoader(ClassLoader loader) {
+        this.targetClassLoader = loader;
+        this.targetClassLoaderSet = true;
+    }
+
+    public boolean matchesTargetClass(Class<?> type) {
+        return type != null
+                && Objects.equals(className, type.getName())
+                && matchesTargetLoader(type.getClassLoader());
+    }
+
+    protected boolean matchesTargetLoader(ClassLoader loader) {
+        return !targetClassLoaderSet || loader == targetClassLoader;
+    }
+
+    public boolean matchesTargetClassLoader(Class<?> type) {
+        return type != null && matchesTargetLoader(type.getClassLoader());
+    }
+
     public void beginApply(Class<?> clazz) {
+        appliedClasses.add(clazz);
         applyResults.put(applyKey(clazz), TransformApplyResult.pending(clazz, uuid));
+    }
+
+    public Set<Class<?>> appliedClassesSnapshot() {
+        return new HashSet<>(appliedClasses);
+    }
+
+    public boolean requiresRetransformOnDelete() {
+        return true;
     }
 
     public TransformApplyResult getApplyResult(Class<?> clazz) {
@@ -109,6 +151,7 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
     }
 
     public List<String> getExtraClassNames() {
+        // Additional class names that this transformer may have instrumented.
         return new ArrayList<>();
     }
 
