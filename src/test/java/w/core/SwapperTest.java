@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import w.Global;
 import w.core.constant.Codes;
+import w.core.diagnostic.DiagnosticRuntime;
 import w.core.model.SwapResult;
 import w.web.message.*;
 
@@ -34,6 +35,8 @@ class SwapperTest {
     public static void setUp() throws Exception {
         Instrumentation instrumentation = ByteBuddyAgent.install();
         Global.instrumentation = instrumentation;
+        BootstrapBridgeInstaller.install(instrumentation);
+        DiagnosticRuntime.initialize();
         Global.fillLoadedClasses();
         System.setProperty("maxHit", "3");
 
@@ -104,10 +107,8 @@ class SwapperTest {
     }
 
     @Test
-    public void watchShouldLoadSingleTargetFromDefaultClassLoader() throws Exception {
+    public void watchShouldResolveTargetFromDefaultClassLoader() throws Exception {
         String className = "w.core.LazyWatchTarget";
-        Assertions.assertFalse(java.util.Arrays.stream(Global.instrumentation.getAllLoadedClasses())
-                .anyMatch(type -> type.getName().equals(className)));
         WatchMessage watchMessage = new WatchMessage();
         watchMessage.setSignature(className + "#ping");
 

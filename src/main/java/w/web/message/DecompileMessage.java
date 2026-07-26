@@ -8,7 +8,7 @@ import lombok.Data;
  * @date 2023/11/25 22:08
  */
 @Data
-public class DecompileMessage extends Message implements RequestMessage {
+public class DecompileMessage extends ClassTargetMessage implements RequestMessage {
     {
         type = MessageType.DECOMPILE;
     }

@@ -5,6 +5,7 @@ import java.net.URL;
 import java.security.CodeSource;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,6 +35,25 @@ public class ClassTargetResolver {
         return result;
     }
 
+    public List<ClassLoaderTarget> listClassLoaders() {
+        Map<ClassLoader, ClassLoaderTarget> targets = new IdentityHashMap<>();
+        for (Class<?> loaded : instrumentation.getAllLoadedClasses()) {
+            if (loaded == null) {
+                continue;
+            }
+            ClassLoader loader = loaded.getClassLoader();
+            ClassLoaderTarget target = targets.computeIfAbsent(loader, ClassLoaderTarget::new);
+            target.classCount++;
+            if (instrumentation.isModifiableClass(loaded)) {
+                target.modifiableClassCount++;
+            }
+        }
+        List<ClassLoaderTarget> result = new ArrayList<>(targets.values());
+        result.sort(Comparator.comparing(ClassLoaderTarget::getClassLoaderName)
+                .thenComparing(ClassLoaderTarget::getClassLoaderHash));
+        return result;
+    }
+
     public Resolution resolve(String className, String requestedHash) {
         List<ClassTarget> candidates = list(className);
         if (candidates.isEmpty()) {
@@ -56,7 +76,7 @@ public class ClassTargetResolver {
         if (normalizedHash == null) {
             if (loadersByHash.size() != 1 || candidates.size() != 1) {
                 return Resolution.failure("Multiple loaded classes named " + className
-                        + "; classLoaderHash is required", candidates);
+                        + "; classLoaderHash is required" + describeCandidates(candidates), candidates);
             }
             return Resolution.success(candidates.get(0), candidates);
         }
@@ -74,6 +94,18 @@ public class ClassTargetResolver {
         return match == null
                 ? Resolution.failure("No loaded " + className + " for classLoaderHash " + normalizedHash, candidates)
                 : Resolution.success(match, candidates);
+    }
+
+    private String describeCandidates(List<ClassTarget> candidates) {
+        StringBuilder result = new StringBuilder("\nCandidates:");
+        for (ClassTarget candidate : candidates) {
+            ClassLoader loader = candidate.getType().getClassLoader();
+            result.append("\n- ")
+                    .append(candidate.getClassLoaderHash())
+                    .append(": ")
+                    .append(loader == null ? "bootstrap" : loader.toString());
+        }
+        return result.toString();
     }
 
     private String normalizeHash(String hash) {
@@ -127,6 +159,36 @@ public class ClassTargetResolver {
             } catch (Throwable ignored) {
                 return "unknown";
             }
+        }
+    }
+
+    public static final class ClassLoaderTarget {
+        private final ClassLoader loader;
+        private int classCount;
+        private int modifiableClassCount;
+
+        private ClassLoaderTarget(ClassLoader loader) {
+            this.loader = loader;
+        }
+
+        public String getClassLoaderHash() {
+            return identityHash(loader);
+        }
+
+        public String getClassLoaderName() {
+            return loader == null ? "bootstrap" : loader.toString();
+        }
+
+        public Map<String, Object> toMap() {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("classLoaderHash", getClassLoaderHash());
+            item.put("classLoaderName", getClassLoaderName());
+            ClassLoader parent = loader == null ? null : loader.getParent();
+            item.put("parentClassLoader", loader == null ? "none"
+                    : (parent == null ? "bootstrap" : parent.toString()));
+            item.put("classCount", classCount);
+            item.put("modifiableClassCount", modifiableClassCount);
+            return item;
         }
     }
 

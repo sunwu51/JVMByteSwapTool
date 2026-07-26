@@ -7,9 +7,13 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import w.Global;
 import w.core.model.SwapResult;
-import w.core.watch.WatchRuntime;
+import w.core.model.TraceTransformer;
+import w.core.diagnostic.DiagnosticRuntime;
 import w.util.RequestUtils;
 import w.web.message.WatchMessage;
+import w.web.message.OuterWatchMessage;
+import w.web.message.TraceMessage;
+import w.web.message.DecompileMessage;
 
 import java.lang.instrument.Instrumentation;
 import java.lang.instrument.ClassFileTransformer;
@@ -34,6 +38,7 @@ class WatchClassLoaderIntegrationTest {
         Global.instrumentation = instrumentation;
         try {
             BootstrapBridgeInstaller.install(instrumentation);
+            DiagnosticRuntime.initialize();
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
@@ -48,11 +53,11 @@ class WatchClassLoaderIntegrationTest {
     @Test
     void extractedBootstrapJarContainsOnlyBridgeApi() throws Exception {
         try (JarFile jar = new JarFile(BootstrapBridgeInstaller.getBridgeJar())) {
-            Assertions.assertNotNull(jar.getEntry("w/bridge/WatchBridge.class"));
-            Assertions.assertNotNull(jar.getEntry("w/bridge/WatchListener.class"));
+            Assertions.assertNotNull(jar.getEntry("w/bridge/DiagnosticBridge.class"));
+            Assertions.assertNotNull(jar.getEntry("w/bridge/DiagnosticListener.class"));
             Assertions.assertEquals(2, jar.size());
         }
-        Assertions.assertNull(Class.forName("w.bridge.WatchBridge", false, null).getClassLoader());
+        Assertions.assertNull(Class.forName("w.bridge.DiagnosticBridge", false, null).getClassLoader());
     }
 
     @Test
@@ -68,6 +73,11 @@ class WatchClassLoaderIntegrationTest {
         SwapResult ambiguousResult = Swapper.getInstance().swap(ambiguous);
         Assertions.assertFalse(ambiguousResult.isSuccess());
         Assertions.assertTrue(ambiguousResult.getMessage().contains("classLoaderHash is required"));
+        Assertions.assertTrue(ambiguousResult.getMessage().contains("Candidates:"));
+        Assertions.assertTrue(ambiguousResult.getMessage().contains(
+                ClassTargetResolver.identityHash(first.getClassLoader())));
+        Assertions.assertTrue(ambiguousResult.getMessage().contains(
+                ClassTargetResolver.identityHash(second.getClassLoader())));
         Assertions.assertTrue(ambiguousResult.getCandidates().size() >= 2);
 
         String traceId = "loader-exact-" + System.nanoTime();
@@ -88,6 +98,62 @@ class WatchClassLoaderIntegrationTest {
         List<Map<String, Object>> logs = Global.readLogs(traceId, 0, 100, 0);
         Assertions.assertEquals(1, logs.size());
         Assertions.assertTrue(String.valueOf(logs.get(0).get("content")).contains("req:[first]"));
+    }
+
+    @Test
+    void nonWatchOperationAlsoRequiresHashForDuplicateClassNames() throws Exception {
+        byte[] bytes = TestLoaders.classBytes("w/core/LoaderWatchTarget.class");
+        new TestLoaders.NullParentLoader(bytes).loadClass("w.core.LoaderWatchTarget");
+        new TestLoaders.NullParentLoader(bytes).loadClass("w.core.LoaderWatchTarget");
+
+        DecompileMessage message = new DecompileMessage();
+        message.setClassName("w.core.LoaderWatchTarget");
+        SwapResult result = Swapper.getInstance().swap(message);
+
+        Assertions.assertFalse(result.isSuccess());
+        Assertions.assertTrue(result.getMessage().contains("classLoaderHash is required"));
+        Assertions.assertTrue(result.getCandidates().size() >= 2);
+    }
+
+    @Test
+    void outerWatchUsesBootstrapBridgeInNullParentLoader() throws Exception {
+        byte[] bytes = TestLoaders.classBytes("w/core/LoaderWatchTarget.class");
+        Class<?> targetClass = new TestLoaders.NullParentLoader(bytes)
+                .loadClass("w.core.LoaderWatchTarget");
+        Object target = targetClass.newInstance();
+        String traceId = "loader-outer-" + System.nanoTime();
+        OuterWatchMessage message = new OuterWatchMessage();
+        message.setId(traceId);
+        message.setSignature("w.core.LoaderWatchTarget#callEcho");
+        message.setInnerSignature("w.core.LoaderWatchTarget#echo");
+        message.setClassLoaderHash(ClassTargetResolver.identityHash(targetClass.getClassLoader()));
+
+        Assertions.assertTrue(Swapper.getInstance().swap(message).isSuccess());
+        Assertions.assertEquals("echo:outer",
+                targetClass.getMethod("callEcho", String.class).invoke(target, "outer"));
+        Assertions.assertTrue(Global.readLogs(traceId, 0, 20, 0).stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains("LoaderWatchTarget#echo")));
+    }
+
+    @Test
+    void traceUsesBootstrapBridgeInNullParentLoader() throws Exception {
+        byte[] bytes = TestLoaders.classBytes("w/core/LoaderWatchTarget.class");
+        Class<?> targetClass = new TestLoaders.NullParentLoader(bytes)
+                .loadClass("w.core.LoaderWatchTarget");
+        Object target = targetClass.newInstance();
+        String traceId = "loader-trace-" + System.nanoTime();
+        TraceMessage message = new TraceMessage();
+        message.setId(traceId);
+        message.setSignature("w.core.LoaderWatchTarget#callEcho");
+        message.setClassLoaderHash(ClassTargetResolver.identityHash(targetClass.getClassLoader()));
+
+        Assertions.assertTrue(Swapper.getInstance().swap(message).isSuccess());
+        Assertions.assertEquals("echo:trace",
+                targetClass.getMethod("callEcho", String.class).invoke(target, "trace"));
+        Assertions.assertTrue(Global.readLogs(traceId, 0, 20, 0).stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains("LoaderWatchTarget#callEcho")));
     }
 
     @Test
@@ -163,7 +229,7 @@ class WatchClassLoaderIntegrationTest {
         worker.start();
         Assertions.assertTrue(entered.await(5, TimeUnit.SECONDS));
         Global.reset();
-        Assertions.assertFalse(WatchRuntime.isRegistered(transformerId.toString()));
+        Assertions.assertFalse(DiagnosticRuntime.isRegistered(transformerId.toString()));
         release.countDown();
         worker.join(5000);
 
@@ -171,6 +237,48 @@ class WatchClassLoaderIntegrationTest {
         Assertions.assertNull(failure.get());
         Assertions.assertEquals("released", result.get());
         Assertions.assertNull(remainingTrace.get());
+    }
+
+    @Test
+    void concurrentResetKeepsTraceTokenSnapshotAndCleansContext() throws Exception {
+        byte[] bytes = TestLoaders.classBytes("w/core/LoaderWatchTarget.class");
+        Class<?> targetClass = new TestLoaders.NullParentLoader(bytes).loadClass("w.core.LoaderWatchTarget");
+        Object target = targetClass.newInstance();
+        TraceMessage message = new TraceMessage();
+        message.setId("loader-trace-reset-" + System.nanoTime());
+        message.setSignature("w.core.LoaderWatchTarget#waitThenRecurse");
+        message.setClassLoaderHash(ClassTargetResolver.identityHash(targetClass.getClassLoader()));
+        SwapResult installed = Swapper.getInstance().swap(message);
+        Assertions.assertTrue(installed.isSuccess(), installed.getMessage());
+        String transformerId = installed.getTransformerId().toString();
+
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        AtomicReference<Boolean> traceContextRemaining = new AtomicReference<>();
+        AtomicReference<Object> result = new AtomicReference<>();
+        Thread worker = new Thread(() -> {
+            try {
+                result.set(targetClass.getMethod("waitThenRecurse", CountDownLatch.class,
+                                CountDownLatch.class, int.class)
+                        .invoke(target, entered, release, 3));
+            } catch (Throwable e) {
+                failure.set(e);
+            } finally {
+                traceContextRemaining.set(TraceTransformer.traceCtx.get().containsKey(transformerId));
+            }
+        });
+        worker.start();
+        Assertions.assertTrue(entered.await(5, TimeUnit.SECONDS));
+        Global.reset();
+        Assertions.assertFalse(DiagnosticRuntime.isRegistered(transformerId));
+        release.countDown();
+        worker.join(5000);
+
+        Assertions.assertFalse(worker.isAlive());
+        Assertions.assertNull(failure.get());
+        Assertions.assertEquals(3, result.get());
+        Assertions.assertEquals(Boolean.FALSE, traceContextRemaining.get());
     }
 
     @Test
@@ -186,7 +294,7 @@ class WatchClassLoaderIntegrationTest {
         try {
             Assertions.assertEquals("echo:one",
                     targetClass.getMethod("echo", String.class).invoke(target, "one"));
-            Assertions.assertFalse(WatchRuntime.isRegistered(installed.getTransformerId().toString()));
+            Assertions.assertFalse(DiagnosticRuntime.isRegistered(installed.getTransformerId().toString()));
             Assertions.assertNull(RequestUtils.getCurTraceId());
         } finally {
             System.setProperty("maxHit", "100");

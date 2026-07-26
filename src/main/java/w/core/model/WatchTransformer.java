@@ -9,8 +9,8 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import w.core.asm.WAdviceAdapter;
-import w.core.watch.WatchConfig;
-import w.core.watch.WatchRuntime;
+import w.core.diagnostic.WatchConfig;
+import w.core.diagnostic.DiagnosticRuntime;
 import w.web.message.WatchMessage;
 
 import java.util.Map;
@@ -20,7 +20,7 @@ import static org.objectweb.asm.Opcodes.ASM9;
 
 @Data
 public class WatchTransformer extends BaseClassTransformer {
-    private static final String BRIDGE = "w/bridge/WatchBridge";
+    private static final String BRIDGE = "w/bridge/DiagnosticBridge";
     private static final String EXIT_DESCRIPTOR =
             "(Ljava/lang/Object;JLjava/lang/Object;[Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Throwable;)V";
 
@@ -111,7 +111,7 @@ public class WatchTransformer extends BaseClassTransformer {
             mv.visitVarInsn(ASTORE, argsIndex);
             mv.visitLabel(startTry);
             mv.visitLdcInsn(uuid.toString());
-            mv.visitMethodInsn(INVOKESTATIC, BRIDGE, "enter",
+            mv.visitMethodInsn(INVOKESTATIC, BRIDGE, "watchEnter",
                     "(Ljava/lang/String;)Ljava/lang/Object;", false);
             mv.visitVarInsn(ASTORE, tokenIndex);
             loadArgArray();
@@ -159,7 +159,7 @@ public class WatchTransformer extends BaseClassTransformer {
             } else {
                 mv.visitVarInsn(ALOAD, throwableIndex);
             }
-            mv.visitMethodInsn(INVOKESTATIC, BRIDGE, "exit", EXIT_DESCRIPTOR, false);
+            mv.visitMethodInsn(INVOKESTATIC, BRIDGE, "watchExit", EXIT_DESCRIPTOR, false);
         }
     }
 
@@ -181,6 +181,6 @@ public class WatchTransformer extends BaseClassTransformer {
 
     @Override
     public void clear() {
-        WatchRuntime.unregister(uuid.toString());
+        DiagnosticRuntime.unregister(uuid.toString());
     }
 }

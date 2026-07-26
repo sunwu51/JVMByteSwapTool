@@ -14,8 +14,8 @@ import java.util.jar.JarOutputStream;
  */
 public final class BootstrapBridgeInstaller {
     private static final String[] BRIDGE_CLASSES = {
-            "w/bridge/WatchBridge.class",
-            "w/bridge/WatchListener.class"
+            "w/bridge/DiagnosticBridge.class",
+            "w/bridge/DiagnosticListener.class"
     };
     private static boolean installed;
     private static File bridgeJar;
@@ -35,9 +35,9 @@ public final class BootstrapBridgeInstaller {
         try {
             writeBridgeJar(jar);
             instrumentation.appendToBootstrapClassLoaderSearch(new JarFile(jar));
-            Class<?> bridge = Class.forName("w.bridge.WatchBridge", true, null);
+            Class<?> bridge = Class.forName("w.bridge.DiagnosticBridge", true, null);
             if (bridge.getClassLoader() != null) {
-                throw new IllegalStateException("WatchBridge was not loaded by bootstrap");
+                throw new IllegalStateException("DiagnosticBridge was not loaded by bootstrap");
             }
             bridgeJar = jar;
             installed = true;
@@ -45,7 +45,7 @@ public final class BootstrapBridgeInstaller {
             if (!jar.delete()) {
                 jar.deleteOnExit();
             }
-            throw new IOException("install bootstrap watch bridge failed", e);
+            throw new IOException("install bootstrap diagnostic bridge failed", e);
         }
     }
 

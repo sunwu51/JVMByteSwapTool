@@ -23,6 +23,13 @@ class ClassTargetResolverTest {
                 resolver.resolve("w.core.LoaderWatchTarget", null);
         Assertions.assertFalse(ambiguous.isSuccess());
         Assertions.assertEquals(2, ambiguous.candidateMaps().size());
+        Assertions.assertTrue(ambiguous.getError().contains("Candidates:"));
+        Assertions.assertTrue(ambiguous.getError().contains("- "
+                + ClassTargetResolver.identityHash(first.getClassLoader()) + ": "
+                + first.getClassLoader()));
+        Assertions.assertTrue(ambiguous.getError().contains("- "
+                + ClassTargetResolver.identityHash(second.getClassLoader()) + ": "
+                + second.getClassLoader()));
 
         String hash = ClassTargetResolver.identityHash(first.getClassLoader());
         ClassTargetResolver.Resolution exact =

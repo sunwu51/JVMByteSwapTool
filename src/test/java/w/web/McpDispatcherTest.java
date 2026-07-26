@@ -57,6 +57,11 @@ public class McpDispatcherTest {
         Assertions.assertNotNull(watch.getJSONObject("inputSchema")
                 .getJSONObject("properties")
                 .getJSONObject("classLoaderHash"));
+        for (String toolName : new String[]{"outer_watch", "trace", "change_body",
+                "change_result", "replace_class", "decompile"}) {
+            Assertions.assertNotNull(findTool(tools, toolName).getJSONObject("inputSchema")
+                    .getJSONObject("properties").getJSONObject("classLoaderHash"), toolName);
+        }
         Assertions.assertTrue(watch.getJSONObject("inputSchema")
                 .getJSONObject("properties")
                 .getJSONObject("ognl")
@@ -104,8 +109,8 @@ public class McpDispatcherTest {
         Assertions.assertNotNull(changeResult);
         Assertions.assertTrue(changeResult.getString("description").contains("$proceed()"));
         Assertions.assertTrue(changeResult.getString("description").contains("$_ = xxx"));
-        Assertions.assertTrue(changeResult.getString("description").contains("w.Global.toJson"));
-        Assertions.assertTrue(changeResult.getString("description").contains("w.Global.ognl"));
+        Assertions.assertTrue(changeResult.getString("description")
+                .contains("w.bridge.DiagnosticBridge.info"));
         Assertions.assertTrue(changeResult.getJSONObject("inputSchema")
                 .getJSONObject("properties")
                 .getJSONObject("body")
@@ -115,12 +120,7 @@ public class McpDispatcherTest {
                 .getJSONObject("properties")
                 .getJSONObject("body")
                 .getString("description")
-                .contains("w.Global.toJson"));
-        Assertions.assertTrue(changeResult.getJSONObject("inputSchema")
-                .getJSONObject("properties")
-                .getJSONObject("body")
-                .getString("description")
-                .contains("w.Global.ognl"));
+                .contains("w.bridge.DiagnosticBridge.info"));
 
         JSONObject eval = findTool(tools, "eval");
         Assertions.assertNotNull(eval);
@@ -139,7 +139,7 @@ public class McpDispatcherTest {
 
         JSONObject listClassloaders = findTool(tools, "list_classloaders");
         Assertions.assertNotNull(listClassloaders);
-        Assertions.assertTrue(listClassloaders.getJSONObject("inputSchema")
+        Assertions.assertFalse(listClassloaders.getJSONObject("inputSchema")
                 .getJSONArray("required").contains("className"));
     }
 
@@ -246,6 +246,28 @@ public class McpDispatcherTest {
             Assertions.assertNotNull(target.get("modifiable"));
             Assertions.assertTrue(target.containsKey("parentClassLoader"));
             Assertions.assertTrue(target.containsKey("codeSource"));
+        } finally {
+            Global.instrumentation = previous;
+        }
+    }
+
+    @Test
+    public void listClassloadersWithoutClassNameShouldEnumerateJvmLoaders() throws Exception {
+        Instrumentation previous = Global.instrumentation;
+        Global.instrumentation = ByteBuddyAgent.install();
+        try {
+            String request = "{\"jsonrpc\":\"2.0\",\"id\":\"all-loaders\",\"method\":\"tools/call\","
+                    + "\"params\":{\"name\":\"list_classloaders\",\"arguments\":{}}}";
+            JSONObject response = JSON.parseObject(globalJson(dispatcher.dispatch(request)));
+            JSONObject structuredContent =
+                    response.getJSONObject("result").getJSONObject("structuredContent");
+            Assertions.assertTrue(structuredContent.getBoolean("success"));
+            Assertions.assertFalse(structuredContent.getJSONArray("data").isEmpty());
+            JSONObject loader = structuredContent.getJSONArray("data").getJSONObject(0);
+            Assertions.assertNotNull(loader.getString("classLoaderHash"));
+            Assertions.assertNotNull(loader.getString("classLoaderName"));
+            Assertions.assertTrue(loader.getInteger("classCount") > 0);
+            Assertions.assertTrue(loader.getInteger("modifiableClassCount") >= 0);
         } finally {
             Global.instrumentation = previous;
         }

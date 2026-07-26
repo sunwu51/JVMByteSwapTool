@@ -9,6 +9,10 @@ public class LoaderWatchTarget {
         return "echo:" + value;
     }
 
+    public String callEcho(String value) {
+        return echo(value);
+    }
+
     public String fail(String message) {
         throw new IllegalStateException(message);
     }
@@ -21,6 +25,15 @@ public class LoaderWatchTarget {
         entered.countDown();
         release.await();
         return "released";
+    }
+
+    public int waitThenRecurse(CountDownLatch entered, CountDownLatch release, int value)
+            throws InterruptedException {
+        if (value == 3) {
+            entered.countDown();
+            release.await();
+        }
+        return value <= 0 ? 0 : 1 + waitThenRecurse(entered, release, value - 1);
     }
 
     public LoaderWatchTarget badJson() {

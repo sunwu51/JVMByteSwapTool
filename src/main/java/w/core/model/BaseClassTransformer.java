@@ -105,8 +105,12 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
                 && matchesTargetLoader(type.getClassLoader());
     }
 
-    private boolean matchesTargetLoader(ClassLoader loader) {
+    protected boolean matchesTargetLoader(ClassLoader loader) {
         return !targetClassLoaderSet || loader == targetClassLoader;
+    }
+
+    public boolean matchesTargetClassLoader(Class<?> type) {
+        return type != null && matchesTargetLoader(type.getClassLoader());
     }
 
     public void beginApply(Class<?> clazz) {
@@ -147,6 +151,7 @@ public abstract class BaseClassTransformer implements ClassFileTransformer {
     }
 
     public List<String> getExtraClassNames() {
+        // Additional class names that this transformer may have instrumented.
         return new ArrayList<>();
     }
 

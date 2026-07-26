@@ -31,7 +31,6 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -326,8 +325,11 @@ public class Global {
                     allLoadedClasses.getOrDefault(it.getClassName(), new HashSet<>()).stream()
                             .filter(it::matchesTargetClass)
                             .forEach(effectedClasses::add);
+                    // Nested and auxiliary targets may have been transformed too; restore them as well.
                     for (String extraClassName : it.getExtraClassNames()) {
-                        effectedClasses.addAll(allLoadedClasses.getOrDefault(extraClassName, new HashSet<>()));
+                        allLoadedClasses.getOrDefault(extraClassName, new HashSet<>()).stream()
+                                .filter(it::matchesTargetClassLoader)
+                                .forEach(effectedClasses::add);
                     }
                 }
 

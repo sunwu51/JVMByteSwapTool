@@ -10,8 +10,9 @@ import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import w.Global;
-import w.core.asm.Tool;
 import w.core.asm.WAdviceAdapter;
+import w.core.diagnostic.DiagnosticRuntime;
+import w.core.diagnostic.OuterWatchConfig;
 import w.web.message.OuterWatchMessage;
 
 import java.io.InputStream;
@@ -35,7 +36,6 @@ import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
 import static org.objectweb.asm.Opcodes.GOTO;
 import static org.objectweb.asm.Opcodes.IFNE;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
-import static org.objectweb.asm.Opcodes.INVOKEVIRTUAL;
 import static org.objectweb.asm.Opcodes.NEW;
 
 
@@ -82,8 +82,14 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         this.ognl = watchMessage.getOgnl();
         this.depthForJson = watchMessage.getDepthForJson() <= 0 ? 3 : watchMessage.getDepthForJson();
         this.variables = watchMessage.getVariables();
-        Tool.registerOgnlVariables(uuid.toString(), variables);
         addTargetMethod(this.className, this.method);
+    }
+
+    public OuterWatchConfig config() {
+        String shortSignature = innerClassName.substring(innerClassName.lastIndexOf('.') + 1)
+                + "#" + innerMethod;
+        return new OuterWatchConfig(uuid.toString(), traceId, shortSignature, printFormat,
+                ognl, depthForJson, variables);
     }
 
     @Override
@@ -97,7 +103,7 @@ public class OuterWatchTransformer extends BaseClassTransformer {
             return origin;
         }
         className = className.replace("/", ".");
-        if (targetMethods.containsKey(className)) {
+        if (targetMethods.containsKey(className) && matchesTargetLoader(loader)) {
             try {
                 byte[] r = transform(origin, className);
                 recordApplySuccess(loader, className);
@@ -113,6 +119,7 @@ public class OuterWatchTransformer extends BaseClassTransformer {
     }
 
     public Set<Class<?>> prepareNestedTargets(Set<Class<?>> rootClasses) {
+        // Include lambda and anonymous-class methods compiled outside the root method.
         if (!includeNested) {
             return Collections.emptySet();
         }
@@ -218,6 +225,7 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
     @Override
     public List<String> getExtraClassNames() {
+        // These classes are also targets and must be considered when removing the transformer.
         List<String> extraClassNames = new ArrayList<>(targetMethods.keySet());
         extraClassNames.remove(className);
         return extraClassNames;
@@ -228,7 +236,7 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES) {
             @Override
             protected ClassLoader getClassLoader() {
-                return Global.getClassLoader();
+                return getTargetClassLoader();
             }
         };
 
@@ -243,18 +251,11 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                 return new WAdviceAdapter(ASM9, mv, access, name, descriptor) {
                     private int line;
                     private int startTimeVarIndex;
-
-                    private int paramsVarIndex;
-
                     private int paramsArrayVarIndex;
-
-                    private int returnValueVarIndex;
-
                     private int returnObjectVarIndex;
-
-                    private int exceptionStringIndex;
-
                     private int exceptionObjectIndex;
+
+                    private int tokenIndex;
 
                     @Override
                     public void visitLineNumber(int line, Label start) {
@@ -266,7 +267,8 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                     protected void onMethodEnter() {
                         if (outerMethod) {
                             mv.visitLdcInsn(uuid.toString());
-                            mv.visitMethodInsn(INVOKESTATIC, "w/core/model/OuterWatchTransformer", "enterOuterWatch", "(Ljava/lang/String;)V", false);
+                            mv.visitMethodInsn(INVOKESTATIC, "w/bridge/DiagnosticBridge",
+                                    "outerEnter", "(Ljava/lang/String;)V", false);
                         }
                     }
 
@@ -274,7 +276,8 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                     protected void onMethodExit(int opcode) {
                         if (outerMethod) {
                             mv.visitLdcInsn(uuid.toString());
-                            mv.visitMethodInsn(INVOKESTATIC, "w/core/model/OuterWatchTransformer", "exitOuterWatch", "(Ljava/lang/String;)V", false);
+                            mv.visitMethodInsn(INVOKESTATIC, "w/bridge/DiagnosticBridge",
+                                    "outerExit", "(Ljava/lang/String;)V", false);
                         }
                     }
 
@@ -286,7 +289,8 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             Label recordStart = new Label();
                             Label guardEnd = new Label();
                             mv.visitLdcInsn(uuid.toString());
-                            mv.visitMethodInsn(INVOKESTATIC, "w/core/model/OuterWatchTransformer", "shouldRecord", "(Ljava/lang/String;)Z", false);
+                            mv.visitMethodInsn(INVOKESTATIC, "w/bridge/DiagnosticBridge",
+                                    "outerShouldRecord", "(Ljava/lang/String;)Z", false);
                             mv.visitJumpInsn(IFNE, recordStart);
                             mv.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
                             mv.visitJumpInsn(GOTO, guardEnd);
@@ -294,13 +298,12 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
                             // long start = System.currentTimeMillis();
                             startTimeVarIndex = asmStoreStartTime(mv);
-                            // String params = Arrays.toString(paramArray);
                             paramsArrayVarIndex = asmSubCallStoreParamsArray(descriptor);
-                            paramsVarIndex = asmStoreObjectString(paramsArrayVarIndex, printFormat, depthForJson, true);
-
-                            mv.visitLdcInsn(traceId);
-                            mv.visitMethodInsn(INVOKESTATIC, "w/util/RequestUtils", "fillCurThread", "(Ljava/lang/String;)V", false);
-
+                            tokenIndex = newLocal(Type.getType(Object.class));
+                            mv.visitLdcInsn(uuid.toString());
+                            mv.visitMethodInsn(INVOKESTATIC, "w/bridge/DiagnosticBridge",
+                                    "outerCallEnter", "(Ljava/lang/String;)Ljava/lang/Object;", false);
+                            mv.visitVarInsn(Opcodes.ASTORE, tokenIndex);
 
                             Label tryStart = new Label();
                             Label tryEnd = new Label();
@@ -311,7 +314,6 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             mv.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
 
                             returnObjectVarIndex = asmStoreRetObject(mv, descriptor);
-                            returnValueVarIndex = asmStoreObjectString(returnObjectVarIndex, printFormat, depthForJson);
                             postProcess(false);
 
                             mv.visitLabel(tryEnd);
@@ -321,20 +323,13 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             mv.visitLabel(catchStart);
                             exceptionObjectIndex = newLocal(Type.getType(Throwable.class));
                             mv.visitVarInsn(Opcodes.ASTORE, exceptionObjectIndex);
-                            mv.visitVarInsn(Opcodes.ALOAD, exceptionObjectIndex);
-                            exceptionStringIndex = newLocal(Type.getType(String.class));
-                            mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Object", "toString", "()Ljava/lang/String;", false);
-                            mv.visitVarInsn(Opcodes.ASTORE, exceptionStringIndex);
-
                             postProcess(true);
-                            mv.visitMethodInsn(INVOKESTATIC, "w/util/RequestUtils", "clearRequestCtx", "()V", false);
                             mv.visitVarInsn(Opcodes.ALOAD, exceptionObjectIndex);
                             mv.visitInsn(Opcodes.ATHROW);
                             Label catchEnd = new Label();
                             mv.visitLabel(catchEnd);
                             mv.visitLabel(invokeEnd);
 
-                            mv.visitMethodInsn(INVOKESTATIC, "w/util/RequestUtils", "clearRequestCtx", "()V", false);
                             mv.visitLabel(guardEnd);
                         } else {
                             mv.visitMethodInsn(opcodeAndSource, owner, name, descriptor, isInterface);
@@ -342,24 +337,10 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                     }
 
                     private void postProcess(boolean whenThrow) {
+                        mv.visitVarInsn(ALOAD, tokenIndex);
                         push(line);
                         loadLocal(startTimeVarIndex, Type.LONG_TYPE);
-                        push(uuid.toString());
-                        push(traceId);
-                        push(innerClassName.substring(innerClassName.lastIndexOf('.') + 1) + "#" + innerMethod);
-                        loadLocal(paramsVarIndex, Type.getType(String.class));
-
-                        if (whenThrow) {
-                            mv.visitInsn(Opcodes.ACONST_NULL);
-                            mv.visitVarInsn(ALOAD, exceptionStringIndex);
-                        } else {
-                            mv.visitVarInsn(ALOAD, returnValueVarIndex);
-                            mv.visitInsn(Opcodes.ACONST_NULL);
-                        }
-
                         loadThisOrNull();
-                        push(ognl == null ? "" : ognl);
-                        push(printFormat);
                         loadLocal(paramsArrayVarIndex, Type.getType(Object[].class));
                         if (whenThrow) {
                             mv.visitInsn(Opcodes.ACONST_NULL);
@@ -368,8 +349,9 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             loadLocal(returnObjectVarIndex, Type.getType(Object.class));
                             mv.visitInsn(Opcodes.ACONST_NULL);
                         }
-                        push(depthForJson);
-                        mv.visitMethodInsn(INVOKESTATIC, "w/core/asm/Tool", "outerWatchPostProcess", "(IJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/String;I[Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Throwable;I)V", false);
+                        mv.visitMethodInsn(INVOKESTATIC, "w/bridge/DiagnosticBridge", "outerCallExit",
+                                "(Ljava/lang/Object;IJLjava/lang/Object;[Ljava/lang/Object;"
+                                        + "Ljava/lang/Object;Ljava/lang/Throwable;)V", false);
                     }
 
                     private void loadThisOrNull() {
@@ -386,10 +368,6 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         byte[] result = classWriter.toByteArray();
         status = 1;
         return result;
-    }
-
-    private boolean isBlank(String value) {
-        return value == null || value.trim().isEmpty();
     }
 
     private boolean shouldWatchMethod(String currentClassName, int access, String name) {
@@ -444,6 +422,6 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         if (map.isEmpty()) {
             outerWatchCtx.remove();
         }
-        Tool.unregisterOgnlVariables(uuid.toString());
+        DiagnosticRuntime.unregister(uuid.toString());
     }
 }

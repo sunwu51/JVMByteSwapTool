@@ -1,26 +1,24 @@
-package w.core.watch;
+package w.core.diagnostic;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-public final class WatchConfig {
+public final class OuterWatchConfig {
     private final String id;
     private final String traceId;
     private final String methodSignature;
     private final int printFormat;
-    private final int minCost;
     private final String ognl;
     private final int depthForJson;
     private final Map<String, String> variables;
 
-    public WatchConfig(String id, String traceId, String methodSignature, int printFormat,
-                       int minCost, String ognl, int depthForJson, Map<String, String> variables) {
+    public OuterWatchConfig(String id, String traceId, String methodSignature, int printFormat,
+                            String ognl, int depthForJson, Map<String, String> variables) {
         this.id = id;
         this.traceId = traceId;
         this.methodSignature = methodSignature;
         this.printFormat = printFormat;
-        this.minCost = minCost;
         this.ognl = ognl;
         this.depthForJson = depthForJson;
         this.variables = variables == null
@@ -42,10 +40,6 @@ public final class WatchConfig {
 
     public int getPrintFormat() {
         return printFormat;
-    }
-
-    public int getMinCost() {
-        return minCost;
     }
 
     public String getOgnl() {
