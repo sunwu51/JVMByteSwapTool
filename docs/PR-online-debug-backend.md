@@ -27,5 +27,4 @@ feat: add bounded online debug backend
 
 ## Related PR
 
-- 前端 PR：[Online Debug frontend](https://github.com/sunwu51/JVMByteSwapTool/pull/REPLACE_WITH_FRONTEND_PR_NUMBER)
-- 创建 PR 后，将占位符替换为实际 GitHub PR URL；前端 PR 中的后端链接同步替换。
+- 前端 PR：[Online Debug frontend](https://github.com/sunwu51/swapper-ui/pull/2)
