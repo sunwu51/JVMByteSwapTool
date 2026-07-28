@@ -34,3 +34,4 @@ build/
 .vscode/
 dependency-reduced-pom.xml
 src/main/resources/nanohttpd/
+/docs/
