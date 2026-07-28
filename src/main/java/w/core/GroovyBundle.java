@@ -8,11 +8,14 @@ import w.util.SpringUtils;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static w.Attach.currentUrl;
@@ -23,102 +26,168 @@ import static w.Attach.currentUrl;
  */
 @Data
 public class GroovyBundle {
-    static ClassLoader cl;
+    private static final Map<ClassLoader, EngineContext> ENGINES = new IdentityHashMap<>();
+    private static JarInJarClassLoader groovyLibraryClassLoader;
 
-    static Object engineObj;
+    public static Object eval(String script) throws Exception {
+        return eval(script, Global.getClassLoader());
+    }
 
-    static {
-        try {
-            JarInJarClassLoader jarInJarClassLoader =
-                    new JarInJarClassLoader(currentUrl(), "W-INF/lib", ClassLoader.getSystemClassLoader().getParent());
-            cl = new WGroovyClassLoader(jarInJarClassLoader, Global.getClassLoader());
-            Thread.currentThread().setContextClassLoader(cl);
-            Class<?> engineClass = cl.loadClass("org.codehaus.groovy.jsr223.GroovyScriptEngineImpl");
-            Class<?> gclClass = cl.loadClass("groovy.lang.GroovyClassLoader");
-            engineObj = engineClass.getConstructor(gclClass).newInstance(gclClass.newInstance());
-            engineClass.getMethod("put", String.class, Object.class).invoke(engineObj, "ctx", SpringUtils.getSpringBootApplicationContext());
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+    public static Object eval(String script, ClassLoader targetClassLoader) throws Exception {
+        if (script.startsWith("!")) {
+            return executeCmd(Arrays.asList(script.substring(1).split(" ")));
+        }
+        EngineContext context = engineContext(targetClassLoader);
+        synchronized (context) {
+            Thread thread = Thread.currentThread();
+            ClassLoader original = thread.getContextClassLoader();
+            try {
+                thread.setContextClassLoader(context.classLoader);
+                return context.evalMethod.invoke(context.engine, script);
+            } finally {
+                thread.setContextClassLoader(original);
+            }
         }
     }
 
-    public static Object eval(String script) throws Exception {
-        if (script.startsWith("!")) {
-            return executeCmd(Arrays.asList(script.substring(1).split(" ")));
-        } else {
-            return engineObj.getClass().getMethod("eval", String.class).invoke(engineObj, script);
+    private static EngineContext engineContext(ClassLoader targetClassLoader) throws Exception {
+        synchronized (ENGINES) {
+            EngineContext existing = ENGINES.get(targetClassLoader);
+            if (existing != null) {
+                return existing;
+            }
+            EngineContext created = createEngineContext(targetClassLoader);
+            ENGINES.put(targetClassLoader, created);
+            return created;
+        }
+    }
+
+    private static EngineContext createEngineContext(ClassLoader targetClassLoader) throws Exception {
+        WGroovyClassLoader classLoader = new WGroovyClassLoader(
+                groovyLibraryClassLoader(), targetClassLoader);
+        Thread thread = Thread.currentThread();
+        ClassLoader original = thread.getContextClassLoader();
+        try {
+            thread.setContextClassLoader(classLoader);
+            Class<?> engineClass = classLoader.loadClass("org.codehaus.groovy.jsr223.GroovyScriptEngineImpl");
+            Class<?> groovyClassLoaderClass = classLoader.loadClass("groovy.lang.GroovyClassLoader");
+            Object engine = engineClass.getConstructor(groovyClassLoaderClass)
+                    .newInstance(groovyClassLoaderClass.newInstance());
+            engineClass.getMethod("put", String.class, Object.class)
+                    .invoke(engine, "ctx", SpringUtils.getSpringBootApplicationContext());
+            return new EngineContext(classLoader, engine,
+                    engineClass.getMethod("eval", String.class));
+        } finally {
+            thread.setContextClassLoader(original);
+        }
+    }
+
+    private static synchronized JarInJarClassLoader groovyLibraryClassLoader() throws Exception {
+        if (groovyLibraryClassLoader == null) {
+            groovyLibraryClassLoader = new JarInJarClassLoader(
+                    currentUrl(), "W-INF/lib", ClassLoader.getSystemClassLoader().getParent());
+        }
+        return groovyLibraryClassLoader;
+    }
+
+    static int engineCount() {
+        synchronized (ENGINES) {
+            return ENGINES.size();
+        }
+    }
+
+    public static void clearEngines() {
+        synchronized (ENGINES) {
+            for (EngineContext context : ENGINES.values()) {
+                synchronized (context) {
+                    try {
+                        context.classLoader.close();
+                    } catch (IOException e) {
+                        Global.error("close Groovy ClassLoader error", e);
+                    }
+                }
+            }
+            ENGINES.clear();
         }
     }
 
     private static String executeCmd(List<String> args) throws Exception {
         ProcessBuilder builder = new ProcessBuilder();
-        List<String> _args = new ArrayList<>();
+        List<String> command = new ArrayList<>();
         String os = System.getProperty("os.name").toLowerCase();
 
         if (os.contains("win")) {
-            _args.add("cmd.exe");
-            _args.add("/c");
+            command.add("cmd.exe");
+            command.add("/c");
         } else {
-            _args.add("sh");
-            _args.add("-c");
+            command.add("sh");
+            command.add("-c");
         }
-        _args.add(String.join(" ", args));
-        builder.command(_args);
+        command.add(String.join(" ", args));
+        builder.command(command);
         Process process = builder.start();
 
-        StringBuilder sb = new StringBuilder();
+        StringBuilder output = new StringBuilder();
         new Thread(() -> {
-            BufferedReader reader1 = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            BufferedReader reader2 = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-            String line1;
-            String line2;
-            while (true) {
-                try {
-                    if ((line1 = reader1.readLine()) == null) {
-                        break;
-                    }
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
+            BufferedReader stdout = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            BufferedReader stderr = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+            String line;
+            try {
+                while ((line = stdout.readLine()) != null) {
+                    output.append(line).append('\n');
                 }
-                sb.append(line1).append('\n');
-            }
-            while (true) {
-                try {
-                    if ((line2 = reader2.readLine()) == null) {
-                        break;
-                    }
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
+                while ((line = stderr.readLine()) != null) {
+                    output.append(line).append('\n');
                 }
-                sb.append(line2).append('\n');
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
         }).start();
-        return process.waitFor(10, TimeUnit.SECONDS) ? sb.toString() : "timeout";
+        return process.waitFor(10, TimeUnit.SECONDS) ? output.toString() : "timeout";
+    }
+
+    private static final class EngineContext {
+        private final WGroovyClassLoader classLoader;
+        private final Object engine;
+        private final Method evalMethod;
+
+        private EngineContext(WGroovyClassLoader classLoader, Object engine, Method evalMethod) {
+            this.classLoader = classLoader;
+            this.engine = engine;
+            this.evalMethod = evalMethod;
+        }
     }
 
     public static class WGroovyClassLoader extends URLClassLoader {
         private final ClassLoader delegate;
+        private final ClassLoader agentClassLoader;
+
         public WGroovyClassLoader(ClassLoader parent, ClassLoader delegate) throws Exception {
-            super(new URL[] { currentUrl() }, parent);
+            super(new URL[]{currentUrl()}, parent);
             this.delegate = delegate;
+            this.agentClassLoader = GroovyBundle.class.getClassLoader();
         }
+
         @Override
         public Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-            // For entrypoint class, must load it by self
-            if (name.equals(GroovyBundle.class.getName())) {
-                Class<?> c = findLoadedClass(name);
-                if (c != null) {
-                    return c;
-                }
-                return findClass(name);
+            if (isAgentApiClass(name)) {
+                return agentClassLoader.loadClass(name);
             }
             try {
-                // For groovy, need to load it by parent(jarInJarClassLoader)
                 return getParent().loadClass(name);
             } catch (ClassNotFoundException e) {
-                // Else load it by delegate(Global.getClassLoader())
+                if (delegate == null) {
+                    return Class.forName(name, false, null);
+                }
                 return delegate.loadClass(name);
             }
+        }
+
+        private boolean isAgentApiClass(String name) {
+            return name.equals("w.Global")
+                    || name.startsWith("w.util.")
+                    || name.startsWith("w.core.")
+                    || name.startsWith("w.web.message.");
         }
     }
 }

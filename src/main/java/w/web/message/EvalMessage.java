@@ -14,4 +14,6 @@ public class EvalMessage extends Message implements RequestMessage {
     }
 
     String body;
+
+    String classLoaderHash;
 }

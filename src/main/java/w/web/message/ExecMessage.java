@@ -16,4 +16,6 @@ public class ExecMessage extends Message implements RequestMessage {
     String body;
 
     int mode;
+
+    String classLoaderHash;
 }

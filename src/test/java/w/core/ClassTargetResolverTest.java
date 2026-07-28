@@ -49,6 +49,20 @@ class ClassTargetResolverTest {
     }
 
     @Test
+    void classLoaderHashSelectsExactLoader() throws Exception {
+        byte[] bytes = TestLoaders.classBytes("w/core/LoaderWatchTarget.class");
+        Class<?> first = new TestLoaders.NullParentLoader(bytes).loadClass("w.core.LoaderWatchTarget");
+        Class<?> second = new TestLoaders.NullParentLoader(bytes).loadClass("w.core.LoaderWatchTarget");
+        ClassTargetResolver resolver = new ClassTargetResolver(instrumentation(first, second));
+
+        ClassTargetResolver.ClassLoaderResolution resolution = resolver.resolveClassLoader(
+                ClassTargetResolver.identityHash(second.getClassLoader()));
+
+        Assertions.assertTrue(resolution.isSuccess());
+        Assertions.assertSame(second.getClassLoader(), resolution.getClassLoader());
+    }
+
+    @Test
     void globalLoadedClassCacheExcludesBootstrapClasses() {
         Instrumentation previousInstrumentation = Global.instrumentation;
         Set<Class<?>> previous = Global.allLoadedClasses.remove(String.class.getName());

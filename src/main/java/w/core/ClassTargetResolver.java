@@ -96,6 +96,39 @@ public class ClassTargetResolver {
                 : Resolution.success(match, candidates);
     }
 
+    public ClassLoaderResolution resolveClassLoader(String requestedHash) {
+        String normalizedHash = normalizeHash(requestedHash);
+        if (normalizedHash == null) {
+            return ClassLoaderResolution.failure("classLoaderHash is required", listClassLoaderMaps());
+        }
+        ClassLoader match = null;
+        boolean found = false;
+        List<Map<String, Object>> candidates = new ArrayList<>();
+        for (ClassLoaderTarget target : listClassLoaders()) {
+            if (target.getClassLoaderHash().equals(normalizedHash)) {
+                candidates.add(target.toMap());
+                if (found && match != target.loader) {
+                    return ClassLoaderResolution.failure(
+                            "ClassLoader identity hash collision: " + normalizedHash, candidates);
+                }
+                match = target.loader;
+                found = true;
+            }
+        }
+        return !found
+                ? ClassLoaderResolution.failure("No ClassLoader for classLoaderHash " + normalizedHash,
+                listClassLoaderMaps())
+                : ClassLoaderResolution.success(match, candidates);
+    }
+
+    private List<Map<String, Object>> listClassLoaderMaps() {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (ClassLoaderTarget target : listClassLoaders()) {
+            result.add(target.toMap());
+        }
+        return result;
+    }
+
     private String describeCandidates(List<ClassTarget> candidates) {
         StringBuilder result = new StringBuilder("\nCandidates:");
         for (ClassTarget candidate : candidates) {
@@ -189,6 +222,44 @@ public class ClassTargetResolver {
             item.put("classCount", classCount);
             item.put("modifiableClassCount", modifiableClassCount);
             return item;
+        }
+    }
+
+    public static final class ClassLoaderResolution {
+        private final ClassLoader classLoader;
+        private final String error;
+        private final List<Map<String, Object>> candidates;
+
+        private ClassLoaderResolution(ClassLoader classLoader, String error,
+                                      List<Map<String, Object>> candidates) {
+            this.classLoader = classLoader;
+            this.error = error;
+            this.candidates = candidates;
+        }
+
+        static ClassLoaderResolution success(ClassLoader classLoader,
+                                             List<Map<String, Object>> candidates) {
+            return new ClassLoaderResolution(classLoader, null, candidates);
+        }
+
+        static ClassLoaderResolution failure(String error, List<Map<String, Object>> candidates) {
+            return new ClassLoaderResolution(null, error, candidates);
+        }
+
+        public boolean isSuccess() {
+            return error == null;
+        }
+
+        public ClassLoader getClassLoader() {
+            return classLoader;
+        }
+
+        public String getError() {
+            return error;
+        }
+
+        public List<Map<String, Object>> getCandidates() {
+            return candidates;
         }
     }
 

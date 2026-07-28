@@ -7,8 +7,8 @@ Usage: swapper.sh [option] [jsonParam]
 
 Options:
   --tools --watch --outer-watch --trace --logs --decompile
-  --find-subclasses --list --eval --exec --change-body --change-result
-  --replace-class --delete --reset
+  --find-subclasses --list-classloaders --list --eval --exec --change-body
+  --change-result --replace-class --delete --reset
 
 Set SWAPPER_URL to override http://127.0.0.1:8000/mcp.
 Write options (--eval, --exec, --change-body, --change-result, --replace-class)
@@ -31,6 +31,7 @@ case "$option" in
   --logs) method="tools/call"; tool="read_logs" ;;
   --decompile) method="tools/call"; tool="decompile" ;;
   --find-subclasses) method="tools/call"; tool="find_subclasses" ;;
+  --list-classloaders) method="tools/call"; tool="list_classloaders" ;;
   --list) method="tools/call"; tool="list_transformers" ;;
   --eval) method="tools/call"; tool="eval" ;;
   --exec) method="tools/call"; tool="exec" ;;

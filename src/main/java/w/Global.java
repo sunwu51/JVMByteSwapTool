@@ -7,6 +7,8 @@ import ognl.DefaultTypeConverter;
 import ognl.Ognl;
 import ognl.OgnlContext;
 import ognl.OgnlException;
+import w.core.ExecBundle;
+import w.core.GroovyBundle;
 import w.core.JsonBridgeBundle;
 import w.core.model.BaseClassTransformer;
 import w.util.NativeUtils;
@@ -375,33 +377,37 @@ public class Global {
     /**
      * Remove all transformer
      */
-    public static synchronized void reset() {
-        Set<Class<?>> effectedClasses = new HashSet<>();
-        for (BaseClassTransformer transformer : transformers) {
-            transformer.setStatus(-1);
-            transformer.clear();
-            instrumentation.removeTransformer(transformer);
-            if (transformer.requiresRetransformOnDelete()) {
-                effectedClasses.addAll(transformer.appliedClassesSnapshot());
-                allLoadedClasses.getOrDefault(transformer.getClassName(), new HashSet<>()).stream()
-                        .filter(transformer::matchesTargetClass)
-                        .forEach(effectedClasses::add);
+    public static void reset() {
+        synchronized (Global.class) {
+            Set<Class<?>> effectedClasses = new HashSet<>();
+            for (BaseClassTransformer transformer : transformers) {
+                transformer.setStatus(-1);
+                transformer.clear();
+                instrumentation.removeTransformer(transformer);
+                if (transformer.requiresRetransformOnDelete()) {
+                    effectedClasses.addAll(transformer.appliedClassesSnapshot());
+                    allLoadedClasses.getOrDefault(transformer.getClassName(), new HashSet<>()).stream()
+                            .filter(transformer::matchesTargetClass)
+                            .forEach(effectedClasses::add);
+                }
             }
+            for (Class<?> aClass : effectedClasses) {
+                if (!isModifiableClass(aClass)) {
+                    debug("skip unmodifiable class on reset retransform: " + aClass.getName());
+                    continue;
+                }
+                try {
+                    instrumentation.retransformClasses(aClass);
+                } catch (Throwable e) {
+                    Global.error("reset re transform error: ", e);
+                }
+            }
+            transformers.clear();
+            activeTransformers.clear();
+            hitCounter.clear();
+            ExecBundle.clearContexts();
         }
-        for (Class<?> aClass : effectedClasses) {
-            if (!isModifiableClass(aClass)) {
-                debug("skip unmodifiable class on reset retransform: " + aClass.getName());
-                continue;
-            }
-            try {
-                instrumentation.retransformClasses(aClass);
-            } catch (Throwable e) {
-                Global.error("reset re transform error: ", e);
-            }
-        }
-        transformers.clear();
-        activeTransformers.clear();
-        hitCounter.clear();
+        GroovyBundle.clearEngines();
         Global.info("uninstall all transformer finished");
     }
 

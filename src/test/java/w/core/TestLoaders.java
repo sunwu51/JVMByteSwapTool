@@ -24,16 +24,22 @@ public final class TestLoaders {
     }
 
     public static final class NullParentLoader extends ClassLoader {
+        private final String className;
         private final byte[] bytes;
 
         public NullParentLoader(byte[] bytes) {
+            this("w.core.LoaderWatchTarget", bytes);
+        }
+
+        public NullParentLoader(String className, byte[] bytes) {
             super(null);
+            this.className = className;
             this.bytes = bytes.clone();
         }
 
         @Override
         protected Class<?> findClass(String name) throws ClassNotFoundException {
-            if (!"w.core.LoaderWatchTarget".equals(name)) {
+            if (!className.equals(name)) {
                 throw new ClassNotFoundException(name);
             }
             return defineClass(name, bytes, 0, bytes.length);
