@@ -153,4 +153,80 @@ public final class DiagnosticBridge {
             // Diagnostics must never change application control flow.
         }
     }
+
+    public static Object debugEnter(String id) {
+        try {
+            DiagnosticListener current = listener;
+            return current == null ? null : current.debugEnter(id);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    public static void debugHit(String id, Object token, Object target, Object[] args) {
+        try {
+            DiagnosticListener current = listener;
+            if (current != null) {
+                current.debugHit(id, token, target, args);
+            }
+        } catch (Throwable ignored) {
+            // Diagnostics must never change application control flow.
+        }
+    }
+
+    public static void debugHit(String id, Object token, Object target, Object[] args,
+                                String[] localNames, String[] localTypes,
+                                Object[] localValues) {
+        try {
+            DiagnosticListener current = listener;
+            if (current != null) {
+                current.debugHit(id, token, target, args,
+                        localNames, localTypes, localValues);
+            }
+        } catch (Throwable ignored) {
+            // Diagnostics must never change application control flow.
+        }
+    }
+
+    public static void debugCallHit(
+            String id, Object token, Object target, Object[] methodArgs,
+            String[] callTypes, Object[] callArgs,
+            String[] localNames, String[] localTypes, Object[] localValues,
+            Object result, Throwable throwable, boolean voidResult,
+            boolean methodExitLine) {
+        try {
+            DiagnosticListener current = listener;
+            if (current != null) {
+                current.debugCallHit(id, token, target, methodArgs,
+                        callTypes, callArgs, localNames, localTypes, localValues,
+                        result, throwable, voidResult, methodExitLine);
+            }
+        } catch (Throwable ignored) {
+            // Diagnostics must never change application control flow.
+        }
+    }
+
+    public static void debugExit(Object token, Object result, Throwable throwable,
+                                 boolean voidResult) {
+        try {
+            DiagnosticListener current = listener;
+            if (current != null) {
+                current.debugExit(token, result, throwable, voidResult);
+            }
+        } catch (Throwable ignored) {
+            // Diagnostics must never change application control flow.
+        }
+    }
+
+    public static void debugBreakpointExit(Object token, Object result,
+                                           Throwable throwable, boolean voidResult) {
+        try {
+            DiagnosticListener current = listener;
+            if (current != null) {
+                current.debugBreakpointExit(token, result, throwable, voidResult);
+            }
+        } catch (Throwable ignored) {
+            // Diagnostics must never change application control flow.
+        }
+    }
 }

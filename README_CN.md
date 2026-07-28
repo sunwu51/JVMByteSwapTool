@@ -31,6 +31,19 @@ $ java -jar -Dw_http_port=9999 -Dw_ws_port=19999 swapper.jar
 
 这是众多功能之一的`watch`，想要查看更多信息可以查看[wiki](https://github.com/sunwu51/JVMByteSwapTool/wiki).
 
+## Online Debug
+在线调试可以为已加载类设置有界、非暂停的行断点，不会暂停业务线程。每条保留命中可展示 Parameters、Breakpoint Return / Throw、Instance fields、Static fields、Method Parameters & Method Return / Throw、Call stack 六个详情区块。
+
+1. 在 Web UI 中打开 **Online Debug**，搜索已加载类。
+2. 选择准确的已加载类，查看运行时字节码反编译源码。
+3. 点击源码 gutter，设置 TTL 与最大命中次数。
+4. 触发业务请求，选择断点，再选择命中以按需加载详情。
+5. 选择命中查看六个详情区块；可全展开/全折叠，也可单独折叠对象树或展开完整调用栈。
+
+捕获采用浅复制并异步渲染。TTL 为 60–3600 秒，最大命中次数为 1–100。单条命中上限为 256 KiB，全部保留详情共享 32 MiB 预算；淘汰旧详情不会改变历史命中计数。
+
+![Online Debug](https://i.imgur.com/ouBvT21.png)
+
 ## TUI CLI
 你也可以使用 TUI 客户端，交互逻辑与 Web UI 一致。
 

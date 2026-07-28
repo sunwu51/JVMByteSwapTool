@@ -7,6 +7,7 @@ import w.core.ExecBundle;
 import w.core.GroovyBundle;
 import w.core.Swapper;
 import w.core.ClassTargetResolver;
+import w.core.debug.DebugManager;
 import w.core.model.SwapResult;
 import w.util.RequestUtils;
 import w.web.message.ChangeBodyMessage;
@@ -102,6 +103,15 @@ public class McpDispatcher {
         tools.add(tool("delete_transformer", "Remove one installed transformer from the host JVM by UUID and retransform affected classes to roll back that transformer. Use list_transformers first when the UUID is unknown. The synchronous result reports delete success or the failure reason."));
         tools.add(tool("reset", "Remove all installed JVMByteSwapTool transformers from the host JVM and retransform affected classes to roll back instrumentation. This is a broad cleanup operation. The synchronous result reports reset success/failure, and cleanup progress/errors are also written to /log."));
         tools.add(tool("list_transformers", "Return a snapshot of active transformers currently installed in the host JVM. The result is grouped by class name and classloader identity, because the same class name may be loaded by multiple classloaders. Each entry includes trace id, transformer description, and UUID. Use this before delete_transformer or to understand current live instrumentation state."));
+        tools.add(tool("search_loaded_classes", "Search classes already loaded in the host JVM for Online Debug. Results preserve exact ClassLoader identity and report whether each class can be modified."));
+        tools.add(tool("inspect_debug_class", "Decompile one exact loaded class and return executable display lines, method metadata, and debug capability limits. Constructors and static initializers are inspection-only."));
+        tools.add(tool("add_debug_breakpoint", "Add a bounded, non-suspending Online Debug breakpoint at an executable decompiled display line. The target thread performs only bounded shallow capture; rendering, notifications, and unload run asynchronously."));
+        tools.add(tool("get_debug_breakpoint", "Get Online Debug breakpoint metadata. timeoutMs can long-poll for a lifecycle or hit-count change for at most 30000ms."));
+        tools.add(tool("list_debug_breakpoints", "List Online Debug breakpoint metadata."));
+        tools.add(tool("list_debug_hits", "List retained hit summaries for one Online Debug breakpoint, newest first, capped at 100."));
+        tools.add(tool("get_debug_hit", "Get retained parameters, instance fields, static fields, call stack, and final return or throw state for one Online Debug hit."));
+        tools.add(tool("remove_debug_breakpoint", "Disarm one Online Debug breakpoint. DISARMED is reported only after transformer removal completes."));
+        tools.add(tool("clear_debug_history", "Delete completed Online Debug breakpoint history. Active breakpoints and terminal records with an attached transformer are retained."));
         result.put("tools", tools);
         return result;
     }
@@ -228,6 +238,41 @@ public class McpDispatcher {
             case "list_transformers":
                 add(properties, "logId", stringProp("Optional correlation id for this listing request."));
                 break;
+            case "search_loaded_classes":
+                add(properties, "query", stringProp("Optional case-insensitive class-name fragment."));
+                add(properties, "limit", integerProp("Maximum results. Defaults to 50; capped at 200."));
+                break;
+            case "inspect_debug_class":
+                addDebugClassTargetProperties(properties);
+                required.add("className");
+                break;
+            case "add_debug_breakpoint":
+                addDebugClassTargetProperties(properties);
+                add(properties, "displayLine", integerProp("Line number shown in inspect_debug_class source. Non-executable lines require adjustToNearest=true."));
+                add(properties, "adjustToNearest", booleanProp("When true, explicitly adjust a non-executable display line to the nearest supported line. Defaults to false."));
+                add(properties, "ttlSeconds", integerProp("Breakpoint lifetime from 60 to 3600 seconds. Defaults to 600."));
+                add(properties, "maxHits", integerProp("Hits before automatic disarm, from 1 to 100. Defaults to 10."));
+                required.add("className");
+                required.add("displayLine");
+                break;
+            case "get_debug_breakpoint":
+                addBreakpointId(properties);
+                add(properties, "timeoutMs", integerProp("Optional long-poll timeout capped at 30000ms."));
+                required.add("breakpointId");
+                break;
+            case "list_debug_breakpoints":
+                break;
+            case "list_debug_hits":
+            case "remove_debug_breakpoint":
+                addBreakpointId(properties);
+                required.add("breakpointId");
+                break;
+            case "get_debug_hit":
+                add(properties, "hitId", stringProp("Online Debug hit identifier."));
+                required.add("hitId");
+                break;
+            case "clear_debug_history":
+                break;
             default:
                 schema.put("additionalProperties", true);
                 break;
@@ -247,6 +292,15 @@ public class McpDispatcher {
 
     private void addClassLoaderHash(Map<String, Object> properties) {
         add(properties, "classLoaderHash", stringProp("Optional hexadecimal ClassLoader identity hash returned by list_classloaders. Required when multiple loaded classes have the same name; the operation affects only the selected loaded class."));
+    }
+
+    private void addDebugClassTargetProperties(Map<String, Object> properties) {
+        add(properties, "className", stringProp("Fully qualified name of an already-loaded class."));
+        addClassLoaderHash(properties);
+    }
+
+    private void addBreakpointId(Map<String, Object> properties) {
+        add(properties, "breakpointId", stringProp("Online Debug breakpoint UUID."));
     }
 
     private Map<String, Object> objectSchema() {
@@ -351,6 +405,36 @@ public class McpDispatcher {
             case "list_transformers":
             case "ping":
                 return toolResult(true, "ok", listActiveTransformers());
+            case "search_loaded_classes":
+                return debugCall(() -> DebugManager.getInstance().searchLoadedClasses(
+                        args.getString("query"), getInt(args, "limit", 50)));
+            case "inspect_debug_class":
+                return debugCall(() -> DebugManager.getInstance().inspectClass(
+                        args.getString("className"), args.getString("classLoaderHash")));
+            case "add_debug_breakpoint":
+                return debugCall(() -> DebugManager.getInstance().addBreakpoint(
+                        args.getString("className"),
+                        args.getString("classLoaderHash"),
+                        getInt(args, "displayLine", 0),
+                        Boolean.TRUE.equals(args.getBoolean("adjustToNearest")),
+                        getInt(args, "ttlSeconds", 600),
+                        getInt(args, "maxHits", 10)));
+            case "get_debug_breakpoint":
+                return debugCall(() -> DebugManager.getInstance().getBreakpoint(
+                        args.getString("breakpointId"), getLong(args, "timeoutMs", 0)));
+            case "list_debug_breakpoints":
+                return debugCall(() -> DebugManager.getInstance().listBreakpoints());
+            case "list_debug_hits":
+                return debugCall(() -> DebugManager.getInstance().listHits(
+                        args.getString("breakpointId")));
+            case "get_debug_hit":
+                return debugCall(() -> DebugManager.getInstance().getHit(
+                        args.getString("hitId")));
+            case "remove_debug_breakpoint":
+                return debugCall(() -> DebugManager.getInstance().removeBreakpoint(
+                        args.getString("breakpointId")));
+            case "clear_debug_history":
+                return debugCall(() -> DebugManager.getInstance().clearHistory());
             default:
                 return toolResult(false, "unsupported tool: " + name, null);
         }
@@ -471,6 +555,15 @@ public class McpDispatcher {
         return toolResult(true, "reset success", null);
     }
 
+    private Map<String, Object> debugCall(DebugOperation operation) {
+        try {
+            Object data = operation.run();
+            return toolResult(true, "online debug request succeeded", data);
+        } catch (Throwable error) {
+            return toolResult(false, error.getMessage(), null);
+        }
+    }
+
     private Map<String, Map<String, List<String>>> listActiveTransformers() {
         Map<String, Map<String, List<String>>> content = new LinkedHashMap<>();
         synchronized (Global.class) {
@@ -534,5 +627,10 @@ public class McpDispatcher {
         response.put("jsonrpc", JSONRPC);
         response.put("id", id);
         return response;
+    }
+
+    @FunctionalInterface
+    private interface DebugOperation {
+        Object run() throws Exception;
     }
 }

@@ -3,6 +3,7 @@ package w.core.diagnostic;
 import w.Global;
 import w.bridge.DiagnosticListener;
 import w.core.asm.Tool;
+import w.core.debug.DebugManager;
 import w.core.model.OuterWatchTransformer;
 import w.core.model.TraceTransformer;
 import w.util.RequestUtils;
@@ -203,6 +204,47 @@ public final class AgentDiagnosticListener implements DiagnosticListener {
                 }
             }
         }
+    }
+
+    @Override
+    public Object debugEnter(String id) {
+        return DebugManager.getInstance().enter(id);
+    }
+
+    @Override
+    public void debugHit(String id, Object token, Object target, Object[] args) {
+        DebugManager.getInstance().hit(id, token, target, args);
+    }
+
+    @Override
+    public void debugHit(String id, Object token, Object target, Object[] args,
+                         String[] localNames, String[] localTypes, Object[] localValues) {
+        DebugManager.getInstance().hit(id, token, target, args,
+                localNames, localTypes, localValues);
+    }
+
+    @Override
+    public void debugCallHit(
+            String id, Object token, Object target, Object[] methodArgs,
+            String[] callTypes, Object[] callArgs,
+            String[] localNames, String[] localTypes, Object[] localValues,
+            Object result, Throwable throwable, boolean voidResult,
+            boolean methodExitLine) {
+        DebugManager.getInstance().callHit(id, token, target, methodArgs,
+                callTypes, callArgs, localNames, localTypes, localValues,
+                result, throwable, voidResult, methodExitLine);
+    }
+
+    @Override
+    public void debugExit(Object token, Object result, Throwable throwable,
+                          boolean voidResult) {
+        DebugManager.getInstance().exit(token, result, throwable, voidResult);
+    }
+
+    @Override
+    public void debugBreakpointExit(Object token, Object result, Throwable throwable,
+                                    boolean voidResult) {
+        DebugManager.getInstance().breakpointExit(token, result, throwable, voidResult);
     }
 
     private String formatArgs(Object[] args, int printFormat, int depthForJson) {

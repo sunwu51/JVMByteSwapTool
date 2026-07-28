@@ -8,6 +8,7 @@ import ognl.Ognl;
 import ognl.OgnlContext;
 import ognl.OgnlException;
 import w.core.JsonBridgeBundle;
+import w.core.debug.DebugManager;
 import w.core.model.BaseClassTransformer;
 import w.util.NativeUtils;
 import w.util.RequestUtils;
@@ -32,6 +33,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -312,70 +314,106 @@ public class Global {
      * @param uuid
      */
     public static synchronized void deleteTransformer(UUID uuid) {
-        info("Deleting transformer " + uuid);
-        Set<String> delClass = new HashSet<>();
-        transformers.removeIf(it -> {
-            if (it.getUuid().equals(uuid)) {
-                it.setStatus(-1);
-                it.clear();
-                instrumentation.removeTransformer(it);
-                Set<Class<?>> effectedClasses = new HashSet<>();
-                if (it.requiresRetransformOnDelete()) {
-                    effectedClasses.addAll(it.appliedClassesSnapshot());
-                    allLoadedClasses.getOrDefault(it.getClassName(), new HashSet<>()).stream()
-                            .filter(it::matchesTargetClass)
-                            .forEach(effectedClasses::add);
-                    // Nested and auxiliary targets may have been transformed too; restore them as well.
-                    for (String extraClassName : it.getExtraClassNames()) {
-                        allLoadedClasses.getOrDefault(extraClassName, new HashSet<>()).stream()
-                                .filter(it::matchesTargetClassLoader)
-                                .forEach(effectedClasses::add);
-                    }
-                }
+        List<String> errors = deleteTransformerChecked(uuid);
+        for (String error : errors) {
+            Global.error(error);
+        }
+    }
 
-                for (Class<?> aClass : effectedClasses) {
-                    if (!isModifiableClass(aClass)) {
-                        debug("skip unmodifiable class on delete retransform: " + aClass.getName());
-                        continue;
+    /**
+     * Remove one transformer and report rollback failures to lifecycle-aware callers.
+     */
+    public static synchronized List<String> deleteTransformerChecked(UUID uuid) {
+        info("Deleting transformer " + uuid);
+        List<String> errors = new ArrayList<>();
+        Set<String> delClass = new HashSet<>();
+        boolean removedAny = false;
+        Iterator<BaseClassTransformer> iterator = transformers.iterator();
+        while (iterator.hasNext()) {
+            BaseClassTransformer it = iterator.next();
+            if (it.getUuid().equals(uuid)) {
+                boolean removed = instrumentation.removeTransformer(it);
+                if (!removed) {
+                    // Keep registry and active maps intact: caller can retry and the
+                    // lifecycle state still reflects a possibly attached transformer.
+                    errors.add("Instrumentation did not remove transformer " + uuid);
+                } else {
+                    removedAny = true;
+                    it.setStatus(-1);
+                    it.clear();
+                    iterator.remove();
+                    Set<Class<?>> effectedClasses = new HashSet<>();
+                    if (it.requiresRetransformOnDelete()) {
+                        effectedClasses.addAll(it.appliedClassesSnapshot());
+                        allLoadedClasses.getOrDefault(it.getClassName(), new HashSet<>()).stream()
+                                .filter(it::matchesTargetClass)
+                                .forEach(effectedClasses::add);
+                        // Nested and auxiliary targets may have been transformed too; restore them as well.
+                        for (String extraClassName : it.getExtraClassNames()) {
+                            allLoadedClasses.getOrDefault(extraClassName, new HashSet<>()).stream()
+                                    .filter(it::matchesTargetClassLoader)
+                                    .forEach(effectedClasses::add);
+                        }
                     }
-                    try {
-                        instrumentation.retransformClasses(aClass);
-                    } catch (Throwable e) {
-                        Global.error("delete re transform error:", e);
+
+                    for (Class<?> aClass : effectedClasses) {
+                        if (!isModifiableClass(aClass)) {
+                            debug("skip unmodifiable class on delete retransform: " + aClass.getName());
+                            errors.add("Cannot restore unmodifiable class " + aClass.getName());
+                            continue;
+                        }
+                        try {
+                            instrumentation.retransformClasses(aClass);
+                        } catch (Throwable e) {
+                            Global.error("delete re transform error:", e);
+                            errors.add("Failed to restore " + aClass.getName() + ": "
+                                    + e.getClass().getName() + ": " + e.getMessage());
+                        }
                     }
                 }
+            }
+        }
+        if (removedAny) {
+            activeTransformers.forEach((c, m) -> {
+                m.forEach((l, list) -> {
+                    list.removeIf(transformer -> transformer.getStatus() == -1);
+                });
+                Set<String> del = new HashSet<>();
+                for (Map.Entry<String, List<BaseClassTransformer>> stringListEntry : m.entrySet()) {
+                    if (stringListEntry.getValue().isEmpty()) {
+                        del.add(stringListEntry.getKey());
+                    }
+                }
+                for (String s : del) {
+                    m.remove(s);
+                }
+                if (m.isEmpty()) {
+                    delClass.add(c);
+                }
+            });
+            for (String aClass : delClass) {
+                activeTransformers.remove(aClass);
+            }
+            hitCounter.remove(uuid.toString());
+        }
+        info("Deleted transformer " + uuid);
+        return errors;
+    }
+
+    public static synchronized boolean isTransformerInstalled(UUID uuid) {
+        for (BaseClassTransformer transformer : transformers) {
+            if (transformer.getUuid().equals(uuid)) {
                 return true;
             }
-            return false;
-        });
-        activeTransformers.forEach((c, m) -> {
-            m.forEach((l, list) -> {
-                list.removeIf(transformer -> transformer.getStatus() == -1);
-            });
-            Set<String> del = new HashSet<>();
-            for (Map.Entry<String, List<BaseClassTransformer>> stringListEntry : m.entrySet()) {
-                if (stringListEntry.getValue().isEmpty()) {
-                    del.add(stringListEntry.getKey());
-                }
-            }
-            for (String s : del) {
-                m.remove(s);
-            }
-            if (m.isEmpty()) {
-                delClass.add(c);
-            }
-        });
-        for (String aClass : delClass) {
-            activeTransformers.remove(aClass);
         }
-        hitCounter.remove(uuid.toString());
-        info("Deleted transformer " + uuid);
+        return false;
     }
 
     /**
      * Remove all transformer
      */
     public static synchronized void reset() {
+        DebugManager.getInstance().reset();
         Set<Class<?>> effectedClasses = new HashSet<>();
         for (BaseClassTransformer transformer : transformers) {
             transformer.setStatus(-1);
@@ -668,6 +706,19 @@ public class Global {
         }
         for (BlockingQueue<String> subscriber : logSubscribers) {
             subscriber.offer(json);
+        }
+    }
+
+    /**
+     * Publish a lightweight structured event through the existing SSE stream.
+     */
+    public static void publishEvent(Map<String, Object> event) {
+        String json = JSON.toJSONString(event);
+        for (BlockingQueue<String> subscriber : logSubscribers) {
+            if (!subscriber.offer(json)) {
+                Logger.getLogger(Global.class.getName())
+                        .log(Level.WARNING, "debug event subscriber queue is full");
+            }
         }
     }
 

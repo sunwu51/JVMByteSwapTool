@@ -35,6 +35,27 @@ public class McpDispatcherTest {
         Assertions.assertTrue(tools.stream().map(it -> ((JSONObject) it).getString("name")).anyMatch("list_transformers"::equals));
         Assertions.assertTrue(tools.stream().map(it -> ((JSONObject) it).getString("name")).anyMatch("find_subclasses"::equals));
         Assertions.assertTrue(tools.stream().map(it -> ((JSONObject) it).getString("name")).anyMatch("list_classloaders"::equals));
+        for (String toolName : new String[]{"search_loaded_classes", "inspect_debug_class",
+                "add_debug_breakpoint", "get_debug_breakpoint", "list_debug_breakpoints",
+                "list_debug_hits", "get_debug_hit", "remove_debug_breakpoint",
+                "clear_debug_history"}) {
+            Assertions.assertNotNull(findTool(tools, toolName), toolName);
+        }
+        Assertions.assertNull(findTool(tools, "list_debug_snapshots"));
+        Assertions.assertNull(findTool(tools, "get_debug_snapshot"));
+        JSONObject addDebugBreakpoint = findTool(tools, "add_debug_breakpoint");
+        Assertions.assertTrue(addDebugBreakpoint.getJSONObject("inputSchema")
+                .getJSONArray("required").contains("displayLine"));
+        Assertions.assertNotNull(addDebugBreakpoint.getJSONObject("inputSchema")
+                .getJSONObject("properties").getJSONObject("adjustToNearest"));
+        Assertions.assertNull(addDebugBreakpoint.getJSONObject("inputSchema")
+                .getJSONObject("properties").getJSONObject("condition"));
+        Assertions.assertTrue(findTool(tools, "list_debug_hits")
+                .getJSONObject("inputSchema").getJSONArray("required")
+                .contains("breakpointId"));
+        Assertions.assertTrue(findTool(tools, "get_debug_hit")
+                .getJSONObject("inputSchema").getJSONArray("required")
+                .contains("hitId"));
         JSONObject watch = findTool(tools, "watch");
         Assertions.assertNotNull(watch);
         Assertions.assertTrue(watch.getString("description").contains("ognl"));
@@ -151,6 +172,20 @@ public class McpDispatcherTest {
         Assertions.assertTrue(result.getBoolean("isError"));
         Assertions.assertFalse(result.getJSONObject("structuredContent").getBoolean("success"));
         Assertions.assertEquals("unsupported tool: missing", result.getJSONObject("structuredContent").getString("message"));
+    }
+
+    @Test
+    public void clearDebugHistoryShouldReturnRemovalCounts() throws Exception {
+        JSONObject response = JSON.parseObject(globalJson(dispatcher.dispatch(
+                "{\"jsonrpc\":\"2.0\",\"id\":\"clear-debug\",\"method\":\"tools/call\","
+                        + "\"params\":{\"name\":\"clear_debug_history\",\"arguments\":{}}}")));
+
+        JSONObject content = response.getJSONObject("result")
+                .getJSONObject("structuredContent");
+        Assertions.assertTrue(content.getBoolean("success"));
+        Assertions.assertNotNull(content.getJSONObject("data").getInteger("removedCount"));
+        Assertions.assertNotNull(
+                content.getJSONObject("data").getInteger("retainedAttachedCount"));
     }
 
     @Test

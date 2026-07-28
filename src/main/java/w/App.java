@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import w.core.BootstrapBridgeInstaller;
 import w.core.diagnostic.DiagnosticRuntime;
+import w.core.debug.OriginalBytecodeObserver;
 import w.util.SpringUtils;
 import w.web.Httpd;
 
@@ -36,6 +37,7 @@ public class App {
             System.setProperty(STARTED_PROPERTY, "true");
             applyArgs(arg);
             Global.instrumentation = instrumentation;
+            OriginalBytecodeObserver.initialize(instrumentation);
             BootstrapBridgeInstaller.install(instrumentation);
             DiagnosticRuntime.initialize();
             Global.fillLoadedClasses();

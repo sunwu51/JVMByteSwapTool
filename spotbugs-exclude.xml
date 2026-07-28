@@ -1,2 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<FindBugsFilter/>
+<FindBugsFilter>
+    <!-- Process-wide service singleton; callers cannot replace INSTANCE. -->
+    <Match>
+        <Class name="w.core.debug.DebugManager"/>
+        <Method name="getInstance"/>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+    <!-- Instrumentation is the JVM-provided process singleton. -->
+    <Match>
+        <Class name="w.core.debug.OriginalBytecodeObserver"/>
+        <Method name="initialize"/>
+        <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+    </Match>
+    <!-- ClassFileTransformer requires null to mean no bytecode change. -->
+    <Match>
+        <Class name="w.core.debug.OriginalBytecodeObserver"/>
+        <Method name="transform"/>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+</FindBugsFilter>
