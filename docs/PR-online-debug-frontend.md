@@ -26,5 +26,5 @@ README 使用同一截图外链，原始图片来源：[Imgur 相册](https://im
 
 ## Related PR
 
-- 后端 PR：[Online Debug backend](https://github.com/sunwu51/JVMByteSwapTool/pull/REPLACE_WITH_BACKEND_PR_NUMBER)
+- 后端 PR：[Online Debug backend](https://github.com/sunwu51/swapper/pull/57)
 - 创建 PR 后，将占位符替换为实际 GitHub PR URL；后端 PR 中的前端链接同步替换。
