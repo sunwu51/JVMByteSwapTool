@@ -301,8 +301,9 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             paramsArrayVarIndex = asmSubCallStoreParamsArray(descriptor);
                             tokenIndex = newLocal(Type.getType(Object.class));
                             mv.visitLdcInsn(uuid.toString());
+                            mv.visitVarInsn(Opcodes.ALOAD, paramsArrayVarIndex);
                             mv.visitMethodInsn(INVOKESTATIC, "w/bridge/DiagnosticBridge",
-                                    "outerCallEnter", "(Ljava/lang/String;)Ljava/lang/Object;", false);
+                                    "outerCallEnter", "(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;", false);
                             mv.visitVarInsn(Opcodes.ASTORE, tokenIndex);
 
                             Label tryStart = new Label();

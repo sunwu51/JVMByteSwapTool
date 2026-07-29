@@ -155,4 +155,25 @@ public class WatchTest {
 
         Assertions.assertEquals("java.nio.file.NoSuchFileException", Global.stash("watch-exp"));
     }
+
+    @Test
+    public void watchShouldLogEntryArgumentSnapshot() {
+        String logId = "watch-entry-args-" + System.nanoTime();
+        long since = System.currentTimeMillis();
+        WatchTarget input = new WatchTarget();
+        input.name = "before-watch";
+        WatchMessage msg = new WatchMessage();
+        msg.setId(logId);
+        msg.setSignature("w.core.WatchTarget#mutateArgument");
+        msg.setOgnl("@w.Global@stash(\"watch-exit-arg\", #req[0].name)");
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertEquals("after-watch", target.mutateArgument(input, "after-watch"));
+
+        Assertions.assertTrue(Global.readLogs(logId, since, 20, 0).stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains(
+                        "req:[name: before-watch, age: 0, after-watch], res:after-watch")));
+        Assertions.assertEquals("after-watch", Global.stash("watch-exit-arg"));
+    }
 }

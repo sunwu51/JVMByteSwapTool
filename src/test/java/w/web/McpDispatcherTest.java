@@ -131,6 +131,12 @@ public class McpDispatcherTest {
                 .getJSONObject("body")
                 .getString("description")
                 .contains("variables assigned in one eval call remain available"));
+        Assertions.assertNotNull(eval.getJSONObject("inputSchema")
+                .getJSONObject("properties").getJSONObject("classLoaderHash"));
+
+        JSONObject exec = findTool(tools, "exec");
+        Assertions.assertNotNull(exec.getJSONObject("inputSchema")
+                .getJSONObject("properties").getJSONObject("classLoaderHash"));
 
         JSONObject findSubclasses = findTool(tools, "find_subclasses");
         Assertions.assertNotNull(findSubclasses);
@@ -268,6 +274,26 @@ public class McpDispatcherTest {
             Assertions.assertNotNull(loader.getString("classLoaderName"));
             Assertions.assertTrue(loader.getInteger("classCount") > 0);
             Assertions.assertTrue(loader.getInteger("modifiableClassCount") >= 0);
+        } finally {
+            Global.instrumentation = previous;
+        }
+    }
+
+    @Test
+    public void evalShouldRejectUnknownClassLoaderHash() throws Exception {
+        Instrumentation previous = Global.instrumentation;
+        Global.instrumentation = ByteBuddyAgent.install();
+        try {
+            String request = "{\"jsonrpc\":\"2.0\",\"id\":\"eval-loader\",\"method\":\"tools/call\","
+                    + "\"params\":{\"name\":\"eval\",\"arguments\":{"
+                    + "\"classLoaderHash\":\"not-a-loader\",\"body\":\"1 + 1\"}}}";
+            JSONObject response = JSON.parseObject(globalJson(dispatcher.dispatch(request)));
+            JSONObject structuredContent =
+                    response.getJSONObject("result").getJSONObject("structuredContent");
+
+            Assertions.assertFalse(structuredContent.getBoolean("success"));
+            Assertions.assertTrue(structuredContent.getString("message")
+                    .contains("No ClassLoader for classLoaderHash not-a-loader"));
         } finally {
             Global.instrumentation = previous;
         }

@@ -110,12 +110,13 @@ public class WatchTransformer extends BaseClassTransformer {
             mv.visitInsn(ACONST_NULL);
             mv.visitVarInsn(ASTORE, argsIndex);
             mv.visitLabel(startTry);
-            mv.visitLdcInsn(uuid.toString());
-            mv.visitMethodInsn(INVOKESTATIC, BRIDGE, "watchEnter",
-                    "(Ljava/lang/String;)Ljava/lang/Object;", false);
-            mv.visitVarInsn(ASTORE, tokenIndex);
             loadArgArray();
             mv.visitVarInsn(ASTORE, argsIndex);
+            mv.visitLdcInsn(uuid.toString());
+            mv.visitVarInsn(ALOAD, argsIndex);
+            mv.visitMethodInsn(INVOKESTATIC, BRIDGE, "watchEnter",
+                    "(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;", false);
+            mv.visitVarInsn(ASTORE, tokenIndex);
         }
 
         @Override

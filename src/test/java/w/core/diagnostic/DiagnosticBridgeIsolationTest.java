@@ -26,7 +26,8 @@ class DiagnosticBridgeIsolationTest {
                 .invoke(null, "message"));
         Assertions.assertDoesNotThrow(() -> bridgeType.getMethod("error", Object.class, Throwable.class)
                 .invoke(null, "message", new IllegalStateException("failure")));
-        Object token = bridgeType.getMethod("watchEnter", String.class).invoke(null, "broken");
+        Object token = bridgeType.getMethod("watchEnter", String.class, Object[].class)
+                .invoke(null, "broken", new Object[]{new Object[0]});
         Assertions.assertNull(token);
         Assertions.assertDoesNotThrow(() -> bridgeType.getMethod(
                         "watchExit", Object.class, long.class, Object.class, Object[].class,
@@ -38,8 +39,8 @@ class DiagnosticBridgeIsolationTest {
                 .invoke(null, "broken"));
         Assertions.assertEquals(false, bridgeType.getMethod("outerShouldRecord", String.class)
                 .invoke(null, "broken"));
-        Assertions.assertNull(bridgeType.getMethod("outerCallEnter", String.class)
-                .invoke(null, "broken"));
+        Assertions.assertNull(bridgeType.getMethod("outerCallEnter", String.class, Object[].class)
+                .invoke(null, "broken", new Object[]{new Object[0]}));
         Assertions.assertDoesNotThrow(() -> bridgeType.getMethod(
                         "outerCallExit", Object.class, int.class, long.class, Object.class,
                         Object[].class, Object.class, Throwable.class)

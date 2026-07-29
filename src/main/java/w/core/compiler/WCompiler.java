@@ -17,8 +17,12 @@ public class WCompiler {
 
     // generate a compiler every time to avoid conflict
     private static SimpleCompiler getCompiler() {
+        return getCompiler(Global.getClassLoader());
+    }
+
+    private static SimpleCompiler getCompiler(ClassLoader parentClassLoader) {
         SimpleCompiler compiler = new SimpleCompiler();
-        compiler.setParentClassLoader(Global.getClassLoader());
+        compiler.setParentClassLoader(parentClassLoader);
         return compiler;
     }
 
@@ -29,7 +33,11 @@ public class WCompiler {
      * @throws CompileException
      */
     public static byte[] compileWholeClass(String content) throws CompileException {
-        SimpleCompiler compiler = getCompiler();
+        return compileWholeClass(content, Global.getClassLoader());
+    }
+
+    public static byte[] compileWholeClass(String content, ClassLoader parentClassLoader) throws CompileException {
+        SimpleCompiler compiler = getCompiler(parentClassLoader);
         compiler.cook(content);
         // only one class will be compiled
         String className = compiler.getBytecodes().keySet().iterator().next();

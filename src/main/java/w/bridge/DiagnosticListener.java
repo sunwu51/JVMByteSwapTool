@@ -8,7 +8,7 @@ public interface DiagnosticListener {
 
     void error(Object message, Throwable throwable);
 
-    Object watchEnter(String id);
+    Object watchEnter(String id, Object[] args);
 
     void watchExit(Object token, long start, Object target, Object[] args,
                    Object result, Throwable throwable);
@@ -19,7 +19,7 @@ public interface DiagnosticListener {
 
     boolean outerShouldRecord(String id);
 
-    Object outerCallEnter(String id);
+    Object outerCallEnter(String id, Object[] args);
 
     void outerCallExit(Object token, int line, long start, Object target, Object[] args,
                        Object result, Throwable throwable);

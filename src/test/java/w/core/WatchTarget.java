@@ -75,6 +75,15 @@ public class WatchTarget implements Runnable {
         readFile("123");
     }
 
+    public String mutateArgument(WatchTarget input, String value) {
+        input.name = value;
+        return input.name;
+    }
+
+    public String callMutateArgument(WatchTarget input, String value) {
+        return mutateArgument(input, value);
+    }
+
     public static void sleep(long millis) {
         try {
             Thread.sleep(millis);

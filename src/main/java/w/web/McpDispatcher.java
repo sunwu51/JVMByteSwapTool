@@ -96,8 +96,8 @@ public class McpDispatcher {
         tools.add(tool("decompile", "Decompile a class currently loaded in the host JVM. Use this to inspect the actual bytecode/source shape of a class from the running process, including classes loaded by different classloaders. Arguments identify the loaded class to decompile. The synchronous result reports transformer/retransform status; generated decompile output is emitted through the normal logging/output path."));
         tools.add(tool("find_subclasses", "Find loaded subclasses or interface implementations in the host JVM. The tool first locates already-loaded target Class objects by fully qualified className, including multiple classloaders, then scans all loaded classes with target.isAssignableFrom(candidate). The result lists matching candidate class names and classloader identities, along with the target classloader they matched."));
         tools.add(tool("list_classloaders", "List ClassLoaders in the host JVM. With className, returns every loaded Class object matching that name. Without className, returns every current ClassLoader with its identity hash and loaded-class counts. Pass a returned classLoaderHash to any class-targeting transformation when duplicate class names exist."));
-        tools.add(tool("exec", "Compile, hot-swap, and invoke the built-in w.Exec class inside the host JVM. Use this for imperative diagnostic code that can call agent APIs such as Global.info, SpringUtils, or OGNL helpers. This tool is effectively void: the synchronous result is only success/failure such as 'exec success'. Any diagnostic output from the executed code should be written with Global.info/Global.error and consumed from /log."));
-        tools.add(tool("eval", "Evaluate Groovy code in an interactive host-JVM context using the target application's classloader. If the current process is a Spring application and its ApplicationContext has been detected, the built-in variable ctx is that Spring ApplicationContext, so agents can call ctx.getBean(SomeClass.class) or ctx.getBean(\"beanName\") to inspect and use live beans. The Groovy engine keeps an interactive binding across eval calls: variables assigned in one eval call can be reused by later eval calls. Prefix the body with '!' to run a shell command instead of Groovy. The synchronous result returns a safe string representation of the expression result; complex host objects are not serialized as JSON. The same result is also logged to /log."));
+        tools.add(tool("exec", "Compile, hot-swap, and invoke the built-in w.Exec class inside the host JVM. Use classLoaderHash to compile and run against one specific target ClassLoader; when omitted, the current Global.getClassLoader() is used. Use this for imperative diagnostic code that can call agent APIs such as Global.info, SpringUtils, or OGNL helpers. This tool is effectively void: the synchronous result is only success/failure such as 'exec success'. Any diagnostic output from the executed code should be written with Global.info/Global.error and consumed from /log."));
+        tools.add(tool("eval", "Evaluate Groovy code in an interactive host-JVM context using a selected target ClassLoader. Use classLoaderHash to select it; when omitted, the current Global.getClassLoader() is used. Agent APIs such as w.Global and w.util.SpringUtils remain visible even when the target ClassLoader is isolated. Each target ClassLoader has an isolated Groovy engine and interactive binding, so variables persist across eval calls for the same loader but are not shared with other loaders. If the current process is a Spring application and its ApplicationContext has been detected, the built-in variable ctx is that Spring ApplicationContext, so agents can call ctx.getBean(SomeClass.class) or ctx.getBean(\"beanName\"). Prefix the body with '!' to run a shell command instead of Groovy. The synchronous result returns a safe string representation of the expression result; complex host objects are not serialized as JSON. The same result is also logged to /log."));
         tools.add(tool("read_logs", "Read recent JVMByteSwapTool logs captured inside the host JVM. Use this after installing asynchronous diagnostics such as watch, outer_watch, trace, exec, reset, or decompile to retrieve runtime output that was not part of the original tool response. The required logId argument is the same logId you passed in the previous diagnostic tool's arguments, for example the logId supplied to watch. Logs are filtered by this logId to avoid returning unrelated host JVM noise. Pass logId='*' only when you intentionally want all recent logs. When timeoutMs is greater than 0, this call waits briefly for matching future logs, which lets an agent call watch and then wait for the method-hit logs produced when the application later handles traffic."));
         tools.add(tool("delete_transformer", "Remove one installed transformer from the host JVM by UUID and retransform affected classes to roll back that transformer. Use list_transformers first when the UUID is unknown. The synchronous result reports delete success or the failure reason."));
         tools.add(tool("reset", "Remove all installed JVMByteSwapTool transformers from the host JVM and retransform affected classes to roll back instrumentation. This is a broad cleanup operation. The synchronous result reports reset success/failure, and cleanup progress/errors are also written to /log."));
@@ -201,13 +201,15 @@ public class McpDispatcher {
                 break;
             case "exec":
                 add(properties, "logId", stringProp("Optional correlation id for logs emitted by Global.info/Global.error inside w.Exec. Reuse this same value as read_logs.logId."));
+                addExecutionClassLoaderHash(properties);
                 add(properties, "body", stringProp("Full Java source for class w.Exec with a public void exec() method. Use Global.info/Global.error for output; output is streamed through /log."));
                 add(properties, "mode", integerProp("Reserved execution mode. Current UI sends 1; the current backend treats exec as compile/swap/invoke of w.Exec."));
                 required.add("body");
                 break;
             case "eval":
                 add(properties, "logId", stringProp("Optional correlation id for the eval result log. Reuse this same value as read_logs.logId."));
-                add(properties, "body", stringProp("Groovy expression or statement to evaluate in the host JVM. If this is a detected Spring application, ctx is the live Spring ApplicationContext and can be used as ctx.getBean(SomeClass.class) or ctx.getBean(\"beanName\"). Eval uses an interactive Groovy binding, so variables assigned in one eval call remain available to later eval calls. Prefix with ! to run a shell command instead of Groovy."));
+                addExecutionClassLoaderHash(properties);
+                add(properties, "body", stringProp("Groovy expression or statement to evaluate in the host JVM. If this is a detected Spring application, ctx is the live Spring ApplicationContext. Eval uses one interactive binding per selected ClassLoader, so variables assigned in one eval call remain available to later eval calls using the same classLoaderHash but not other loaders. Prefix with ! to run a shell command instead of Groovy."));
                 required.add("body");
                 break;
             case "read_logs":
@@ -247,6 +249,10 @@ public class McpDispatcher {
 
     private void addClassLoaderHash(Map<String, Object> properties) {
         add(properties, "classLoaderHash", stringProp("Optional hexadecimal ClassLoader identity hash returned by list_classloaders. Required when multiple loaded classes have the same name; the operation affects only the selected loaded class."));
+    }
+
+    private void addExecutionClassLoaderHash(Map<String, Object> properties) {
+        add(properties, "classLoaderHash", stringProp("Optional hexadecimal ClassLoader identity hash returned by list_classloaders. The selected ClassLoader is used to resolve application classes. When omitted, the current Global.getClassLoader() is used."));
     }
 
     private Map<String, Object> objectSchema() {
@@ -362,10 +368,19 @@ public class McpDispatcher {
         return toolResult(result.isSuccess(), result.getMessage(), result);
     }
 
-    private Map<String, Object> exec(ExecMessage message, String traceId) throws Exception {
+    private Map<String, Object> exec(ExecMessage message, String traceId) {
         message.setId(traceId);
-        ExecBundle.changeBodyAndInvoke(message.getBody());
-        return toolResult(true, "exec success", null);
+        ClassLoaderSelection selection = selectClassLoader(message.getClassLoaderHash());
+        if (!selection.success) {
+            return toolResult(false, selection.error, selection.candidates);
+        }
+        try {
+            ExecBundle.changeBodyAndInvoke(message.getBody(), selection.classLoader);
+            return toolResult(true, "exec success", null);
+        } catch (Exception e) {
+            Global.error(e.toString(), e);
+            return toolResult(false, e.getMessage(), e.toString());
+        }
     }
 
     private Map<String, Object> findSubclasses(FindSubclassesMessage message) {
@@ -399,14 +414,56 @@ public class McpDispatcher {
 
     private Map<String, Object> eval(EvalMessage message, String traceId) {
         message.setId(traceId);
+        ClassLoaderSelection selection = selectClassLoader(message.getClassLoaderHash());
+        if (!selection.success) {
+            return toolResult(false, selection.error, selection.candidates);
+        }
         try {
-            Object res = GroovyBundle.eval(message.getBody());
+            Object res = GroovyBundle.eval(message.getBody(), selection.classLoader);
             Global.info((message.getBody().startsWith("!") ?
                     "$ " + message.getBody().substring(1) : "groovy > " + message.getBody()) + "\n> " + res);
             return toolResult(true, "eval success", stringifyEvalResult(res));
         } catch (Exception e) {
             Global.error(e.toString(), e);
             return toolResult(false, e.getMessage(), e.toString());
+        }
+    }
+
+    private ClassLoaderSelection selectClassLoader(String classLoaderHash) {
+        if (classLoaderHash == null || classLoaderHash.trim().isEmpty()) {
+            return ClassLoaderSelection.success(Global.getClassLoader());
+        }
+        try {
+            ClassTargetResolver.ClassLoaderResolution resolution =
+                    new ClassTargetResolver(Global.instrumentation).resolveClassLoader(classLoaderHash);
+            return resolution.isSuccess()
+                    ? ClassLoaderSelection.success(resolution.getClassLoader())
+                    : ClassLoaderSelection.failure(resolution.getError(), resolution.getCandidates());
+        } catch (Throwable e) {
+            return ClassLoaderSelection.failure(e.getMessage(), null);
+        }
+    }
+
+    private static final class ClassLoaderSelection {
+        private final boolean success;
+        private final ClassLoader classLoader;
+        private final String error;
+        private final Object candidates;
+
+        private ClassLoaderSelection(boolean success, ClassLoader classLoader,
+                                     String error, Object candidates) {
+            this.success = success;
+            this.classLoader = classLoader;
+            this.error = error;
+            this.candidates = candidates;
+        }
+
+        private static ClassLoaderSelection success(ClassLoader classLoader) {
+            return new ClassLoaderSelection(true, classLoader, null, null);
+        }
+
+        private static ClassLoaderSelection failure(String error, Object candidates) {
+            return new ClassLoaderSelection(false, null, error, candidates);
         }
     }
 
