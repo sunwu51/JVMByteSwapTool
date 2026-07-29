@@ -62,13 +62,14 @@ public final class AgentDiagnosticListener implements DiagnosticListener {
     }
 
     @Override
-    public Object watchEnter(String id) {
+    public Object watchEnter(String id, Object[] args) {
         WatchConfig config = watchConfigs.get(id);
         if (config == null) {
             return null;
         }
+        String argsSnapshot = formatArgs(args, config.getPrintFormat(), config.getDepthForJson());
         RequestUtils.fillCurThread(config.getTraceId());
-        return new Token(config);
+        return new Token(config, argsSnapshot);
     }
 
     @Override
@@ -77,7 +78,8 @@ public final class AgentDiagnosticListener implements DiagnosticListener {
         if (!(opaqueToken instanceof Token) || !(((Token) opaqueToken).config instanceof WatchConfig)) {
             return;
         }
-        WatchConfig config = (WatchConfig) ((Token) opaqueToken).config;
+        Token token = (Token) opaqueToken;
+        WatchConfig config = (WatchConfig) token.config;
         try {
             long cost = System.currentTimeMillis() - start;
             if (cost < config.getMinCost()) {
@@ -86,7 +88,7 @@ public final class AgentDiagnosticListener implements DiagnosticListener {
             Global.checkCountAndUnload(config.getId());
             StringBuilder message = new StringBuilder(config.getMethodSignature())
                     .append(", cost:").append(cost).append("ms, req:")
-                    .append(formatArgs(args, config.getPrintFormat(), config.getDepthForJson()))
+                    .append(token.argsSnapshot)
                     .append(", res:").append(format(result, config.getPrintFormat(), config.getDepthForJson()))
                     .append(", throw:").append(format(throwable, config.getPrintFormat(), config.getDepthForJson()))
                     .append(", mdc:")
@@ -118,13 +120,14 @@ public final class AgentDiagnosticListener implements DiagnosticListener {
     }
 
     @Override
-    public Object outerCallEnter(String id) {
+    public Object outerCallEnter(String id, Object[] args) {
         OuterWatchConfig config = outerConfigs.get(id);
         if (config == null) {
             return null;
         }
+        String argsSnapshot = formatArgs(args, config.getPrintFormat(), config.getDepthForJson());
         RequestUtils.fillCurThread(config.getTraceId());
-        return new Token(config);
+        return new Token(config, argsSnapshot);
     }
 
     @Override
@@ -133,14 +136,15 @@ public final class AgentDiagnosticListener implements DiagnosticListener {
         if (!(opaqueToken instanceof Token) || !(((Token) opaqueToken).config instanceof OuterWatchConfig)) {
             return;
         }
-        OuterWatchConfig config = (OuterWatchConfig) ((Token) opaqueToken).config;
+        Token token = (Token) opaqueToken;
+        OuterWatchConfig config = (OuterWatchConfig) token.config;
         try {
             long cost = System.currentTimeMillis() - start;
             Global.checkCountAndUnload(config.getId());
             StringBuilder message = new StringBuilder("line: ").append(line)
                     .append(", ").append(config.getMethodSignature())
                     .append(", cost: ").append(cost).append("ms, req: ")
-                    .append(formatArgs(args, config.getPrintFormat(), config.getDepthForJson()))
+                    .append(token.argsSnapshot)
                     .append(", res: ")
                     .append(throwable == null
                             ? format(result, config.getPrintFormat(), config.getDepthForJson()) : null)
@@ -240,9 +244,15 @@ public final class AgentDiagnosticListener implements DiagnosticListener {
 
     private static final class Token {
         private final Object config;
+        private final String argsSnapshot;
 
         private Token(Object config) {
+            this(config, null);
+        }
+
+        private Token(Object config, String argsSnapshot) {
             this.config = config;
+            this.argsSnapshot = argsSnapshot;
         }
     }
 }

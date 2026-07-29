@@ -39,10 +39,10 @@ public final class DiagnosticBridge {
         }
     }
 
-    public static Object watchEnter(String id) {
+    public static Object watchEnter(String id, Object[] args) {
         try {
             DiagnosticListener current = listener;
-            return current == null ? null : current.watchEnter(id);
+            return current == null ? null : current.watchEnter(id, args);
         } catch (Throwable ignored) {
             return null;
         }
@@ -91,10 +91,10 @@ public final class DiagnosticBridge {
         }
     }
 
-    public static Object outerCallEnter(String id) {
+    public static Object outerCallEnter(String id, Object[] args) {
         try {
             DiagnosticListener current = listener;
-            return current == null ? null : current.outerCallEnter(id);
+            return current == null ? null : current.outerCallEnter(id, args);
         } catch (Throwable ignored) {
             return null;
         }

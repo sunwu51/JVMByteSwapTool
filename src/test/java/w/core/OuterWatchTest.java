@@ -95,6 +95,26 @@ public class OuterWatchTest {
     }
 
     @Test
+    public void outerWatchShouldLogEntryArgumentSnapshot() {
+        String logId = "outer-entry-args-" + System.nanoTime();
+        long since = System.currentTimeMillis();
+        WatchTarget input = new WatchTarget();
+        input.name = "before-outer";
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setId(logId);
+        msg.setSignature("w.core.WatchTarget#callMutateArgument");
+        msg.setInnerSignature("w.core.WatchTarget#mutateArgument");
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertEquals("after-outer", target.callMutateArgument(input, "after-outer"));
+
+        Assertions.assertTrue(Global.readLogs(logId, since, 20, 0).stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains(
+                        "req: [name: before-outer, age: 0, after-outer], res: after-outer")));
+    }
+
+    @Test
     public void watchShouldLogOgnlValueFromThisRoot() {
         String logId = "watch-ognl-" + System.nanoTime();
         long since = System.currentTimeMillis();
