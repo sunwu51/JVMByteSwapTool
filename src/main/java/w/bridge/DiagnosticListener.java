@@ -21,6 +21,8 @@ public interface DiagnosticListener {
 
     Object outerCallEnter(String id, Object[] args);
 
+    Object outerCallEnter(String id, Object[] args, String[] localNames, Object[] localValues);
+
     void outerCallExit(Object token, int line, long start, Object target, Object[] args,
                        Object result, Throwable throwable);
 

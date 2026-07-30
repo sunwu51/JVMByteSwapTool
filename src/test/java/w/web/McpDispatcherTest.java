@@ -98,6 +98,9 @@ public class McpDispatcherTest {
                 .getJSONObject("depthForJson"));
         Assertions.assertNotNull(outerWatch.getJSONObject("inputSchema")
                 .getJSONObject("properties")
+                .getJSONObject("printLvt"));
+        Assertions.assertNotNull(outerWatch.getJSONObject("inputSchema")
+                .getJSONObject("properties")
                 .getJSONObject("variables"));
         Assertions.assertTrue(outerWatch.getJSONObject("inputSchema")
                 .getJSONObject("properties")

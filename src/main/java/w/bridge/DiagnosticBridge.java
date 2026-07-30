@@ -100,6 +100,15 @@ public final class DiagnosticBridge {
         }
     }
 
+    public static Object outerCallEnter(String id, Object[] args, String[] localNames, Object[] localValues) {
+        try {
+            DiagnosticListener current = listener;
+            return current == null ? null : current.outerCallEnter(id, args, localNames, localValues);
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     public static void outerCallExit(Object token, int line, long start, Object target,
                                      Object[] args, Object result, Throwable throwable) {
         try {

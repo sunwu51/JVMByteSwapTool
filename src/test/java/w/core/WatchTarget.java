@@ -122,6 +122,17 @@ public class WatchTarget implements Runnable {
         return ow1(a + b);
     }
 
+    public int callOw1WithLocals() {
+        int a = 10;
+        int b = 20;
+        return ow1(a, b);
+    }
+
+    public int callOw1WithParameterAndLocal(int a) {
+        int b = 20;
+        return ow1(a, b);
+    }
+
     public int ow1(int c) {
         return (int) add(c, 0, 1);
     }

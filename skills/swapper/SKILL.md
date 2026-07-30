@@ -41,7 +41,7 @@ The `.cmd` wrapper delegates JSON handling to the PowerShell included with suppo
 | --- | --- | --- |
 | `--tools` | `{}` | Show server-provided tool schemas. |
 | `--watch` | `{"signature":"pkg.Class#method","logId":"id","printFormat":2}` | Log method arguments, return value, exception, and duration on invocation. Optional: `classLoaderHash`, `minCost`, `depthForJson`, `ognl`, `variables`. |
-| `--outer-watch` | `{"signature":"pkg.Outer#method","innerSignature":"pkg.Inner#method","logId":"id"}` | Observe an inner call made from an outer method. Use `"*#method"` for an unknown/lambda inner owner. Optional: `classLoaderHash`, `includeNested`, `printFormat`, `ognl`, `variables`. |
+| `--outer-watch` | `{"signature":"pkg.Outer#method","innerSignature":"pkg.Inner#method","logId":"id"}` | Observe an inner call made from an outer method. Use `"*#method"` for an unknown/lambda inner owner. Optional: `classLoaderHash`, `includeNested`, `printLvt`, `printFormat`, `ognl`, `variables`. |
 | `--trace` | `{"signature":"pkg.Class#method","logId":"id"}` | Log the synchronous method-call path. Optional: `classLoaderHash`, `minCost`, `ignoreZero`, `includeNested`. |
 | `--logs` | `{"logId":"id","timeoutMs":5000,"maxLines":100}` | Read logs for one diagnostic correlation ID. Optional: `since`; `timeoutMs` is at most 30000. |
 | `--decompile` | `{"className":"pkg.Class","logId":"id"}` | Decompile a class loaded in the target JVM; use `--logs` to retrieve output. Optional: `classLoaderHash`. |

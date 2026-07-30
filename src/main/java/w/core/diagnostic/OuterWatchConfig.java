@@ -11,16 +11,18 @@ public final class OuterWatchConfig {
     private final int printFormat;
     private final String ognl;
     private final int depthForJson;
+    private final boolean printLvt;
     private final Map<String, String> variables;
 
     public OuterWatchConfig(String id, String traceId, String methodSignature, int printFormat,
-                            String ognl, int depthForJson, Map<String, String> variables) {
+                            String ognl, int depthForJson, boolean printLvt, Map<String, String> variables) {
         this.id = id;
         this.traceId = traceId;
         this.methodSignature = methodSignature;
         this.printFormat = printFormat;
         this.ognl = ognl;
         this.depthForJson = depthForJson;
+        this.printLvt = printLvt;
         this.variables = variables == null
                 ? Collections.emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<>(variables));
@@ -48,6 +50,10 @@ public final class OuterWatchConfig {
 
     public int getDepthForJson() {
         return depthForJson;
+    }
+
+    public boolean isPrintLvt() {
+        return printLvt;
     }
 
     public Map<String, String> getVariables() {
