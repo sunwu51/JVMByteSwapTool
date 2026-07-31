@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>w</groupId>
 	<artifactId>swapper</artifactId>
-	<version>0.0.19</version>
+	<version>0.0.20</version>
 	<name>swapper</name>
 	<description>swapper</description>
 	<properties>
