@@ -62,6 +62,9 @@ public class McpDispatcherTest {
             Assertions.assertNotNull(findTool(tools, toolName).getJSONObject("inputSchema")
                     .getJSONObject("properties").getJSONObject("classLoaderHash"), toolName);
         }
+        JSONObject decompile = findTool(tools, "decompile");
+        Assertions.assertTrue(decompile.getString("description").contains("line mapping"));
+        Assertions.assertTrue(decompile.getString("description").contains("outer_watch"));
         Assertions.assertTrue(watch.getJSONObject("inputSchema")
                 .getJSONObject("properties")
                 .getJSONObject("ognl")
@@ -77,6 +80,7 @@ public class McpDispatcherTest {
         JSONObject outerWatch = findTool(tools, "outer_watch");
         Assertions.assertNotNull(outerWatch);
         Assertions.assertTrue(outerWatch.getString("description").contains("*#methodName"));
+        Assertions.assertTrue(outerWatch.getString("description").contains("data.inspectedCalls"));
         Assertions.assertTrue(outerWatch.getString("description").contains("ognl"));
         Assertions.assertTrue(outerWatch.getJSONObject("inputSchema")
                 .getJSONObject("properties")

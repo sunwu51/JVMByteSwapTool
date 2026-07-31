@@ -31,6 +31,7 @@ import java.util.Set;
 
 
 public class Swapper {
+    private static final int MAX_DECOMPILE_RETRIES = 8;
     private static final Swapper INSTANCE = new Swapper();
 
     private Swapper() {}
@@ -166,42 +167,91 @@ public class Swapper {
         }
         Global.debug("add transformer" + transformer.getUuid() +" finish, will retrans class");
 
-        LinkedHashSet<Class<?>> finalClasses = new LinkedHashSet<>();
-        // decompile also need to retransform inner.class
-        if (transformer instanceof DecompileTransformer) {
-            String outerClassName = transformer.getClassName();
-            Global.allLoadedClasses.entrySet().stream()
-                    .filter(entry -> isDecompileRelatedClass(outerClassName, entry.getKey()))
-                    .flatMap(entry -> entry.getValue().stream())
-                    .filter(transformer::matchesTargetClassLoader)
-                    .filter(Global::isModifiableClass)
-                    .forEach(finalClasses::add);
-        }
-        finalClasses.addAll(classes);
+        LinkedHashSet<Class<?>> finalClasses = transformer instanceof DecompileTransformer
+                ? decompileClasses(transformer, classes)
+                : new LinkedHashSet<>(classes);
 
         List<TransformApplyResult> applyResults = new ArrayList<>();
-        for (Class<?> aClass : finalClasses) {
+        if (!applyClasses(transformer, finalClasses, applyResults)) {
+            Global.deleteTransformer(transformer.getUuid());
+            SwapResult result = SwapResult.of(message, transformer, applyResults);
+            attachTransformerData(result, transformer);
+            return result;
+        }
+
+        if (transformer instanceof DecompileTransformer) {
+            DecompileTransformer decompileTransformer = (DecompileTransformer) transformer;
+            int previousClassCount = finalClasses.size();
+            int retries = 0;
+            while (decompileTransformer.consumeRetryRequired()) {
+                if (retries++ >= MAX_DECOMPILE_RETRIES) {
+                    applyResults.add(TransformApplyResult.failure(target, transformer.getUuid(),
+                            "decompile exceeded " + MAX_DECOMPILE_RETRIES + " inner class retries"));
+                    break;
+                }
+                Global.fillLoadedClasses();
+                LinkedHashSet<Class<?>> retryClasses = decompileClasses(transformer, classes);
+                if (retryClasses.size() <= previousClassCount) {
+                    applyResults.add(TransformApplyResult.failure(target, transformer.getUuid(),
+                            "decompile requested another inner class pass but no new class was loaded"));
+                    break;
+                }
+                previousClassCount = retryClasses.size();
+                if (!applyClasses(transformer, retryClasses, applyResults)) {
+                    break;
+                }
+            }
+        }
+
+        SwapResult result = SwapResult.of(message, transformer, applyResults);
+        attachTransformerData(result, transformer);
+        if (!result.isSuccess() || transformer instanceof DecompileTransformer) {
+            Global.deleteTransformer(transformer.getUuid());
+        }
+        return result;
+    }
+
+    private boolean applyClasses(BaseClassTransformer transformer, Set<Class<?>> classes,
+                                 List<TransformApplyResult> applyResults) {
+        for (Class<?> aClass : classes) {
             transformer.beginApply(aClass);
             try {
                 Global.addActiveTransformer(aClass, transformer);
             } catch (Throwable e) {
                 Global.error("re transformer error:", e);
                 applyResults.add(TransformApplyResult.failure(aClass, transformer.getUuid(), e));
-                Global.deleteTransformer(transformer.getUuid());
-                return SwapResult.of(message, transformer, applyResults);
+                return false;
             }
             TransformApplyResult applyResult = transformer.getApplyResult(aClass);
             if (applyResult == null) {
-                applyResult = TransformApplyResult.failure(aClass, transformer.getUuid(), "transformer was not called");
+                applyResult = TransformApplyResult.failure(aClass, transformer.getUuid(),
+                        "transformer was not called");
             }
             applyResults.add(applyResult);
         }
+        return true;
+    }
 
-        SwapResult result = SwapResult.of(message, transformer, applyResults);
-        if (!result.isSuccess() || transformer instanceof DecompileTransformer) {
-            Global.deleteTransformer(transformer.getUuid());
-        }
+    private LinkedHashSet<Class<?>> decompileClasses(BaseClassTransformer transformer,
+                                                      Set<Class<?>> primaryClasses) {
+        LinkedHashSet<Class<?>> result = new LinkedHashSet<>();
+        String outerClassName = transformer.getClassName();
+        Global.allLoadedClasses.entrySet().stream()
+                .filter(entry -> isDecompileRelatedClass(outerClassName, entry.getKey()))
+                .flatMap(entry -> entry.getValue().stream())
+                .filter(transformer::matchesTargetClassLoader)
+                .filter(Global::isModifiableClass)
+                .forEach(result::add);
+        result.addAll(primaryClasses);
         return result;
+    }
+
+    private void attachTransformerData(SwapResult result, BaseClassTransformer transformer) {
+        if (transformer instanceof DecompileTransformer) {
+            result.setData(((DecompileTransformer) transformer).getDecompileResult());
+        } else if (transformer instanceof OuterWatchTransformer) {
+            result.setData(((OuterWatchTransformer) transformer).getOuterWatchResult());
+        }
     }
 
     private boolean isBlank(String value) {

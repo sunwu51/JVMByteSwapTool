@@ -76,6 +76,8 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
     private final Map<String, Set<String>> targetMethods = new LinkedHashMap<>();
 
+    private final Map<String, OuterWatchResult.InspectedCall> inspectedCalls = new LinkedHashMap<>();
+
 
     public OuterWatchTransformer(OuterWatchMessage watchMessage) {
         this.message = watchMessage;
@@ -231,6 +233,12 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         return copy;
     }
 
+    public synchronized OuterWatchResult getOuterWatchResult() {
+        OuterWatchResult result = new OuterWatchResult();
+        result.setInspectedCalls(new ArrayList<>(inspectedCalls.values()));
+        return result;
+    }
+
     @Override
     public List<String> getExtraClassNames() {
         // These classes are also targets and must be considered when removing the transformer.
@@ -258,6 +266,8 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                 if (!shouldWatchMethod(currentClassName, access, name)) {
                     return mv;
                 }
+                String containingMethod = name;
+                String containingDescriptor = descriptor;
                 boolean outerMethod = currentClassName.equals(className) && name.equals(method);
                 List<LocalSnapshot> methodLocalSnapshots = localSnapshots.getOrDefault(
                         name + descriptor, Collections.emptyList());
@@ -304,6 +314,8 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                         boolean hit = (owner.replace("/", ".").equals(innerClassName) || "*".equals(innerClassName))
                                 && name.equals(innerMethod);
                         if (hit) {
+                            recordInspectedCall(currentClassName, containingMethod, containingDescriptor,
+                                    line, owner, name, descriptor);
                             Label recordStart = new Label();
                             Label guardEnd = new Label();
                             mv.visitLdcInsn(uuid.toString());
@@ -414,6 +426,23 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         byte[] result = classWriter.toByteArray();
         status = 1;
         return result;
+    }
+
+    private synchronized void recordInspectedCall(String declaringClass, String outerMethod,
+                                                  String outerDescriptor, int line, String owner,
+                                                  String innerMethod, String innerDescriptor) {
+        String innerOwner = owner.replace('/', '.');
+        String key = declaringClass + '#' + outerMethod + outerDescriptor + ':' + line + ':'
+                + innerOwner + '#' + innerMethod + innerDescriptor;
+        inspectedCalls.computeIfAbsent(key, ignored -> {
+            OuterWatchResult.InspectedCall call = new OuterWatchResult.InspectedCall();
+            call.setLine(line);
+            call.setOuterSignature(declaringClass + '#' + outerMethod);
+            call.setOuterDescriptor(outerDescriptor);
+            call.setInnerSignature(innerOwner + '#' + innerMethod);
+            call.setInnerDescriptor(innerDescriptor);
+            return call;
+        });
     }
 
     private Map<String, List<LocalSnapshot>> collectLocalSnapshots(byte[] origin, String currentClassName) {

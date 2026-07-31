@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import w.Global;
 import w.core.constant.Codes;
 import w.core.diagnostic.DiagnosticRuntime;
+import w.core.model.OuterWatchResult;
 import w.core.model.SwapResult;
 import w.web.message.*;
 
@@ -124,7 +125,14 @@ class SwapperTest {
         OuterWatchMessage message = new OuterWatchMessage();
         message.setSignature("w.core.TestClass#wrapperHello");
         message.setInnerSignature("*#hello");
-        Assertions.assertTrue(swapper.swap(message).isSuccess());
+        SwapResult result = swapper.swap(message);
+        Assertions.assertTrue(result.isSuccess());
+        OuterWatchResult outerWatchResult = (OuterWatchResult) result.getData();
+        Assertions.assertEquals(1, outerWatchResult.getInspectedCalls().size());
+        OuterWatchResult.InspectedCall inspectedCall = outerWatchResult.getInspectedCalls().get(0);
+        Assertions.assertTrue(inspectedCall.getLine() > 0);
+        Assertions.assertEquals("w.core.TestClass#wrapperHello", inspectedCall.getOuterSignature());
+        Assertions.assertEquals("w.core.TestClass#hello", inspectedCall.getInnerSignature());
         t.wrapperHello("world");
         t.wrapperHello("world");
         t.wrapperHello("world");

@@ -18,6 +18,7 @@ public class SwapResult {
     private UUID transformerId;
     private List<TransformApplyResult> applyResults = new ArrayList<>();
     private List<Map<String, Object>> candidates = new ArrayList<>();
+    private Object data;
 
     public static SwapResult failure(Message request, String message) {
         SwapResult result = new SwapResult();

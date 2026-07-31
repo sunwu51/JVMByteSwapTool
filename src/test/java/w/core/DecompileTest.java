@@ -6,6 +6,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import w.Global;
+import w.core.model.DecompileResult;
+import w.core.model.SwapResult;
 import w.web.message.DecompileMessage;
 
 import java.lang.instrument.Instrumentation;
@@ -39,7 +41,12 @@ public class DecompileTest {
         new WatchTarget();
         DecompileMessage msg = new DecompileMessage();
         msg.setClassName("w.core.ChangeTarget");
-        Assertions.assertTrue(swapper.swap(msg).isSuccess());
-        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        SwapResult result = swapper.swap(msg);
+        Assertions.assertTrue(result.isSuccess());
+        Assertions.assertNotNull(result.getData());
+        Assertions.assertFalse(String.valueOf(result.getData()).contains("try again"));
+        DecompileResult decompileResult = (DecompileResult) result.getData();
+        Assertions.assertTrue(decompileResult.getInvocations().stream()
+                .anyMatch(site -> site.getDeclaringClass().equals("w.core.ChangeTarget$1")));
     }
 }

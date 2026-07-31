@@ -78,7 +78,7 @@
 		<dependency>
 			<groupId>com.github.sunwu51</groupId>
 			<artifactId>fernflower</artifactId>
-			<version>v0.0.2</version>
+			<version>v0.0.3</version>
 		</dependency>
 		<dependency>
             <groupId>org.junit.jupiter</groupId>
