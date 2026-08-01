@@ -16,6 +16,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class HttpdTest {
 
@@ -62,7 +64,13 @@ public class HttpdTest {
         Httpd httpd = new Httpd(port);
         httpd.start();
         try {
-            HttpURLConnection connection = get(port, "/assets/index.css");
+            HttpURLConnection indexConnection = get(port, "/");
+            Assertions.assertEquals(200, indexConnection.getResponseCode());
+            Matcher cssAsset = Pattern.compile("href=\"(\\./assets/index-[^\"]+\\.css)\"")
+                    .matcher(read(indexConnection.getInputStream()));
+            Assertions.assertTrue(cssAsset.find());
+
+            HttpURLConnection connection = get(port, cssAsset.group(1).substring(1));
 
             Assertions.assertEquals(200, connection.getResponseCode());
             Assertions.assertTrue(connection.getContentType().startsWith("text/css"));
