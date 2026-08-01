@@ -49,7 +49,8 @@ public class HttpdTest {
             Assertions.assertTrue(connection.getContentType().startsWith("text/html"));
             String body = read(connection.getInputStream());
             Assertions.assertTrue(body.contains("<div id=\"root\"></div>"));
-            Assertions.assertTrue(body.contains("./assets/index.js"));
+            Assertions.assertTrue(body.matches(
+                    "(?s).*<script[^>]+src=\"\\./assets/index-[^\"]+\\.js\"[^>]*>.*"));
         } finally {
             httpd.stop();
         }

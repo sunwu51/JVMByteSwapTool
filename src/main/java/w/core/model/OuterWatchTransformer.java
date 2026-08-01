@@ -9,6 +9,11 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.LocalVariableNode;
+import org.objectweb.asm.tree.MethodInsnNode;
+import org.objectweb.asm.tree.MethodNode;
 import w.Global;
 import w.core.asm.WAdviceAdapter;
 import w.core.diagnostic.DiagnosticRuntime;
@@ -61,6 +66,8 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
     boolean includeNested;
 
+    boolean printLvt;
+
     String ognl;
 
     int depthForJson;
@@ -68,6 +75,8 @@ public class OuterWatchTransformer extends BaseClassTransformer {
     Map<String, String> variables;
 
     private final Map<String, Set<String>> targetMethods = new LinkedHashMap<>();
+
+    private final Map<String, OuterWatchResult.InspectedCall> inspectedCalls = new LinkedHashMap<>();
 
 
     public OuterWatchTransformer(OuterWatchMessage watchMessage) {
@@ -79,6 +88,7 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         this.printFormat = watchMessage.getPrintFormat();
         this.traceId = watchMessage.getId();
         this.includeNested = watchMessage.isIncludeNested();
+        this.printLvt = watchMessage.isPrintLvt();
         this.ognl = watchMessage.getOgnl();
         this.depthForJson = watchMessage.getDepthForJson() <= 0 ? 3 : watchMessage.getDepthForJson();
         this.variables = watchMessage.getVariables();
@@ -89,7 +99,7 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         String shortSignature = innerClassName.substring(innerClassName.lastIndexOf('.') + 1)
                 + "#" + innerMethod;
         return new OuterWatchConfig(uuid.toString(), traceId, shortSignature, printFormat,
-                ognl, depthForJson, variables);
+                ognl, depthForJson, printLvt, variables);
     }
 
     @Override
@@ -223,6 +233,12 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         return copy;
     }
 
+    public synchronized OuterWatchResult getOuterWatchResult() {
+        OuterWatchResult result = new OuterWatchResult();
+        result.setInspectedCalls(new ArrayList<>(inspectedCalls.values()));
+        return result;
+    }
+
     @Override
     public List<String> getExtraClassNames() {
         // These classes are also targets and must be considered when removing the transformer.
@@ -233,6 +249,9 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
     private byte[] transform(byte[] origin, String currentClassName) throws Exception {
         ClassReader classReader = new ClassReader(origin);
+        Map<String, List<LocalSnapshot>> localSnapshots = printLvt
+                ? collectLocalSnapshots(origin, currentClassName)
+                : Collections.emptyMap();
         ClassWriter classWriter = new ClassWriter(classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES) {
             @Override
             protected ClassLoader getClassLoader() {
@@ -247,7 +266,11 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                 if (!shouldWatchMethod(currentClassName, access, name)) {
                     return mv;
                 }
+                String containingMethod = name;
+                String containingDescriptor = descriptor;
                 boolean outerMethod = currentClassName.equals(className) && name.equals(method);
+                List<LocalSnapshot> methodLocalSnapshots = localSnapshots.getOrDefault(
+                        name + descriptor, Collections.emptyList());
                 return new WAdviceAdapter(ASM9, mv, access, name, descriptor) {
                     private int line;
                     private int startTimeVarIndex;
@@ -256,6 +279,7 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                     private int exceptionObjectIndex;
 
                     private int tokenIndex;
+                    private int methodCallIndex;
 
                     @Override
                     public void visitLineNumber(int line, Label start) {
@@ -283,9 +307,15 @@ public class OuterWatchTransformer extends BaseClassTransformer {
 
                     @Override
                     public void visitMethodInsn(int opcodeAndSource, String owner, String name, String descriptor, boolean isInterface) {
+                        LocalSnapshot localSnapshot = methodCallIndex < methodLocalSnapshots.size()
+                                ? methodLocalSnapshots.get(methodCallIndex)
+                                : LocalSnapshot.EMPTY;
+                        methodCallIndex++;
                         boolean hit = (owner.replace("/", ".").equals(innerClassName) || "*".equals(innerClassName))
                                 && name.equals(innerMethod);
                         if (hit) {
+                            recordInspectedCall(currentClassName, containingMethod, containingDescriptor,
+                                    line, owner, name, descriptor);
                             Label recordStart = new Label();
                             Label guardEnd = new Label();
                             mv.visitLdcInsn(uuid.toString());
@@ -302,8 +332,10 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                             tokenIndex = newLocal(Type.getType(Object.class));
                             mv.visitLdcInsn(uuid.toString());
                             mv.visitVarInsn(Opcodes.ALOAD, paramsArrayVarIndex);
+                            loadLocalSnapshot(localSnapshot);
                             mv.visitMethodInsn(INVOKESTATIC, "w/bridge/DiagnosticBridge",
-                                    "outerCallEnter", "(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;", false);
+                                    "outerCallEnter", "(Ljava/lang/String;[Ljava/lang/Object;[Ljava/lang/String;"
+                                            + "[Ljava/lang/Object;)Ljava/lang/Object;", false);
                             mv.visitVarInsn(Opcodes.ASTORE, tokenIndex);
 
                             Label tryStart = new Label();
@@ -363,12 +395,110 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                         }
                     }
 
+                    private void loadLocalSnapshot(LocalSnapshot snapshot) {
+                        if (!printLvt || snapshot.names.length == 0) {
+                            mv.visitInsn(Opcodes.ACONST_NULL);
+                            mv.visitInsn(Opcodes.ACONST_NULL);
+                            return;
+                        }
+                        push(snapshot.names.length);
+                        newArray(Type.getType(String.class));
+                        for (int i = 0; i < snapshot.names.length; i++) {
+                            dup();
+                            push(i);
+                            mv.visitLdcInsn(snapshot.names[i]);
+                            arrayStore(Type.getType(String.class));
+                        }
+                        push(snapshot.names.length);
+                        newArray(Type.getType(Object.class));
+                        for (int i = 0; i < snapshot.names.length; i++) {
+                            dup();
+                            push(i);
+                            visitVarInsn(snapshot.types[i].getOpcode(Opcodes.ILOAD), snapshot.slots[i]);
+                            box(snapshot.types[i]);
+                            arrayStore(Type.getType(Object.class));
+                        }
+                    }
+
                 };
             }
         }, ClassReader.EXPAND_FRAMES);
         byte[] result = classWriter.toByteArray();
         status = 1;
         return result;
+    }
+
+    private synchronized void recordInspectedCall(String declaringClass, String outerMethod,
+                                                  String outerDescriptor, int line, String owner,
+                                                  String innerMethod, String innerDescriptor) {
+        String innerOwner = owner.replace('/', '.');
+        String key = declaringClass + '#' + outerMethod + outerDescriptor + ':' + line + ':'
+                + innerOwner + '#' + innerMethod + innerDescriptor;
+        inspectedCalls.computeIfAbsent(key, ignored -> {
+            OuterWatchResult.InspectedCall call = new OuterWatchResult.InspectedCall();
+            call.setLine(line);
+            call.setOuterSignature(declaringClass + '#' + outerMethod);
+            call.setOuterDescriptor(outerDescriptor);
+            call.setInnerSignature(innerOwner + '#' + innerMethod);
+            call.setInnerDescriptor(innerDescriptor);
+            return call;
+        });
+    }
+
+    private Map<String, List<LocalSnapshot>> collectLocalSnapshots(byte[] origin, String currentClassName) {
+        ClassNode classNode = new ClassNode(ASM9);
+        new ClassReader(origin).accept(classNode, ClassReader.SKIP_FRAMES);
+        Map<String, List<LocalSnapshot>> result = new HashMap<>();
+        for (MethodNode methodNode : classNode.methods) {
+            if (!shouldWatchMethod(currentClassName, methodNode.access, methodNode.name)) {
+                continue;
+            }
+            List<LocalSnapshot> snapshots = new ArrayList<>();
+            for (AbstractInsnNode instruction : methodNode.instructions) {
+                if (!(instruction instanceof MethodInsnNode)) {
+                    continue;
+                }
+                int instructionIndex = methodNode.instructions.indexOf(instruction);
+                List<String> names = new ArrayList<>();
+                List<Integer> slots = new ArrayList<>();
+                List<Type> types = new ArrayList<>();
+                if (methodNode.localVariables != null) {
+                    for (LocalVariableNode local : methodNode.localVariables) {
+                        int start = methodNode.instructions.indexOf(local.start);
+                        int end = methodNode.instructions.indexOf(local.end);
+                        if ("this".equals(local.name) || local.desc == null
+                                || start < 0 || end < 0
+                                || instructionIndex < start || instructionIndex >= end) {
+                            continue;
+                        }
+                        names.add(local.name);
+                        slots.add(local.index);
+                        types.add(Type.getType(local.desc));
+                    }
+                }
+                snapshots.add(new LocalSnapshot(names, slots, types));
+            }
+            result.put(methodNode.name + methodNode.desc, snapshots);
+        }
+        return result;
+    }
+
+    private static final class LocalSnapshot {
+        private static final LocalSnapshot EMPTY = new LocalSnapshot(
+                Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+
+        private final String[] names;
+        private final int[] slots;
+        private final Type[] types;
+
+        private LocalSnapshot(List<String> names, List<Integer> slots, List<Type> types) {
+            this.names = names.toArray(new String[0]);
+            this.slots = new int[slots.size()];
+            for (int i = 0; i < slots.size(); i++) {
+                this.slots[i] = slots.get(i);
+            }
+            this.types = types.toArray(new Type[0]);
+        }
     }
 
     private boolean shouldWatchMethod(String currentClassName, int access, String name) {

@@ -9,6 +9,7 @@ import w.util.RequestUtils;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -121,13 +122,21 @@ public final class AgentDiagnosticListener implements DiagnosticListener {
 
     @Override
     public Object outerCallEnter(String id, Object[] args) {
+        return outerCallEnter(id, args, null, null);
+    }
+
+    @Override
+    public Object outerCallEnter(String id, Object[] args, String[] localNames, Object[] localValues) {
         OuterWatchConfig config = outerConfigs.get(id);
         if (config == null) {
             return null;
         }
         String argsSnapshot = formatArgs(args, config.getPrintFormat(), config.getDepthForJson());
+        String localsSnapshot = config.isPrintLvt()
+                ? formatLocals(localNames, localValues, config.getPrintFormat(), config.getDepthForJson())
+                : null;
         RequestUtils.fillCurThread(config.getTraceId());
-        return new Token(config, argsSnapshot);
+        return new Token(config, argsSnapshot, localsSnapshot);
     }
 
     @Override
@@ -145,6 +154,7 @@ public final class AgentDiagnosticListener implements DiagnosticListener {
                     .append(", ").append(config.getMethodSignature())
                     .append(", cost: ").append(cost).append("ms, req: ")
                     .append(token.argsSnapshot)
+                    .append(token.localsSnapshot == null ? "" : ", lvt: " + token.localsSnapshot)
                     .append(", res: ")
                     .append(throwable == null
                             ? format(result, config.getPrintFormat(), config.getDepthForJson()) : null)
@@ -234,6 +244,17 @@ public final class AgentDiagnosticListener implements DiagnosticListener {
         }
     }
 
+    private String formatLocals(String[] names, Object[] values, int printFormat, int depthForJson) {
+        if (names == null || values == null || names.length == 0 || names.length != values.length) {
+            return null;
+        }
+        Map<String, Object> locals = new LinkedHashMap<>();
+        for (int i = 0; i < names.length; i++) {
+            locals.put(names[i], values[i]);
+        }
+        return format(locals, printFormat, depthForJson);
+    }
+
     private String formatError(Throwable e) {
         return "render error: " + e.getClass().getSimpleName() + ": " + e.getMessage();
     }
@@ -245,14 +266,20 @@ public final class AgentDiagnosticListener implements DiagnosticListener {
     private static final class Token {
         private final Object config;
         private final String argsSnapshot;
+        private final String localsSnapshot;
 
         private Token(Object config) {
-            this(config, null);
+            this(config, null, null);
         }
 
         private Token(Object config, String argsSnapshot) {
+            this(config, argsSnapshot, null);
+        }
+
+        private Token(Object config, String argsSnapshot, String localsSnapshot) {
             this.config = config;
             this.argsSnapshot = argsSnapshot;
+            this.localsSnapshot = localsSnapshot;
         }
     }
 }

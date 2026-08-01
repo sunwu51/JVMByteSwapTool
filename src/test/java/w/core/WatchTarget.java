@@ -19,6 +19,13 @@ public class WatchTarget implements Runnable {
         System.out.println("voidMethodWithNoParams");
     }
 
+    public void printlnWithLaterLocals() {
+        System.out.println("before locals");
+        String value = "after locals";
+        int count = 1;
+        System.out.println(value + count);
+    }
+
     public double doubleMethodWithParams(double... params) {
         System.out.println("doubleMethodWithParams");
         return params[0];
@@ -120,6 +127,17 @@ public class WatchTarget implements Runnable {
 
     public int ow1(int a, int b) {
         return ow1(a + b);
+    }
+
+    public int callOw1WithLocals() {
+        int a = 10;
+        int b = 20;
+        return ow1(a, b);
+    }
+
+    public int callOw1WithParameterAndLocal(int a) {
+        int b = 20;
+        return ow1(a, b);
     }
 
     public int ow1(int c) {

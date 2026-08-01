@@ -28,6 +28,8 @@ public class OuterWatchMessage extends ClassTargetMessage implements RequestMess
 
     boolean includeNested = true;
 
+    boolean printLvt;
+
     String ognl;
 
     Map<String, String> variables;

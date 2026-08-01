@@ -3,6 +3,8 @@ package w.core.compiler;
 import org.codehaus.commons.compiler.CompileException;
 import org.codehaus.janino.SimpleCompiler;
 import org.jetbrains.java.decompiler.main.decompiler.InMemoryDecompiler;
+import org.jetbrains.java.decompiler.main.decompiler.InMemoryDecompiler.InMemoryDecompileResult;
+import org.jetbrains.java.decompiler.main.extern.IFernflowerPreferences;
 import w.Global;
 
 import java.util.HashMap;
@@ -69,21 +71,35 @@ public class WCompiler {
 
 
     public static String decompile(Map<String, byte[]> classes, String entrypoint) {
+        return decompileResult(classes, entrypoint).getSource();
+    }
+
+    public static DecompileResult decompileResult(Map<String, byte[]> classes, String entrypoint) {
+        return decompileResult(classes, entrypoint, Global.getClassLoader());
+    }
+
+    public static DecompileResult decompileResult(Map<String, byte[]> classes, String entrypoint,
+                                                  ClassLoader classLoader) {
         Map<String, Object> defaultOpt = new HashMap<>();
         defaultOpt.put("cps", "1");
         defaultOpt.put("crp", "1");
-        return decompileWithFernFlower(classes, entrypoint, defaultOpt);
+        defaultOpt.put(IFernflowerPreferences.BYTECODE_SOURCE_MAPPING, "1");
+        return decompileWithFernFlower(classes, entrypoint, defaultOpt, classLoader);
     }
 
-    private static String decompileWithFernFlower(Map<String, byte[]> classes, String entrypoint, Map<String, Object> options) {
+    private static DecompileResult decompileWithFernFlower(Map<String, byte[]> classes, String entrypoint,
+                                                           Map<String, Object> options, ClassLoader classLoader) {
         AtomicBoolean needReDecompile = new AtomicBoolean(false);
 
-        String result = InMemoryDecompiler.decompileClass(classes, entrypoint, options, null, (innerClassName) -> {
+        InMemoryDecompileResult result = InMemoryDecompiler.decompileClassResult(classes, entrypoint, options, null, (innerClassName) -> {
             String pureClassName = innerClassName.replace(".class", "").replace("/", ".");
+            if (pureClassName.contains("##Lambda_")) {
+                return false;
+            }
             if (pureClassName.startsWith(entrypoint)) {
                 if (!Global.allLoadedClasses.containsKey(pureClassName)) {
                     try {
-                        Global.getClassLoader().loadClass(pureClassName);
+                        Class.forName(pureClassName, true, classLoader);
                         needReDecompile.set(true);
                         Global.info("Try to load class:" + pureClassName);
                         return true;
@@ -97,9 +113,36 @@ public class WCompiler {
         });
 
         if (needReDecompile.get()) {
-            Global.fillLoadedClasses();
-            return "There are some inner class need to be loaded firstly, try again!";
+            return new DecompileResult(null, null, true);
         }
-        return result;
+        return new DecompileResult(result.getSource(), result.getLineMapping(), false);
+    }
+
+    public static final class DecompileResult {
+        private final String source;
+        private final int[] lineMapping;
+        private final boolean retryRequired;
+
+        public DecompileResult(String source, int[] lineMapping) {
+            this(source, lineMapping, false);
+        }
+
+        public DecompileResult(String source, int[] lineMapping, boolean retryRequired) {
+            this.source = source;
+            this.lineMapping = lineMapping == null ? null : lineMapping.clone();
+            this.retryRequired = retryRequired;
+        }
+
+        public String getSource() {
+            return source;
+        }
+
+        public int[] getLineMapping() {
+            return lineMapping == null ? null : lineMapping.clone();
+        }
+
+        public boolean isRetryRequired() {
+            return retryRequired;
+        }
     }
 }

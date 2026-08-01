@@ -115,6 +115,93 @@ public class OuterWatchTest {
     }
 
     @Test
+    public void outerWatchShouldNotPrintLvtByDefault() {
+        String logId = "outer-lvt-default-" + System.nanoTime();
+        long since = System.currentTimeMillis();
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setId(logId);
+        msg.setSignature("w.core.WatchTarget#callOw1WithLocals");
+        msg.setInnerSignature("*#ow1");
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertEquals(31, target.callOw1WithLocals());
+
+        List<String> contents = Global.readLogs(logId, since, 20, 0).stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .collect(java.util.stream.Collectors.toList());
+        Assertions.assertTrue(contents.stream().anyMatch(content -> content.contains("req: [10, 20]")));
+        Assertions.assertFalse(contents.stream().anyMatch(content -> content.contains(", lvt: ")));
+    }
+
+    @Test
+    public void outerWatchShouldPrintLvtUsingToString() {
+        String logId = "outer-lvt-string-" + System.nanoTime();
+        long since = System.currentTimeMillis();
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setId(logId);
+        msg.setSignature("w.core.WatchTarget#callOw1WithLocals");
+        msg.setInnerSignature("*#ow1");
+        msg.setPrintLvt(true);
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertEquals(31, target.callOw1WithLocals());
+
+        Assertions.assertTrue(Global.readLogs(logId, since, 20, 0).stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains("lvt: {a=10, b=20}")));
+    }
+
+    @Test
+    public void outerWatchShouldPrintLvtUsingJson() {
+        String logId = "outer-lvt-json-" + System.nanoTime();
+        long since = System.currentTimeMillis();
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setId(logId);
+        msg.setSignature("w.core.WatchTarget#callOw1WithLocals");
+        msg.setInnerSignature("*#ow1");
+        msg.setPrintLvt(true);
+        msg.setPrintFormat(2);
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertEquals(31, target.callOw1WithLocals());
+
+        Assertions.assertTrue(Global.readLogs(logId, since, 20, 0).stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains("lvt: {")
+                        && content.contains("\"a\":10")
+                        && content.contains("\"b\":20")));
+    }
+
+    @Test
+    public void outerWatchShouldPrintParameterAndLocalFromLvt() {
+        String logId = "outer-lvt-parameter-" + System.nanoTime();
+        long since = System.currentTimeMillis();
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setId(logId);
+        msg.setSignature("w.core.WatchTarget#callOw1WithParameterAndLocal");
+        msg.setInnerSignature("*#ow1");
+        msg.setPrintLvt(true);
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertEquals(31, target.callOw1WithParameterAndLocal(10));
+
+        Assertions.assertTrue(Global.readLogs(logId, since, 20, 0).stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains("lvt: {a=10, b=20}")));
+    }
+
+    @Test
+    public void outerWatchLvtShouldRemapLocalsAllocatedAfterEarlierCallSite() {
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setSignature("w.core.WatchTarget#printlnWithLaterLocals");
+        msg.setInnerSignature("java.io.PrintStream#println");
+        msg.setPrintLvt(true);
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertDoesNotThrow(target::printlnWithLaterLocals);
+    }
+
+    @Test
     public void watchShouldLogOgnlValueFromThisRoot() {
         String logId = "watch-ognl-" + System.nanoTime();
         long since = System.currentTimeMillis();
