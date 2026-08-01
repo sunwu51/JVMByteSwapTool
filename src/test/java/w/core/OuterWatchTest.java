@@ -191,6 +191,17 @@ public class OuterWatchTest {
     }
 
     @Test
+    public void outerWatchLvtShouldRemapLocalsAllocatedAfterEarlierCallSite() {
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setSignature("w.core.WatchTarget#printlnWithLaterLocals");
+        msg.setInnerSignature("java.io.PrintStream#println");
+        msg.setPrintLvt(true);
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertDoesNotThrow(target::printlnWithLaterLocals);
+    }
+
+    @Test
     public void watchShouldLogOgnlValueFromThisRoot() {
         String logId = "watch-ognl-" + System.nanoTime();
         long since = System.currentTimeMillis();

@@ -19,6 +19,13 @@ public class WatchTarget implements Runnable {
         System.out.println("voidMethodWithNoParams");
     }
 
+    public void printlnWithLaterLocals() {
+        System.out.println("before locals");
+        String value = "after locals";
+        int count = 1;
+        System.out.println(value + count);
+    }
+
     public double doubleMethodWithParams(double... params) {
         System.out.println("doubleMethodWithParams");
         return params[0];

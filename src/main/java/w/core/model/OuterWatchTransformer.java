@@ -414,7 +414,7 @@ public class OuterWatchTransformer extends BaseClassTransformer {
                         for (int i = 0; i < snapshot.names.length; i++) {
                             dup();
                             push(i);
-                            mv.visitVarInsn(snapshot.types[i].getOpcode(Opcodes.ILOAD), snapshot.slots[i]);
+                            visitVarInsn(snapshot.types[i].getOpcode(Opcodes.ILOAD), snapshot.slots[i]);
                             box(snapshot.types[i]);
                             arrayStore(Type.getType(Object.class));
                         }
