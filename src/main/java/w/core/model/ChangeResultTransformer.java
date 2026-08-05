@@ -28,6 +28,7 @@ import org.objectweb.asm.tree.TryCatchBlockNode;
 import org.objectweb.asm.tree.VarInsnNode;
 import w.Global;
 import w.core.compiler.WCompiler;
+import w.util.IOUtils;
 import w.core.constant.Codes;
 import w.web.message.ChangeResultMessage;
 
@@ -244,7 +245,7 @@ public class ChangeResultTransformer extends BaseClassTransformer {
             if (inputStream == null) {
                 return null;
             }
-            return inputStream.readAllBytes();
+            return IOUtils.readAllBytes(inputStream);
         } catch (Throwable e) {
             Global.debug("change result read class bytes error: " + className + ", " + e.getMessage());
             return null;
