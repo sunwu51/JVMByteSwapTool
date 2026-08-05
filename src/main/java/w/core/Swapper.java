@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 
 public class Swapper {
@@ -269,11 +270,19 @@ public class Swapper {
             if (watchResult == null || watchResult.getInspectedCalls().isEmpty()) {
                 return SwapResult.failure(message, "no call sites matched innerSignature, nothing was instrumented");
             }
+            Global.info("outer watch enhanced " + watchResult.getInspectedCalls().size() + " call site(s): line "
+                    + watchResult.getInspectedCalls().stream()
+                            .map(it -> String.valueOf(it.getLine()))
+                            .collect(Collectors.joining(", ")));
         } else if (transformer instanceof ChangeResultTransformer) {
             ChangeResultResult changeResult = (ChangeResultResult) result.getData();
             if (changeResult == null || changeResult.getEnhancedCalls().isEmpty()) {
                 return SwapResult.failure(message, "no call sites matched innerMethod, nothing was enhanced");
             }
+            Global.info("change result enhanced " + changeResult.getEnhancedCalls().size() + " call site(s): line "
+                    + changeResult.getEnhancedCalls().stream()
+                            .map(it -> String.valueOf(it.getLine()))
+                            .collect(Collectors.joining(", ")));
         }
         return result;
     }
