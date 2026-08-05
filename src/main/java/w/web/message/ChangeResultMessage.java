@@ -19,6 +19,7 @@ public class ChangeResultMessage extends ClassTargetMessage implements RequestMe
     String innerMethod;
     String body;
     int mode;
+    boolean includeNested = true;
     {
         type = MessageType.CHANGE_RESULT;
     }

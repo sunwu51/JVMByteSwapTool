@@ -45,7 +45,18 @@ public class SwapResult {
         result.setTransformerId(transformer.getUuid());
         result.setApplyResults(applyResults);
         result.setSuccess(!applyResults.isEmpty() && applyResults.stream().allMatch(TransformApplyResult::isSuccess));
-        result.setMessage(result.isSuccess() ? "retransform success" : "retransform failed");
+        if (result.isSuccess()) {
+            result.setMessage("retransform success");
+        } else {
+            String reason = "retransform failed";
+            for (TransformApplyResult applyResult : applyResults) {
+                if (!applyResult.isSuccess() && applyResult.getMessage() != null) {
+                    reason = applyResult.getMessage();
+                    break;
+                }
+            }
+            result.setMessage(reason);
+        }
         return result;
     }
 

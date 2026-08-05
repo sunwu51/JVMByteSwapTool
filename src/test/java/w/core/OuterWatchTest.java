@@ -8,7 +8,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import w.Global;
 import w.core.diagnostic.DiagnosticRuntime;
+import w.core.model.OuterWatchResult;
 import w.core.model.OuterWatchTransformer;
+import w.core.model.SwapResult;
 import w.web.message.OuterWatchMessage;
 import w.web.message.WatchMessage;
 
@@ -313,6 +315,139 @@ public class OuterWatchTest {
                 .map(log -> String.valueOf(log.get("content")))
                 .anyMatch(content -> content.contains("outerWatchLogId=" + logId)));
         Assertions.assertTrue(OuterWatchTransformer.outerWatchCtx.get().isEmpty());
+    }
+
+    @Test
+    public void includeNestedShouldCollectRecursiveLambdaTargets() {
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setSignature("w.core.ChangeTarget#outerWatchNestedLambdaTest");
+        msg.setInnerSignature("w.core.ChangeTarget#hello");
+        msg.setIncludeNested(true);
+        OuterWatchTransformer transformer = new OuterWatchTransformer(msg);
+
+        transformer.prepareNestedTargets(Collections.singleton(ChangeTarget.class));
+        Map<String, Set<String>> targetMethods = transformer.getTargetMethods();
+
+        Set<String> methods = targetMethods.get("w.core.ChangeTarget");
+        long nestedLambdaCount = methods.stream()
+                .filter(method -> method.startsWith("lambda$outerWatchNestedLambdaTest$"))
+                .count();
+        Assertions.assertEquals(2, nestedLambdaCount);
+    }
+
+    @Test
+    public void includeNestedShouldWatchNestedLambdaInnerCall() {
+        String logId = "outer-watch-nested-recursive-" + System.nanoTime();
+        long since = System.currentTimeMillis();
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setId(logId);
+        msg.setSignature("w.core.ChangeTarget#outerWatchNestedLambdaTest");
+        msg.setInnerSignature("w.core.ChangeTarget#hello");
+        msg.setIncludeNested(true);
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        try {
+            MDC.put("outerWatchLogId", logId);
+            Assertions.assertEquals("outerWatchNestedLambdaTest", changeTarget.outerWatchNestedLambdaTest());
+        } finally {
+            MDC.clear();
+        }
+        List<Map<String, Object>> logs = Global.readLogs(logId, since, 20, 0);
+
+        Assertions.assertTrue(logs.stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains("user will save")));
+        Assertions.assertTrue(OuterWatchTransformer.outerWatchCtx.get().isEmpty());
+    }
+
+    @Test
+    public void includeNestedShouldCollectLambdaInsideAnonymousClassTarget() {
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setSignature("w.core.ChangeTarget#outerWatchLambdaInAnonymousTest");
+        msg.setInnerSignature("w.core.ChangeTarget#hello");
+        msg.setIncludeNested(true);
+        OuterWatchTransformer transformer = new OuterWatchTransformer(msg);
+
+        transformer.prepareNestedTargets(Collections.singleton(ChangeTarget.class));
+        Map<String, Set<String>> targetMethods = transformer.getTargetMethods();
+
+        boolean found = targetMethods.entrySet().stream()
+                .filter(entry -> entry.getKey().matches("w\\.core\\.ChangeTarget\\$\\d+"))
+                .anyMatch(entry -> entry.getValue().stream()
+                        .anyMatch(method -> method.startsWith("lambda$")));
+        Assertions.assertTrue(found);
+    }
+
+    @Test
+    public void includeNestedShouldWatchLambdaInsideAnonymousInnerCall() {
+        String logId = "outer-watch-anonymous-lambda-" + System.nanoTime();
+        long since = System.currentTimeMillis();
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setId(logId);
+        msg.setSignature("w.core.ChangeTarget#outerWatchLambdaInAnonymousTest");
+        msg.setInnerSignature("w.core.ChangeTarget#hello");
+        msg.setIncludeNested(true);
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        try {
+            MDC.put("outerWatchLogId", logId);
+            Assertions.assertEquals("outerWatchLambdaInAnonymousTest", changeTarget.outerWatchLambdaInAnonymousTest());
+        } finally {
+            MDC.clear();
+        }
+        List<Map<String, Object>> logs = Global.readLogs(logId, since, 20, 0);
+
+        Assertions.assertTrue(logs.stream()
+                .map(log -> String.valueOf(log.get("content")))
+                .anyMatch(content -> content.contains("user will save")));
+        Assertions.assertTrue(OuterWatchTransformer.outerWatchCtx.get().isEmpty());
+    }
+
+    @Test
+    public void outerWatchResultShouldReportReadableLambdaOuterDisplay() {
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setSignature("w.core.ChangeTarget#outerWatchNestedLambdaTest");
+        msg.setInnerSignature("w.core.ChangeTarget#hello");
+        msg.setIncludeNested(true);
+
+        SwapResult swapResult = swapper.swap(msg);
+        Assertions.assertTrue(swapResult.isSuccess());
+        Assertions.assertEquals("outerWatchNestedLambdaTest", changeTarget.outerWatchNestedLambdaTest());
+
+        OuterWatchResult result = (OuterWatchResult) swapResult.getData();
+        Assertions.assertTrue(result.getInspectedCalls().stream()
+                .map(OuterWatchResult.InspectedCall::getOuterDisplay)
+                .anyMatch(display -> display != null
+                        && display.matches("w\\.core\\.ChangeTarget#outerWatchNestedLambdaTest\\[lambda\\$\\d+\\]")));
+    }
+
+    @Test
+    public void outerWatchShouldFailWhenNoMatchingInnerCall() {
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setSignature("w.core.ChangeTarget#outerWatchLambdaTest");
+        msg.setInnerSignature("w.core.ChangeTarget#noSuchMethod");
+        msg.setIncludeNested(true);
+
+        SwapResult result = swapper.swap(msg);
+        Assertions.assertFalse(result.isSuccess());
+        Assertions.assertTrue(String.valueOf(result.getMessage()).contains("nothing was instrumented"));
+    }
+
+    @Test
+    public void outerWatchResultShouldReportEnhancedCallSites() {
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setSignature("w.core.ChangeTarget#outerWatchLambdaTest");
+        msg.setInnerSignature("w.core.ChangeTarget#hello");
+        msg.setIncludeNested(true);
+
+        SwapResult result = swapper.swap(msg);
+        Assertions.assertTrue(result.isSuccess());
+        OuterWatchResult data = (OuterWatchResult) result.getData();
+        Assertions.assertNotNull(data);
+        Assertions.assertFalse(data.getInspectedCalls().isEmpty());
+        OuterWatchResult.InspectedCall call = data.getInspectedCalls().get(0);
+        Assertions.assertTrue(call.getLine() > 0);
+        Assertions.assertTrue(call.getInnerSignature().contains("#hello"));
     }
 
     @Test

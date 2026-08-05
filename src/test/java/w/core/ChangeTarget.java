@@ -62,4 +62,44 @@ public class ChangeTarget implements Runnable {
         r.run();
         return "outerWatchLambdaTest";
     }
+
+    public String outerWatchNestedLambdaTest() {
+        Runnable r1 = () -> {
+            Runnable r2 = () -> hello();
+            r2.run();
+        };
+        r1.run();
+        return "outerWatchNestedLambdaTest";
+    }
+
+    public String outerWatchLambdaInAnonymousTest() {
+        Runnable a = new Runnable() {
+            @Override
+            public void run() {
+                Runnable r = () -> hello();
+                r.run();
+            }
+        };
+        a.run();
+        return "outerWatchLambdaInAnonymousTest";
+    }
+
+    public String nestedLambdaResult() {
+        java.util.function.Supplier<String> s1 = () -> {
+            java.util.function.Supplier<String> s2 = () -> hello();
+            return s2.get();
+        };
+        return s1.get();
+    }
+
+    public String lambdaInAnonymousResult() {
+        java.util.function.Supplier<String> result = new java.util.function.Supplier<String>() {
+            @Override
+            public String get() {
+                java.util.function.Supplier<String> s = () -> hello();
+                return s.get();
+            }
+        };
+        return result.get();
+    }
 }

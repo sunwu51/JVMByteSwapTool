@@ -3,8 +3,10 @@ package w.core;
 import w.Global;
 import w.core.model.BaseClassTransformer;
 import w.core.model.ChangeBodyTransformer;
+import w.core.model.ChangeResultResult;
 import w.core.model.ChangeResultTransformer;
 import w.core.model.DecompileTransformer;
+import w.core.model.OuterWatchResult;
 import w.core.model.OuterWatchTransformer;
 import w.core.model.ReplaceClassTransformer;
 import w.core.model.SwapResult;
@@ -14,6 +16,7 @@ import w.core.model.WatchTransformer;
 import w.core.diagnostic.DiagnosticRuntime;
 import w.web.message.ChangeBodyMessage;
 import w.web.message.ChangeResultMessage;
+import w.web.message.Message;
 import w.web.message.ClassTargetMessage;
 import w.web.message.DecompileMessage;
 import w.web.message.OuterWatchMessage;
@@ -28,6 +31,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 
 public class Swapper {
@@ -144,6 +148,9 @@ public class Swapper {
         if (transformer instanceof OuterWatchTransformer) {
             classes.addAll(((OuterWatchTransformer) transformer).prepareNestedTargets(classes));
         }
+        if (transformer instanceof ChangeResultTransformer) {
+            classes.addAll(((ChangeResultTransformer) transformer).prepareNestedTargets(classes));
+        }
 
         boolean diagnosticRegistered = false;
         try {
@@ -205,6 +212,7 @@ public class Swapper {
 
         SwapResult result = SwapResult.of(message, transformer, applyResults);
         attachTransformerData(result, transformer);
+        result = enforceEnhancedCallSites(message, transformer, result);
         if (!result.isSuccess() || transformer instanceof DecompileTransformer) {
             Global.deleteTransformer(transformer.getUuid());
         }
@@ -251,7 +259,36 @@ public class Swapper {
             result.setData(((DecompileTransformer) transformer).getDecompileResult());
         } else if (transformer instanceof OuterWatchTransformer) {
             result.setData(((OuterWatchTransformer) transformer).getOuterWatchResult());
+        } else if (transformer instanceof ChangeResultTransformer) {
+            result.setData(((ChangeResultTransformer) transformer).getResult());
         }
+    }
+
+    private SwapResult enforceEnhancedCallSites(Message message, BaseClassTransformer transformer, SwapResult result) {
+        if (!result.isSuccess()) {
+            // keep the real failure reason, e.g. "Multi methods match ... different owner/desc"
+            return result;
+        }
+        if (transformer instanceof OuterWatchTransformer) {
+            OuterWatchResult watchResult = (OuterWatchResult) result.getData();
+            if (watchResult == null || watchResult.getInspectedCalls().isEmpty()) {
+                return SwapResult.failure(message, "no call sites matched innerSignature, nothing was instrumented");
+            }
+            Global.info("outer watch enhanced " + watchResult.getInspectedCalls().size() + " call site(s): line "
+                    + watchResult.getInspectedCalls().stream()
+                            .map(it -> String.valueOf(it.getLine()))
+                            .collect(Collectors.joining(", ")));
+        } else if (transformer instanceof ChangeResultTransformer) {
+            ChangeResultResult changeResult = (ChangeResultResult) result.getData();
+            if (changeResult == null || changeResult.getEnhancedCalls().isEmpty()) {
+                return SwapResult.failure(message, "no call sites matched innerMethod, nothing was enhanced");
+            }
+            Global.info("change result enhanced " + changeResult.getEnhancedCalls().size() + " call site(s): line "
+                    + changeResult.getEnhancedCalls().stream()
+                            .map(it -> String.valueOf(it.getLine()))
+                            .collect(Collectors.joining(", ")));
+        }
+        return result;
     }
 
     private boolean isBlank(String value) {

@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>w</groupId>
 	<artifactId>swapper</artifactId>
-	<version>0.0.20</version>
+	<version>0.0.21</version>
 	<name>swapper</name>
 	<description>swapper</description>
 	<properties>
@@ -305,7 +305,7 @@
 					</execution>
 				</executions>
 			</plugin>
-			<!-- SpotBugs: Bug 检测 -->
+			<!-- SpotBugs: Bug 检测-->
 			<plugin>
 				<groupId>com.github.spotbugs</groupId>
 				<artifactId>spotbugs-maven-plugin</artifactId>
