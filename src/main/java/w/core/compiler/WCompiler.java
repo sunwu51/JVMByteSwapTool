@@ -10,6 +10,7 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 import w.Global;
+import w.util.IOUtils;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -163,7 +164,7 @@ public class WCompiler {
             if (inputStream == null) {
                 return nested;
             }
-            byte[] bytes = inputStream.readAllBytes();
+            byte[] bytes = IOUtils.readAllBytes(inputStream);
             new ClassReader(bytes).accept(new ClassVisitor(Opcodes.ASM9) {
                 @Override
                 public MethodVisitor visitMethod(int access, String name, String descriptor,

@@ -174,7 +174,7 @@ public class ChangeResultTest {
 
         SwapResult result = swapper.swap(msg);
         Assertions.assertFalse(result.isSuccess());
-        Assertions.assertTrue(String.valueOf(result.getMessage()).contains("nothing was enhanced"));
+        Assertions.assertTrue(String.valueOf(result.getMessage()).contains("noSuchMethod"));
     }
 
     @Test

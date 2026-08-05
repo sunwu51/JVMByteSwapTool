@@ -18,6 +18,7 @@ import w.Global;
 import w.core.asm.WAdviceAdapter;
 import w.core.diagnostic.DiagnosticRuntime;
 import w.core.diagnostic.OuterWatchConfig;
+import w.util.IOUtils;
 import w.web.message.OuterWatchMessage;
 
 import java.io.InputStream;
@@ -227,7 +228,7 @@ public class OuterWatchTransformer extends BaseClassTransformer {
             if (inputStream == null) {
                 return null;
             }
-            return inputStream.readAllBytes();
+            return IOUtils.readAllBytes(inputStream);
         } catch (Throwable e) {
             Global.debug("outer watch read class bytes error: " + className + ", " + e.getMessage());
             return null;
