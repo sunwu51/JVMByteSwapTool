@@ -329,10 +329,13 @@ public class OuterWatchTest {
         Map<String, Set<String>> targetMethods = transformer.getTargetMethods();
 
         Set<String> methods = targetMethods.get("w.core.ChangeTarget");
-        long nestedLambdaCount = methods.stream()
-                .filter(method -> method.startsWith("lambda$outerWatchNestedLambdaTest$"))
+        // javac names the outer lambda lambda$<method>$N and, depending on the
+        // compiler version, the inner nested lambda either lambda$<method>$N or
+        // lambda$null$N, so count all collected lambda methods instead of one prefix.
+        long lambdaMethodCount = methods.stream()
+                .filter(method -> method.startsWith("lambda$"))
                 .count();
-        Assertions.assertEquals(2, nestedLambdaCount);
+        Assertions.assertEquals(2, lambdaMethodCount);
     }
 
     @Test
@@ -415,10 +418,12 @@ public class OuterWatchTest {
         Assertions.assertEquals("outerWatchNestedLambdaTest", changeTarget.outerWatchNestedLambdaTest());
 
         OuterWatchResult result = (OuterWatchResult) swapResult.getData();
+        // JDK 8 names the inner nested lambda lambda$null$N, JDK 17 uses
+        // lambda$<method>$N; both must map to a readable [lambda$N] display.
         Assertions.assertTrue(result.getInspectedCalls().stream()
                 .map(OuterWatchResult.InspectedCall::getOuterDisplay)
                 .anyMatch(display -> display != null
-                        && display.matches("w\\.core\\.ChangeTarget#outerWatchNestedLambdaTest\\[lambda\\$\\d+\\]")));
+                        && display.matches("w\\.core\\.ChangeTarget#[^\\[\\]]+\\[lambda\\$\\d+\\]")));
     }
 
     @Test
