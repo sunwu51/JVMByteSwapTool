@@ -7,6 +7,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import w.Global;
 import w.core.constant.Codes;
+import w.core.model.ChangeResultResult;
+import w.core.model.SwapResult;
 import w.web.message.ChangeBodyMessage;
 import w.web.message.ChangeResultMessage;
 
@@ -135,6 +137,44 @@ public class ChangeResultTest {
 
         Assertions.assertTrue(swapper.swap(msg).isSuccess());
         Assertions.assertEquals("changed-in-anonymous", target.lambdaInAnonymousResult());
+    }
+
+    @Test
+    public void asmResultShouldReportEnhancedCallSites() throws IOException, InterruptedException {
+        ChangeResultMessage msg = new ChangeResultMessage();
+        msg.setClassName("w.core.ChangeTarget");
+        msg.setMethod("addWrapper");
+        msg.setMode(Codes.CHANGE_RESULT_MODE_USE_ASM);
+        msg.setParamTypes(Arrays.asList("int", "int"));
+        msg.setInnerMethod("add");
+        msg.setInnerClassName("*");
+        msg.setBody("$_ = 1;");
+
+        SwapResult result = swapper.swap(msg);
+        Assertions.assertTrue(result.isSuccess());
+        ChangeResultResult data = (ChangeResultResult) result.getData();
+        Assertions.assertNotNull(data);
+        Assertions.assertFalse(data.getEnhancedCalls().isEmpty());
+        ChangeResultResult.EnhancedCall call = data.getEnhancedCalls().get(0);
+        Assertions.assertTrue(call.getLine() > 0);
+        Assertions.assertTrue(call.getOuterSignature().contains("#addWrapper"));
+        Assertions.assertTrue(call.getInnerSignature().contains("#add"));
+    }
+
+    @Test
+    public void asmShouldFailWhenNoMatchingInnerCall() throws IOException, InterruptedException {
+        ChangeResultMessage msg = new ChangeResultMessage();
+        msg.setClassName("w.core.ChangeTarget");
+        msg.setMethod("addWrapper");
+        msg.setMode(Codes.CHANGE_RESULT_MODE_USE_ASM);
+        msg.setParamTypes(Arrays.asList("int", "int"));
+        msg.setInnerMethod("noSuchMethod");
+        msg.setInnerClassName("*");
+        msg.setBody("$_ = 1;");
+
+        SwapResult result = swapper.swap(msg);
+        Assertions.assertFalse(result.isSuccess());
+        Assertions.assertTrue(String.valueOf(result.getMessage()).contains("nothing was enhanced"));
     }
 
     @Test

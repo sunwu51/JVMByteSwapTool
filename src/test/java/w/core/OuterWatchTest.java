@@ -422,6 +422,35 @@ public class OuterWatchTest {
     }
 
     @Test
+    public void outerWatchShouldFailWhenNoMatchingInnerCall() {
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setSignature("w.core.ChangeTarget#outerWatchLambdaTest");
+        msg.setInnerSignature("w.core.ChangeTarget#noSuchMethod");
+        msg.setIncludeNested(true);
+
+        SwapResult result = swapper.swap(msg);
+        Assertions.assertFalse(result.isSuccess());
+        Assertions.assertTrue(String.valueOf(result.getMessage()).contains("nothing was instrumented"));
+    }
+
+    @Test
+    public void outerWatchResultShouldReportEnhancedCallSites() {
+        OuterWatchMessage msg = new OuterWatchMessage();
+        msg.setSignature("w.core.ChangeTarget#outerWatchLambdaTest");
+        msg.setInnerSignature("w.core.ChangeTarget#hello");
+        msg.setIncludeNested(true);
+
+        SwapResult result = swapper.swap(msg);
+        Assertions.assertTrue(result.isSuccess());
+        OuterWatchResult data = (OuterWatchResult) result.getData();
+        Assertions.assertNotNull(data);
+        Assertions.assertFalse(data.getInspectedCalls().isEmpty());
+        OuterWatchResult.InspectedCall call = data.getInspectedCalls().get(0);
+        Assertions.assertTrue(call.getLine() > 0);
+        Assertions.assertTrue(call.getInnerSignature().contains("#hello"));
+    }
+
+    @Test
     public void duplicateOuterWatchShouldKeepEachLogId() {
         String firstLogId = "outer-watch-dup-first-" + System.nanoTime();
         String secondLogId = "outer-watch-dup-second-" + System.nanoTime();

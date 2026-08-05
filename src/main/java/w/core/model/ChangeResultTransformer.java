@@ -93,6 +93,8 @@ public class ChangeResultTransformer extends BaseClassTransformer {
 
     private final Map<String, Set<String>> targetMethods = new LinkedHashMap<>();
 
+    private final List<ChangeResultResult.EnhancedCall> enhancedCalls = new ArrayList<>();
+
     public ChangeResultTransformer(ChangeResultMessage message) {
         this.className = message.getClassName();
         this.method = message.getMethod();
@@ -295,6 +297,38 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         return false;
     }
 
+    private void recordEnhancedCall(MethodNode outerNode, MethodInsnNode mnode, int line) {
+        ChangeResultResult.EnhancedCall call = new ChangeResultResult.EnhancedCall();
+        call.setLine(line);
+        call.setOuterSignature(className + "#" + outerNode.name);
+        call.setOuterDescriptor(outerNode.desc);
+        call.setInnerSignature(mnode.owner.replace("/", ".") + "#" + mnode.name);
+        call.setInnerDescriptor(mnode.desc);
+        synchronized (enhancedCalls) {
+            enhancedCalls.add(call);
+        }
+    }
+
+    private void recordEnhancedCall(CtMethod outerMethod, MethodCall m) {
+        ChangeResultResult.EnhancedCall call = new ChangeResultResult.EnhancedCall();
+        call.setLine(m.getLineNumber());
+        call.setOuterSignature(className + "#" + outerMethod.getName());
+        call.setOuterDescriptor(outerMethod.getSignature());
+        call.setInnerSignature(m.getClassName() + "#" + m.getMethodName());
+        call.setInnerDescriptor(m.getSignature());
+        synchronized (enhancedCalls) {
+            enhancedCalls.add(call);
+        }
+    }
+
+    public synchronized ChangeResultResult getResult() {
+        ChangeResultResult result = new ChangeResultResult();
+        synchronized (enhancedCalls) {
+            result.setEnhancedCalls(new ArrayList<>(enhancedCalls));
+        }
+        return result;
+    }
+
     @Override
     public List<String> getExtraClassNames() {
         List<String> extraClassNames = new ArrayList<>(targetMethods.keySet());
@@ -319,6 +353,7 @@ public class ChangeResultTransformer extends BaseClassTransformer {
                 public void edit(MethodCall m) throws CannotCompileException {
                     if (m.getMethodName().equals(innerMethod)) {
                         if (Objects.equals(innerClassName, "*") || Objects.equals(innerClassName, m.getClassName())) {
+                            recordEnhancedCall(declaredMethod, m);
                             m.replace("{" + message.getBody() + "}");
                         }
                     }
@@ -410,12 +445,17 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         // replace the innerMethod with the replacement
         InsnList list = new InsnList();
         int curMaxLocals = outerNode.maxLocals;
+        int currentLine = -1;
         for (AbstractInsnNode instruction : outerNode.instructions) {
+            if (instruction instanceof LineNumberNode) {
+                currentLine = ((LineNumberNode) instruction).line;
+            }
             if (instruction instanceof MethodInsnNode) {
                 MethodInsnNode mnode = (MethodInsnNode) instruction;
                 if (mnode.name.equals(innerMethod) && (
                         mnode.owner.replace("/", ".").equals(innerClassName) || "*".equals(innerClassName))
                 ) {
+                    recordEnhancedCall(outerNode, mnode, currentLine);
                     int[] indexes = transArgsToVars(replacementNode.desc, curMaxLocals, list);
                     int resVarIndex = indexes[indexes.length - 1];
                     Map<LabelNode, LabelNode> labels = new HashMap<>();
