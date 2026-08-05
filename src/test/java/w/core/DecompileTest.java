@@ -49,4 +49,30 @@ public class DecompileTest {
         Assertions.assertTrue(decompileResult.getInvocations().stream()
                 .anyMatch(site -> site.getDeclaringClass().equals("w.core.ChangeTarget$1")));
     }
+
+    @Test
+    public void shouldDecompileDeepNestedAnonymousChain() {
+        new DeepChainTarget();
+        DecompileMessage msg = new DecompileMessage();
+        msg.setClassName("w.core.DeepChainTarget");
+        SwapResult result = swapper.swap(msg);
+        Assertions.assertTrue(result.isSuccess(), String.valueOf(result.getMessage()));
+        DecompileResult decompileResult = (DecompileResult) result.getData();
+        Assertions.assertNotNull(decompileResult);
+        Assertions.assertNotNull(decompileResult.getSource());
+        Assertions.assertTrue(decompileResult.getSource().contains("go"));
+    }
+
+    @Test
+    public void shouldDecompileClassWithManyLambdas() {
+        new DeepChainTarget();
+        DecompileMessage msg = new DecompileMessage();
+        msg.setClassName("w.core.DeepChainTarget");
+        SwapResult result = swapper.swap(msg);
+        Assertions.assertTrue(result.isSuccess(), String.valueOf(result.getMessage()));
+        DecompileResult decompileResult = (DecompileResult) result.getData();
+        Assertions.assertNotNull(decompileResult);
+        Assertions.assertNotNull(decompileResult.getSource());
+        Assertions.assertTrue(decompileResult.getSource().contains("manyLambdas"));
+    }
 }
