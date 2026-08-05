@@ -23,8 +23,10 @@ import w.web.message.OuterWatchMessage;
 import java.io.InputStream;
 import java.lang.instrument.IllegalClassFormatException;
 import java.security.ProtectionDomain;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -153,46 +155,82 @@ public class OuterWatchTransformer extends BaseClassTransformer {
     }
 
     private void collectNestedTargets(Class<?> rootClass) {
-        String resourceName = rootClass.getName().replace('.', '/') + ".class";
+        ClassLoader loader = rootClass.getClassLoader();
+        Deque<ScanTarget> pending = new ArrayDeque<>();
+        Set<String> visited = new HashSet<>();
+        pending.push(new ScanTarget(className, method));
+        while (!pending.isEmpty()) {
+            ScanTarget target = pending.pop();
+            String scanKey = target.className + "#" + target.methodName;
+            if (!visited.add(scanKey)) {
+                continue;
+            }
+            byte[] bytes = readClassBytes(loader, target.className);
+            if (bytes == null) {
+                continue;
+            }
+            try {
+                new ClassReader(bytes).accept(new ClassVisitor(ASM9) {
+                    @Override
+                    public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                        MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
+                        if (!"*".equals(target.methodName) && !Objects.equals(name, target.methodName)) {
+                            return mv;
+                        }
+                        return new MethodVisitor(ASM9, mv) {
+                            @Override
+                            public void visitInvokeDynamicInsn(String name, String descriptor, org.objectweb.asm.Handle bootstrapMethodHandle, Object... bootstrapMethodArguments) {
+                                if (bootstrapMethodArguments != null) {
+                                    for (Object bootstrapMethodArgument : bootstrapMethodArguments) {
+                                        if (!(bootstrapMethodArgument instanceof org.objectweb.asm.Handle)) {
+                                            continue;
+                                        }
+                                        org.objectweb.asm.Handle handle = (org.objectweb.asm.Handle) bootstrapMethodArgument;
+                                        if (!handle.getName().startsWith("lambda$")) {
+                                            continue;
+                                        }
+                                        String lambdaOwner = handle.getOwner().replace("/", ".");
+                                        addTargetMethod(lambdaOwner, handle.getName());
+                                        pending.push(new ScanTarget(lambdaOwner, handle.getName()));
+                                    }
+                                }
+                                super.visitInvokeDynamicInsn(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments);
+                            }
+
+                            @Override
+                            public void visitTypeInsn(int opcode, String type) {
+                                if (opcode == NEW && type != null) {
+                                    String nestedClassName = type.replace("/", ".");
+                                    if (nestedClassName.startsWith(target.className + "$")) {
+                                        addAllMethodsTarget(nestedClassName);
+                                        pending.push(new ScanTarget(nestedClassName, "*"));
+                                    }
+                                }
+                                super.visitTypeInsn(opcode, type);
+                            }
+                        };
+                    }
+                }, ClassReader.SKIP_FRAMES);
+            } catch (Throwable e) {
+                Global.debug("outer watch collect nested targets error: " + target.className + ", " + e.getMessage());
+            }
+        }
+    }
+
+    private byte[] readClassBytes(ClassLoader loader, String className) {
+        String resourceName = className.replace('.', '/') + ".class";
         InputStream inputStream = null;
         try {
-            ClassLoader loader = rootClass.getClassLoader();
             inputStream = loader == null
                     ? ClassLoader.getSystemResourceAsStream(resourceName)
                     : loader.getResourceAsStream(resourceName);
             if (inputStream == null) {
-                return;
+                return null;
             }
-            ClassReader classReader = new ClassReader(inputStream);
-            classReader.accept(new ClassVisitor(ASM9) {
-                @Override
-                public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-                    MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
-                    if (!Objects.equals(name, method)) {
-                        return mv;
-                    }
-                    return new MethodVisitor(ASM9, mv) {
-                        @Override
-                        public void visitInvokeDynamicInsn(String name, String descriptor, org.objectweb.asm.Handle bootstrapMethodHandle, Object... bootstrapMethodArguments) {
-                            collectLambdaTarget(bootstrapMethodArguments);
-                            super.visitInvokeDynamicInsn(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments);
-                        }
-
-                        @Override
-                        public void visitTypeInsn(int opcode, String type) {
-                            if (opcode == NEW && type != null) {
-                                String nestedClassName = type.replace("/", ".");
-                                if (nestedClassName.startsWith(className + "$")) {
-                                    addAllMethodsTarget(nestedClassName);
-                                }
-                            }
-                            super.visitTypeInsn(opcode, type);
-                        }
-                    };
-                }
-            }, ClassReader.SKIP_FRAMES);
+            return inputStream.readAllBytes();
         } catch (Throwable e) {
-            Global.debug("outer watch collect nested targets error: " + rootClass.getName() + ", " + e.getMessage());
+            Global.debug("outer watch read class bytes error: " + className + ", " + e.getMessage());
+            return null;
         } finally {
             if (inputStream != null) {
                 try {
@@ -203,19 +241,13 @@ public class OuterWatchTransformer extends BaseClassTransformer {
         }
     }
 
-    private void collectLambdaTarget(Object[] bootstrapMethodArguments) {
-        if (bootstrapMethodArguments == null) {
-            return;
-        }
-        for (Object bootstrapMethodArgument : bootstrapMethodArguments) {
-            if (!(bootstrapMethodArgument instanceof org.objectweb.asm.Handle)) {
-                continue;
-            }
-            org.objectweb.asm.Handle handle = (org.objectweb.asm.Handle) bootstrapMethodArgument;
-            if (!handle.getName().startsWith("lambda$")) {
-                continue;
-            }
-            addTargetMethod(handle.getOwner().replace("/", "."), handle.getName());
+    private static final class ScanTarget {
+        private final String className;
+        private final String methodName;
+
+        private ScanTarget(String className, String methodName) {
+            this.className = className;
+            this.methodName = methodName;
         }
     }
 
@@ -441,8 +473,22 @@ public class OuterWatchTransformer extends BaseClassTransformer {
             call.setOuterDescriptor(outerDescriptor);
             call.setInnerSignature(innerOwner + '#' + innerMethod);
             call.setInnerDescriptor(innerDescriptor);
+            call.setOuterDisplay(readableOuterMethod(declaringClass, outerMethod));
             return call;
         });
+    }
+
+    private static String readableOuterMethod(String declaringClass, String method) {
+        if (!method.startsWith("lambda$")) {
+            return declaringClass + "#" + method;
+        }
+        int lastDollar = method.lastIndexOf('$');
+        String suffix = lastDollar >= 0 ? method.substring(lastDollar) : "";
+        String source = lastDollar > 1 ? method.substring("lambda$".length(), lastDollar) : method;
+        if ("new".equals(source)) {
+            source = "<init>";
+        }
+        return declaringClass + "#" + source + "[lambda" + suffix + "]";
     }
 
     private Map<String, List<LocalSnapshot>> collectLocalSnapshots(byte[] origin, String currentClassName) {

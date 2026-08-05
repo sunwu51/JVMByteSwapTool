@@ -16,5 +16,6 @@ public class OuterWatchResult {
         private String outerDescriptor;
         private String innerSignature;
         private String innerDescriptor;
+        private String outerDisplay;
     }
 }

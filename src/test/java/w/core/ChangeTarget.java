@@ -62,4 +62,25 @@ public class ChangeTarget implements Runnable {
         r.run();
         return "outerWatchLambdaTest";
     }
+
+    public String outerWatchNestedLambdaTest() {
+        Runnable r1 = () -> {
+            Runnable r2 = () -> hello();
+            r2.run();
+        };
+        r1.run();
+        return "outerWatchNestedLambdaTest";
+    }
+
+    public String outerWatchLambdaInAnonymousTest() {
+        Runnable a = new Runnable() {
+            @Override
+            public void run() {
+                Runnable r = () -> hello();
+                r.run();
+            }
+        };
+        a.run();
+        return "outerWatchLambdaInAnonymousTest";
+    }
 }
