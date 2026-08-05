@@ -144,6 +144,9 @@ public class Swapper {
         if (transformer instanceof OuterWatchTransformer) {
             classes.addAll(((OuterWatchTransformer) transformer).prepareNestedTargets(classes));
         }
+        if (transformer instanceof ChangeResultTransformer) {
+            classes.addAll(((ChangeResultTransformer) transformer).prepareNestedTargets(classes));
+        }
 
         boolean diagnosticRegistered = false;
         try {

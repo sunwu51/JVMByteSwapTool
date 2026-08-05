@@ -92,4 +92,64 @@ public class ChangeResultTest {
         System.out.println(target.hello());
 
     }
+
+    @Test
+    public void asmShouldChangeResultInsideNestedLambda() throws IOException, InterruptedException {
+        ChangeResultMessage msg = new ChangeResultMessage();
+        msg.setClassName("w.core.ChangeTarget");
+        msg.setMethod("nestedLambdaResult");
+        msg.setMode(Codes.CHANGE_RESULT_MODE_USE_ASM);
+        msg.setParamTypes(Arrays.asList());
+        msg.setInnerMethod("hello");
+        msg.setInnerClassName("w.core.ChangeTarget");
+        msg.setBody("$_ = \"changed-by-nested-lambda\";");
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertEquals("changed-by-nested-lambda", target.nestedLambdaResult());
+    }
+
+    @Test
+    public void javassistShouldChangeResultInsideNestedLambda() throws IOException, InterruptedException {
+        ChangeResultMessage msg = new ChangeResultMessage();
+        msg.setClassName("w.core.ChangeTarget");
+        msg.setMethod("nestedLambdaResult");
+        msg.setParamTypes(Arrays.asList());
+        msg.setInnerMethod("hello");
+        msg.setInnerClassName("w.core.ChangeTarget");
+        msg.setBody("{$_= \"changed-by-javassist\";}");
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertEquals("changed-by-javassist", target.nestedLambdaResult());
+    }
+
+    @Test
+    public void asmShouldChangeResultInsideLambdaInAnonymousClass() throws IOException, InterruptedException {
+        ChangeResultMessage msg = new ChangeResultMessage();
+        msg.setClassName("w.core.ChangeTarget");
+        msg.setMethod("lambdaInAnonymousResult");
+        msg.setMode(Codes.CHANGE_RESULT_MODE_USE_ASM);
+        msg.setParamTypes(Arrays.asList());
+        msg.setInnerMethod("hello");
+        msg.setInnerClassName("w.core.ChangeTarget");
+        msg.setBody("$_ = \"changed-in-anonymous\";");
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertEquals("changed-in-anonymous", target.lambdaInAnonymousResult());
+    }
+
+    @Test
+    public void includeNestedFalseShouldOnlyChangeDirectOuterCall() throws IOException, InterruptedException {
+        ChangeResultMessage msg = new ChangeResultMessage();
+        msg.setClassName("w.core.ChangeTarget");
+        msg.setMethod("addWrapper");
+        msg.setMode(Codes.CHANGE_RESULT_MODE_USE_ASM);
+        msg.setParamTypes(Arrays.asList("int", "int"));
+        msg.setInnerMethod("add");
+        msg.setInnerClassName("*");
+        msg.setIncludeNested(false);
+        msg.setBody("$_ = $proceed() + 1;");
+
+        Assertions.assertTrue(swapper.swap(msg).isSuccess());
+        Assertions.assertEquals(10003.0, target.addWrapper(1, 1));
+    }
 }

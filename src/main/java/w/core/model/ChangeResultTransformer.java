@@ -10,7 +10,10 @@ import javassist.expr.MethodCall;
 import lombok.Data;
 import org.codehaus.commons.compiler.CompileException;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Handle;
+import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
@@ -33,19 +36,29 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.instrument.IllegalClassFormatException;
 import java.nio.charset.StandardCharsets;
+import java.security.ProtectionDomain;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
+import static org.objectweb.asm.Opcodes.ASM9;
 import static org.objectweb.asm.Opcodes.ASTORE;
 import static org.objectweb.asm.Opcodes.DSTORE;
 import static org.objectweb.asm.Opcodes.FSTORE;
@@ -53,6 +66,7 @@ import static org.objectweb.asm.Opcodes.GOTO;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 import static org.objectweb.asm.Opcodes.ISTORE;
 import static org.objectweb.asm.Opcodes.LSTORE;
+import static org.objectweb.asm.Opcodes.NEW;
 import static org.objectweb.asm.Opcodes.RETURN;
 
 /**
@@ -75,6 +89,10 @@ public class ChangeResultTransformer extends BaseClassTransformer {
 
     int mode;
 
+    boolean includeNested;
+
+    private final Map<String, Set<String>> targetMethods = new LinkedHashMap<>();
+
     public ChangeResultTransformer(ChangeResultMessage message) {
         this.className = message.getClassName();
         this.method = message.getMethod();
@@ -84,51 +102,236 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         this.message = message;
         this.traceId = message.getId();
         this.mode = message.getMode();
+        this.includeNested = message.isIncludeNested();
+        addTargetMethod(className, method);
+    }
+
+    @Override
+    public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
+                            ProtectionDomain protectionDomain, byte[] origin) throws IllegalClassFormatException {
+        if (className == null) {
+            return origin;
+        }
+        className = className.replace("/", ".");
+        if (targetMethods.containsKey(className) && matchesTargetLoader(loader)) {
+            try {
+                byte[] r = transform(origin, className);
+                recordApplySuccess(loader, className);
+                Global.info(className + " transformer " + uuid + " added success <(^-^)>");
+                return r;
+            } catch (Throwable e) {
+                recordApplyFailure(loader, className, e);
+                Global.error(className + " transformer " + uuid + " added fail -(′д｀)-: ", e);
+                CompletableFuture.runAsync(() -> Global.deleteTransformer(uuid));
+            }
+        }
+        return null;
     }
 
     @Override
     public byte[] transform(byte[] origin) throws Exception {
+        return transform(origin, className);
+    }
+
+    private byte[] transform(byte[] origin, String currentClassName) throws Exception {
         byte[] result = null;
         if (mode == Codes.CHANGE_RESULT_MODE_USE_JAVASSIST) {
             // use javassist $_=xxx to change result
-            result = changeResultByJavassist(origin);
+            result = changeResultByJavassist(origin, currentClassName);
         } else if (mode == Codes.CHANGE_RESULT_MODE_USE_ASM) {
             // use asm
-            result = changeResultByASM(origin);
+            result = changeResultByASM(origin, currentClassName);
         }
         status = 1;
         return result;
     }
 
+    public Set<Class<?>> prepareNestedTargets(Set<Class<?>> rootClasses) {
+        if (!includeNested) {
+            return Collections.emptySet();
+        }
+        Set<Class<?>> nestedClasses = new LinkedHashSet<>();
+        for (Class<?> rootClass : rootClasses) {
+            collectNestedTargets(rootClass);
+        }
+        Set<String> extraClassNames = new HashSet<>(targetMethods.keySet());
+        extraClassNames.remove(className);
+        for (Class<?> rootClass : rootClasses) {
+            ClassLoader loader = rootClass.getClassLoader();
+            for (String extraClassName : extraClassNames) {
+                try {
+                    nestedClasses.add(Class.forName(extraClassName, false, loader));
+                } catch (Throwable e) {
+                    Global.debug("change result nested class not loaded: " + extraClassName + ", " + e.getMessage());
+                }
+            }
+        }
+        return nestedClasses;
+    }
 
-    private byte[] changeResultByJavassist(byte[] origin) throws Exception {
+    private void collectNestedTargets(Class<?> rootClass) {
+        ClassLoader loader = rootClass.getClassLoader();
+        Deque<ScanTarget> pending = new ArrayDeque<>();
+        Set<String> visited = new HashSet<>();
+        pending.push(new ScanTarget(className, method));
+        while (!pending.isEmpty()) {
+            ScanTarget target = pending.pop();
+            String scanKey = target.className + "#" + target.methodName;
+            if (!visited.add(scanKey)) {
+                continue;
+            }
+            byte[] bytes = readClassBytes(loader, target.className);
+            if (bytes == null) {
+                continue;
+            }
+            try {
+                new ClassReader(bytes).accept(new ClassVisitor(ASM9) {
+                    @Override
+                    public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
+                        MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
+                        if (!"*".equals(target.methodName) && !Objects.equals(name, target.methodName)) {
+                            return mv;
+                        }
+                        return new MethodVisitor(ASM9, mv) {
+                            @Override
+                            public void visitInvokeDynamicInsn(String name, String descriptor, Handle bootstrapMethodHandle, Object... bootstrapMethodArguments) {
+                                if (bootstrapMethodArguments != null) {
+                                    for (Object bootstrapMethodArgument : bootstrapMethodArguments) {
+                                        if (!(bootstrapMethodArgument instanceof Handle)) {
+                                            continue;
+                                        }
+                                        Handle handle = (Handle) bootstrapMethodArgument;
+                                        if (!handle.getName().startsWith("lambda$")) {
+                                            continue;
+                                        }
+                                        String lambdaOwner = handle.getOwner().replace("/", ".");
+                                        addTargetMethod(lambdaOwner, handle.getName());
+                                        pending.push(new ScanTarget(lambdaOwner, handle.getName()));
+                                    }
+                                }
+                                super.visitInvokeDynamicInsn(name, descriptor, bootstrapMethodHandle, bootstrapMethodArguments);
+                            }
+
+                            @Override
+                            public void visitTypeInsn(int opcode, String type) {
+                                if (opcode == NEW && type != null) {
+                                    String nestedClassName = type.replace("/", ".");
+                                    if (nestedClassName.startsWith(target.className + "$")) {
+                                        addAllMethodsTarget(nestedClassName);
+                                        pending.push(new ScanTarget(nestedClassName, "*"));
+                                    }
+                                }
+                                super.visitTypeInsn(opcode, type);
+                            }
+                        };
+                    }
+                }, ClassReader.SKIP_FRAMES);
+            } catch (Throwable e) {
+                Global.debug("change result collect nested targets error: " + target.className + ", " + e.getMessage());
+            }
+        }
+    }
+
+    private byte[] readClassBytes(ClassLoader loader, String className) {
+        String resourceName = className.replace('.', '/') + ".class";
+        InputStream inputStream = null;
+        try {
+            inputStream = loader == null
+                    ? ClassLoader.getSystemResourceAsStream(resourceName)
+                    : loader.getResourceAsStream(resourceName);
+            if (inputStream == null) {
+                return null;
+            }
+            return inputStream.readAllBytes();
+        } catch (Throwable e) {
+            Global.debug("change result read class bytes error: " + className + ", " + e.getMessage());
+            return null;
+        } finally {
+            if (inputStream != null) {
+                try {
+                    inputStream.close();
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
+
+    private static final class ScanTarget {
+        private final String className;
+        private final String methodName;
+
+        private ScanTarget(String className, String methodName) {
+            this.className = className;
+            this.methodName = methodName;
+        }
+    }
+
+    private void addTargetMethod(String targetClassName, String targetMethod) {
+        targetMethods.computeIfAbsent(targetClassName, k -> new LinkedHashSet<>()).add(targetMethod);
+    }
+
+    private void addAllMethodsTarget(String targetClassName) {
+        targetMethods.computeIfAbsent(targetClassName, k -> new LinkedHashSet<>()).add("*");
+    }
+
+    private boolean shouldInstrumentMethod(String currentClassName, int access, String name) {
+        Set<String> methods = targetMethods.get(currentClassName);
+        if (methods == null) {
+            return false;
+        }
+        if (methods.contains(name)) {
+            return true;
+        }
+        return methods.contains("*") && !name.equals("<init>") && !name.equals("<clinit>")
+                && (access & ACC_SYNTHETIC) == 0;
+    }
+
+    private boolean hasNestedTargetClasses() {
+        for (String targetClassName : targetMethods.keySet()) {
+            if (!Objects.equals(targetClassName, className)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public List<String> getExtraClassNames() {
+        List<String> extraClassNames = new ArrayList<>(targetMethods.keySet());
+        extraClassNames.remove(className);
+        return extraClassNames;
+    }
+
+    private byte[] changeResultByJavassist(byte[] origin, String currentClassName) throws Exception {
         CtClass ctClass = Global.classPool.makeClass(new ByteArrayInputStream(origin));
         boolean effect = false;
         for (CtMethod declaredMethod : ctClass.getDeclaredMethods()) {
-            if (Objects.equals(declaredMethod.getName(), method) &&
-                    Arrays.equals(paramTypes.toArray(new String[0]),
-                            Arrays.stream(declaredMethod.getParameterTypes()).map(CtClass::getName).toArray())
-            ) {
-                if ((declaredMethod.getModifiers() & Modifier.ABSTRACT) != 0) {
-                    throw new IllegalArgumentException("Cannot change abstract method.");
-                }
-                if ((declaredMethod.getModifiers() & Modifier.NATIVE) != 0) {
-                    throw new IllegalArgumentException("Cannot change native method.");
-                }
-                declaredMethod.instrument(new ExprEditor() {
-                    public void edit(MethodCall m) throws CannotCompileException {
-                        if (m.getMethodName().equals(innerMethod)) {
-                            if (Objects.equals(innerClassName, "*") || Objects.equals(innerClassName, m.getClassName())) {
-                                m.replace("{"+message.getBody()+"}");
-                            }
+            if (!shouldInstrumentMethod(currentClassName, declaredMethod.getModifiers(), declaredMethod.getName())) {
+                continue;
+            }
+            if ((declaredMethod.getModifiers() & Modifier.ABSTRACT) != 0) {
+                throw new IllegalArgumentException("Cannot change abstract method.");
+            }
+            if ((declaredMethod.getModifiers() & Modifier.NATIVE) != 0) {
+                throw new IllegalArgumentException("Cannot change native method.");
+            }
+            declaredMethod.instrument(new ExprEditor() {
+                public void edit(MethodCall m) throws CannotCompileException {
+                    if (m.getMethodName().equals(innerMethod)) {
+                        if (Objects.equals(innerClassName, "*") || Objects.equals(innerClassName, m.getClassName())) {
+                            m.replace("{" + message.getBody() + "}");
                         }
                     }
-                });
-                effect = true;
-            }
+                }
+            });
+            effect = true;
         }
         if (!effect) {
-            throw new IllegalArgumentException("Method not declared here.");
+            if (Objects.equals(currentClassName, className)) {
+                throw new IllegalArgumentException("Method not declared here.");
+            }
+            ctClass.detach();
+            return origin;
         }
         byte[] result = ctClass.toBytecode();
         ctClass.detach();
@@ -136,13 +339,74 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         return result;
     }
 
-    private byte[] changeResultByASM(byte[] origin) throws CompileException, IOException {
+    private byte[] changeResultByASM(byte[] origin, String currentClassName) throws CompileException, IOException {
         ClassReader cr = new ClassReader(origin);
         ClassNode classNode = new ClassNode();
         cr.accept(classNode, ClassReader.EXPAND_FRAMES);
-        MethodNode[] nodes  = getOuterAndReplacementMethodNode(classNode);
-        MethodNode outerNode = nodes[0];
-        MethodNode replacementNode = nodes[1];
+        List<MethodNode> targetNodes = targetMethodNodes(classNode, currentClassName);
+        if (targetNodes.isEmpty()) {
+            if (Objects.equals(currentClassName, className)) {
+                throw new IllegalArgumentException("Method " + method + paramTypesToDescriptor(paramTypes) + " not declared here");
+            }
+            return origin;
+        }
+        boolean replacedAny = false;
+        for (MethodNode outerNode : targetNodes) {
+            replacedAny |= applyReplacement(classNode, outerNode, false);
+        }
+        if (!replacedAny) {
+            if (Objects.equals(currentClassName, className) && !hasNestedTargetClasses()) {
+                throw new IllegalArgumentException("No methods match the *#" + innerMethod);
+            }
+            return origin;
+        }
+        // Create a class writer to modify the class
+        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS) {
+            @Override
+            protected ClassLoader getClassLoader() {
+                return getTargetClassLoader();
+            }
+        };
+
+        classNode.accept(classWriter);
+        return classWriter.toByteArray();
+    }
+
+    private List<MethodNode> targetMethodNodes(ClassNode classNode, String currentClassName) {
+        String paramDes = paramTypesToDescriptor(paramTypes);
+        return classNode.methods.stream()
+                .filter(it -> shouldInstrumentMethod(currentClassName, it.access, it.name))
+                .filter(it -> !it.name.equals(method) || it.desc.startsWith(paramDes))
+                .collect(Collectors.toList());
+    }
+
+    private boolean applyReplacement(ClassNode classNode, MethodNode outerNode, boolean failIfNoMatch) throws CompileException, IOException {
+        Set<String> distinctMethod = new HashSet<>();
+        AtomicReference<MethodInsnNode> methodInsnRef = new AtomicReference<>();
+        for (AbstractInsnNode it : outerNode.instructions.toArray()) {
+            if (it instanceof MethodInsnNode) {
+                MethodInsnNode item = (MethodInsnNode) it;
+                if (item.name.equals(innerMethod) && (
+                        item.owner.replace("/", ".").equals(innerClassName) || "*".equals(innerClassName))
+                ) {
+                    String methodCode = item.getOpcode() + "#" + item.owner + "#" + item.name + "#" + item.desc;
+                    distinctMethod.add(methodCode);
+                    methodInsnRef.compareAndSet(null, item);
+                    if (distinctMethod.size() > 1) {
+                        throw new IllegalArgumentException("Multi methods match the " + innerClassName + "#" + innerMethod + ", " +
+                                "which have different owner/desc");
+                    }
+                }
+            }
+        }
+        if (distinctMethod.isEmpty()) {
+            if (failIfNoMatch) {
+                throw new IllegalArgumentException("No methods match the *#" + innerMethod);
+            }
+            return false;
+        }
+        MethodInsnNode methodInsn = methodInsnRef.get();
+        MethodNode replacementNode = getReplacementMethodNode(methodInsn.getOpcode() == INVOKESTATIC, methodInsn.owner, methodInsn.desc);
         // replace the innerMethod with the replacement
         InsnList list = new InsnList();
         int curMaxLocals = outerNode.maxLocals;
@@ -225,53 +489,7 @@ public class ChangeResultTransformer extends BaseClassTransformer {
         }
         outerNode.instructions.clear();
         outerNode.instructions.add(list);
-        // Create a class writer to modify the class
-        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS) {
-            @Override
-            protected ClassLoader getClassLoader() {
-                return getTargetClassLoader();
-            }
-        };
-
-        classNode.accept(classWriter);
-        byte[] result = classWriter.toByteArray();
-        return result;
-    }
-
-    private MethodNode[] getOuterAndReplacementMethodNode(ClassNode classNode) throws CompileException, IOException {
-        String paramDes = paramTypesToDescriptor(paramTypes);
-        Optional<MethodNode> outerNodeOpt = classNode.methods.stream()
-                .filter(it->it.name.equals(method) && it.desc.startsWith(paramDes)).findFirst();
-
-        if (!outerNodeOpt.isPresent()) {
-            throw new IllegalArgumentException("Method " + method + paramDes + " not declared here");
-        }
-        MethodNode outerNode = outerNodeOpt.get();
-        // check
-        Set<String> distinctMethod = new HashSet<>();
-        AtomicReference<MethodInsnNode> methodInsnRef = new AtomicReference<>();
-        Arrays.stream(outerNode.instructions.toArray()).forEach(it -> {
-            if (it instanceof MethodInsnNode) {
-                MethodInsnNode item = (MethodInsnNode) it;
-                if (item.name.equals(innerMethod) && (
-                        item.owner.replace("/", ".").equals(innerClassName) || "*".equals(innerClassName))
-                ) {
-                    String methodCode = item.getOpcode() + "#" + item.owner + "#" + item.name + "#" + item.desc;
-                    distinctMethod.add(methodCode);
-                    methodInsnRef.compareAndSet(null, item);
-                    if (distinctMethod.size() > 1 ) {
-                        throw new IllegalArgumentException("Multi methods match the " + innerClassName + "#" + innerMethod + ", " +
-                                "which have different owner/desc");
-                    }
-                }
-            }
-        });
-        if (distinctMethod.isEmpty()) {
-            throw new IllegalArgumentException("No methods match the *#" + innerMethod);
-        }
-        MethodInsnNode methodInsn = methodInsnRef.get();
-        MethodNode replacementNode = getReplacementMethodNode(methodInsn.getOpcode() == INVOKESTATIC, methodInsn.owner, methodInsn.desc);
-        return new MethodNode[]{outerNode, replacementNode};
+        return true;
     }
 
     private static byte[] compile(boolean staticMethod, String owner, String desc, String body) throws CompileException, IOException {
