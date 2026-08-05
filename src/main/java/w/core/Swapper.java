@@ -265,6 +265,10 @@ public class Swapper {
     }
 
     private SwapResult enforceEnhancedCallSites(Message message, BaseClassTransformer transformer, SwapResult result) {
+        if (!result.isSuccess()) {
+            // keep the real failure reason, e.g. "Multi methods match ... different owner/desc"
+            return result;
+        }
         if (transformer instanceof OuterWatchTransformer) {
             OuterWatchResult watchResult = (OuterWatchResult) result.getData();
             if (watchResult == null || watchResult.getInspectedCalls().isEmpty()) {

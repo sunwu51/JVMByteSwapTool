@@ -6,7 +6,7 @@ import java.util.function.Supplier;
  *
  * Usage:
  *   1. Compile and run:            java MultiLevelLambdaDemo
- *   2. Attach the agent jar:       java -jar target/swapper-0.0.20.jar <PID>
+ *   2. Attach the agent jar:       java -jar target/swapper-0.0.21.jar <PID>
  *   3. outerWatch (observe greeting() inside buildGreeting's nested lambdas):
  *        outer_watch  { "signature": "MultiLevelLambdaDemo#buildGreeting",
  *                       "innerSignature": "MultiLevelLambdaDemo#greeting",
@@ -22,8 +22,40 @@ import java.util.function.Supplier;
  *      The demo loop then prints "injected by changeResult".
  *   5. The anonymous-class variant buildGreetingViaAnonymous works the same way,
  *      the call is inside a lambda inside an anonymous class.
+ *   6. Same-name calls from different owners (buildUserId):
+ *      - outer_watch with innerSignature "*#getId" observes BOTH the
+ *        MultiLevelLambdaDemo$User#getId and MultiLevelLambdaDemo$Product#getId
+ *        call sites (two entries in data.inspectedCalls).
+ *      - change_result with innerMethod "getId", innerClassName "*" FAILS with
+ *        "Multi methods match ... which have different owner/desc".
+ *      - change_result with innerClassName "MultiLevelLambdaDemo$User" only
+ *        replaces the User#getId call and reports one enhancedCalls entry.
  */
 public class MultiLevelLambdaDemo {
+
+    static class User {
+        private final int id;
+
+        User(int id) {
+            this.id = id;
+        }
+
+        int getId() {
+            return id;
+        }
+    }
+
+    static class Product {
+        private final int id;
+
+        Product(int id) {
+            this.id = id;
+        }
+
+        int getId() {
+            return id;
+        }
+    }
 
     public String greeting() {
         return "hello, original greeting";
@@ -65,12 +97,31 @@ public class MultiLevelLambdaDemo {
         return s.get();
     }
 
+    /**
+     * The innermost lambda calls two same-name methods from different owners:
+     * MultiLevelLambdaDemo$User#getId and MultiLevelLambdaDemo$Product#getId.
+     * Default result is 300 (100 + 200).
+     */
+    public int buildUserId() {
+        User user = new User(100);
+        Product product = new Product(200);
+        Supplier<Integer> level1 = () -> {
+            Supplier<Integer> level2 = () -> {
+                Supplier<Integer> level3 = () -> user.getId() + product.getId();
+                return level3.get();
+            };
+            return level2.get();
+        };
+        return level1.get();
+    }
+
     public static void main(String[] args) throws Exception {
         System.out.println("Attach JVMByteSwapTool to PID " + ProcessHandle.current().pid());
         while (true) {
             MultiLevelLambdaDemo demo = new MultiLevelLambdaDemo();
             System.out.println("buildGreeting             = " + demo.buildGreeting());
             System.out.println("buildGreetingViaAnonymous = " + demo.buildGreetingViaAnonymous());
+            System.out.println("buildUserId               = " + demo.buildUserId());
             System.out.println("--------------------------------------------");
             Thread.sleep(1_000L);
         }
