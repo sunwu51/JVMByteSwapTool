@@ -305,7 +305,7 @@
 					</execution>
 				</executions>
 			</plugin>
-			<!-- SpotBugs: Bug 检�?-->
+			<!-- SpotBugs: Bug 检测-->
 			<plugin>
 				<groupId>com.github.spotbugs</groupId>
 				<artifactId>spotbugs-maven-plugin</artifactId>
