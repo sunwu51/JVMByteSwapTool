@@ -7,6 +7,18 @@ A tool that can hot swap the class byte code while jvm is running. Very suitable
 
 Based on the jvm instrumentation tech, ASM, javassist and JVMTI.
 
+<p align="center">
+  <img src="assets/architecture.svg" alt="swapper architecture" width="100%" />
+</p>
+
+<p align="center">
+  <a href="https://nanollm-assets.wuyao.org/jvmbyteswaptool/how-it-works.mp4">
+    <img src="https://nanollm-assets.wuyao.org/jvmbyteswaptool/swap-loop.gif" alt="How swapper works (90s video)" width="100%" />
+  </a>
+  <br />
+  <sub>▶ Click to watch <b>How swapper works</b> (90s video)</sub>
+</p>
+
 # Usage
 Download `swapper.jar` from the [release](https://github.com/sunwu51/JVMByteSwapTool/releases) page.
 

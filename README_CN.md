@@ -5,6 +5,18 @@
 
 这是一个能在jvm运行时热替换类的字节码的工具，特别适合`Spring Boot`框架，它基于`instrumentation` `ASM` `javassist` `JVMTI`等技术。
 
+<p align="center">
+  <img src="assets/architecture.svg" alt="swapper 架构图" width="100%" />
+</p>
+
+<p align="center">
+  <a href="https://nanollm-assets.wuyao.org/jvmbyteswaptool/how-it-works.mp4">
+    <img src="https://nanollm-assets.wuyao.org/jvmbyteswaptool/swap-loop.gif" alt="swapper 工作原理（90 秒视频）" width="100%" />
+  </a>
+  <br />
+  <sub>▶ 点击观看 <b>swapper 工作原理</b>（90 秒视频）</sub>
+</p>
+
 # 用法
 从 [release](https://github.com/sunwu51/JVMByteSwapTool/releases) 下载 `swapper.jar`，并确保运行环境是 `jdk8+`
 ```bash

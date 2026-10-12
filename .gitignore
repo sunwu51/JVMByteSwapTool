@@ -34,3 +34,6 @@ build/
 .vscode/
 dependency-reduced-pom.xml
 src/main/resources/nanohttpd/
+
+# HyperFrames video project (renders hosted on R2)
+video/
